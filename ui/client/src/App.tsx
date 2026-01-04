@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { Route, Switch } from "wouter";
 import RagOverview from "@/pages/RagOverview";
 import AgenticOverview from "@/pages/AgenticOverview";
@@ -8,13 +9,14 @@ import AgentRepository from "@/pages/AgentRepository";
 import AgenticChats from "@/pages/AgenticChats";
 import GetToKnow from "@/pages/GetToKnow";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SharedProvider } from '@/contexts/SharedContext';
 import DocumentsPage from "./features/docs/DocumentsPage";
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AgenticAIProvider } from '@/contexts/AgenticAIContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import SlackIntegration from "./features/slack/SlackIntegration";
@@ -29,6 +31,30 @@ const withAgenticAIProvider = <P extends object>(Component: React.ComponentType<
   );
 };
 
+// Component to redirect authenticated users away from auth pages
+const AuthRoute: React.FC<{ component: React.ComponentType }> = ({ component: Component }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // If authenticated and not loading, redirect to home
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      window.location.href = '/';
+    }
+  }, [isAuthenticated, isLoading]);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+    </div>;
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
+
+  return <Component />;
+};
+
 function App() {
   // Set document title
   useEffect(() => {
@@ -41,27 +67,40 @@ function App() {
         <SharedProvider>
           <ProjectProvider>
             <NotificationProvider>
-              <ProtectedRoute>
-                <Switch>
-                  {/* Agentic AI routes - wrapped with AgenticAIProvider */}
-                  <Route path="/" component={GetToKnow} />
-                  <Route path="/agentic-overview" component={withAgenticAIProvider(AgenticOverview)} />
-                  <Route path="/agentic-ai" component={withAgenticAIProvider(AgenticAI)} />
-                  <Route path="/inventory" component={withAgenticAIProvider(AgentRepository)} />
-                  <Route path="/agentic-chats" component={withAgenticAIProvider(AgenticChats)} />
-                  
-                  {/* Non-agentic routes - don't need AgenticAIProvider */}
-                  <Route path="/rag-overview" component={RagOverview} />
-                  <Route path="/jira" component={JiraIntegration} />
-                  <Route path="/slack" component={SlackIntegration} />
-                  <Route path="/documents" component={DocumentsPage} />
-                  <Route path="/slack/add-source" component={SlackAddSourcePage} />
-                  <Route path="/get-to-know" component={GetToKnow} />
-                  <Route path="/configuration" component={Configuration} />
-                  <Route path="/guides" component={GuidesPage} />
-                  <Route component={NotFound} />
-                </Switch>
-              </ProtectedRoute>
+              <Switch>
+                {/* Public auth routes - outside of ProtectedRoute */}
+                <Route path="/login">
+                  <AuthRoute component={Login} />
+                </Route>
+                <Route path="/signup">
+                  <AuthRoute component={Signup} />
+                </Route>
+                
+                {/* Protected routes */}
+                <Route>
+                  <ProtectedRoute>
+                    <Switch>
+                      {/* Agentic AI routes - wrapped with AgenticAIProvider */}
+                      <Route path="/" component={GetToKnow} />
+                      <Route path="/agentic-overview" component={withAgenticAIProvider(AgenticOverview)} />
+                      <Route path="/agentic-ai" component={withAgenticAIProvider(AgenticAI)} />
+                      <Route path="/inventory" component={withAgenticAIProvider(AgentRepository)} />
+                      <Route path="/agentic-chats" component={withAgenticAIProvider(AgenticChats)} />
+                      
+                      {/* Non-agentic routes - don't need AgenticAIProvider */}
+                      <Route path="/rag-overview" component={RagOverview} />
+                      <Route path="/jira" component={JiraIntegration} />
+                      <Route path="/slack" component={SlackIntegration} />
+                      <Route path="/documents" component={DocumentsPage} />
+                      <Route path="/slack/add-source" component={SlackAddSourcePage} />
+                      <Route path="/get-to-know" component={GetToKnow} />
+                      <Route path="/configuration" component={Configuration} />
+                      <Route path="/guides" component={GuidesPage} />
+                      <Route component={NotFound} />
+                    </Switch>
+                  </ProtectedRoute>
+                </Route>
+              </Switch>
             </NotificationProvider>
           </ProjectProvider>
         </SharedProvider>
@@ -71,4 +110,4 @@ function App() {
 }
 
 export default App;
-              
+

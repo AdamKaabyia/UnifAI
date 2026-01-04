@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/auth/LoadingSpinner';
 
@@ -7,16 +8,23 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    // If not loading and not authenticated, redirect to login page
+    if (!isLoading && !isAuthenticated) {
+      setLocation('/login');
+    }
+  }, [isLoading, isAuthenticated, setLocation]);
 
   // Show loading spinner while checking authentication
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
-  // If not authenticated, redirect to login
+  // If not authenticated, show loading while redirecting
   if (!isAuthenticated) {
-    login();
     return <LoadingSpinner message="Redirecting to login..." />;
   }
 

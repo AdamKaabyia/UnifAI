@@ -8,13 +8,16 @@ export interface User {
   name: string;
   sub: string;
   token_expires_at: number;
+  auth_provider?: 'local' | 'keycloak';
 }
 
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authProvider: 'local' | 'keycloak' | null;
   login: () => void;
+  loginWithCredentials: (identifier: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -29,6 +32,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authProvider, setAuthProvider] = useState<'local' | 'keycloak' | null>(null);
 
   // Load analytics after authentication
   loadAnalytics(isAuthenticated, user);
@@ -40,22 +44,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.data.authenticated && response.data.user) {
         setUser(response.data.user);
         setIsAuthenticated(true);
+        setAuthProvider(response.data.user.auth_provider || 'keycloak');
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        setAuthProvider(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       setUser(null);
       setIsAuthenticated(false);
+      setAuthProvider(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initiate login by redirecting to backend auth endpoint
+  // Initiate SSO login by redirecting to backend auth endpoint
   const login = () => {
     window.location.href = `${api.defaults.baseURL}/auth/login`;
+  };
+
+  // Login with username/email and password (local auth)
+  const loginWithCredentials = async (identifier: string, password: string): Promise<boolean> => {
+    try {
+      const response = await api.post('/auth/local/login', { identifier, password });
+      if (response.data.authenticated && response.data.user) {
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        setAuthProvider('local');
+        // Navigate to home page
+        window.location.href = '/';
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Local login failed:', error);
+      return false;
+    }
   };
 
   // Logout user
@@ -67,8 +93,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
-      // Redirect to login
-      login();
+      setAuthProvider(null);
+      // Redirect to login page instead of SSO
+      window.location.href = '/login';
     }
   };
 
@@ -133,7 +160,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     isAuthenticated,
     isLoading,
+    authProvider,
     login,
+    loginWithCredentials,
     logout,
     checkAuthStatus,
   };

@@ -9,6 +9,7 @@ from flask import Flask
 from flask_cors import CORS
 from global_utils.flask.request_rules import RequestRules
 from utils.auth_manager import AuthManager
+from utils.local_auth_manager import LocalAuthManager
 from config.app_config import AppConfig
 
 # Init FLASK
@@ -20,11 +21,14 @@ app.version = config.get("version", "1.0.0")
 # Configure CORS to allow credentials
 CORS(app, supports_credentials=True, origins=os.environ.get("FRONTEND_URL", "http://localhost:5000"))
 
-# Initialize Authentication Manager
+# Initialize Authentication Managers
+# Keycloak SSO for internal users
 auth_manager = AuthManager(app)
-
-# Store auth_manager in app extensions for easy access
 app.extensions['auth_manager'] = auth_manager
+
+# Local auth for external users
+local_auth_manager = LocalAuthManager(app)
+app.extensions['local_auth_manager'] = local_auth_manager
 
 register_all_endpoints(app)
 
