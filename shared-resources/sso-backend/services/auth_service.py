@@ -145,7 +145,7 @@ class AuthService:
     
     def refresh_session(self) -> AuthResult:
         """
-        Refresh the current session token.
+        Refresh the current session token for another 10 hours.
         
         Returns:
             AuthResult indicating success or failure
@@ -162,22 +162,25 @@ class AuthService:
             session.clear()
             return AuthResult(False, "User not found")
 
-        # Refresh token expiration
+        # Refresh both session and token for another 10 hours
         now = datetime.now()
-        token_expires_at = now + timedelta(hours=1)
+        session_expires_at = now + timedelta(hours=10)
+        token_expires_at = now + timedelta(hours=10)
         
+        session['user']['session_expires_at'] = session_expires_at.timestamp()
         session['user']['token_expires_at'] = token_expires_at.timestamp()
         session['token_expires_at'] = token_expires_at.timestamp()
         session['access_token'] = f"local_{user.sub}_{now.timestamp()}"
         
-        logger.info(f"Session refreshed for user {user.username}")
+        logger.info(f"Session refreshed for user {user.username} - expires at {session_expires_at}")
         return AuthResult(True, "Session refreshed successfully")
     
     def _create_session(self, user: LocalUser) -> Dict[str, Any]:
         """Create session data for authenticated user."""
         now = datetime.now()
+        # Both session and token expire in 10 hours for local users
         session_expires_at = now + timedelta(hours=10)
-        token_expires_at = now + timedelta(hours=1)
+        token_expires_at = now + timedelta(hours=10)
         
         session_user = {
             'username': user.username,

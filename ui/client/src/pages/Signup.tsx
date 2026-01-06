@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/http/authClient';
+import { checkUsernameAvailability, checkEmailAvailability, signup } from '@/api/users';
 import { FaUser, FaEnvelope, FaKey, FaUserEdit, FaArrowRight, FaCheck, FaTimes } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
 
@@ -47,8 +47,8 @@ export default function Signup() {
       setCheckingUsername(true);
       const timer = setTimeout(async () => {
         try {
-          const response = await api.get(`/auth/local/check-username?username=${formData.username}`);
-          setUsernameAvailable(response.data.available);
+          const available = await checkUsernameAvailability(formData.username);
+          setUsernameAvailable(available);
         } catch {
           setUsernameAvailable(null);
         } finally {
@@ -67,8 +67,8 @@ export default function Signup() {
       setCheckingEmail(true);
       const timer = setTimeout(async () => {
         try {
-          const response = await api.get(`/auth/local/check-email?email=${formData.email}`);
-          setEmailAvailable(response.data.available);
+          const available = await checkEmailAvailability(formData.email);
+          setEmailAvailable(available);
         } catch {
           setEmailAvailable(null);
         } finally {
@@ -115,21 +115,21 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/local/signup', {
+      const response = await signup({
         username: formData.username,
         email: formData.email,
         name: formData.name,
         password: formData.password
       });
 
-      if (response.data.success) {
+      if (response.success) {
         setSuccess(true);
         // Redirect to login after 2 seconds
         setTimeout(() => {
           setLocation('/login');
         }, 2000);
       } else {
-        setError(response.data.message || 'Registration failed');
+        setError(response.message || 'Registration failed');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'An error occurred during registration');

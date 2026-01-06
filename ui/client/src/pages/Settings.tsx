@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import StatusBar from "@/components/layout/StatusBar";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/http/authClient";
+import { checkUsernameAvailability, checkEmailAvailability, updateProfile, updatePassword } from "@/api/users";
 import { motion } from "framer-motion";
 import { 
   FaUser, FaEnvelope, FaKey, FaUserEdit, FaCheck, FaTimes, 
@@ -48,9 +48,91 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   
+  // Availability checking state
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  
   // Check if user is external (local auth)
   const isExternalUser = authProvider === 'local';
   const isEnterpriseUser = authProvider === 'keycloak' || !authProvider;
+  
+  // Debounced username availability check
+  useEffect(() => {
+    // Only check if username changed from original
+    if (profileData.username === user?.username) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+    
+    if (profileData.username.length >= 3) {
+      setCheckingUsername(true);
+      const timer = setTimeout(async () => {
+        try {
+          const available = await checkUsernameAvailability(profileData.username);
+          setUsernameAvailable(available);
+        } catch {
+          setUsernameAvailable(null);
+        } finally {
+          setCheckingUsername(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setUsernameAvailable(null);
+    }
+  }, [profileData.username, user?.username]);
+  
+  // Debounced email availability check
+  useEffect(() => {
+    // Only check if email changed from original
+    if (profileData.email === user?.email) {
+      setEmailAvailable(null);
+      setCheckingEmail(false);
+      return;
+    }
+    
+    if (profileData.email.includes('@') && profileData.email.includes('.')) {
+      setCheckingEmail(true);
+      const timer = setTimeout(async () => {
+        try {
+          const available = await checkEmailAvailability(profileData.email);
+          setEmailAvailable(available);
+        } catch {
+          setEmailAvailable(null);
+        } finally {
+          setCheckingEmail(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setEmailAvailable(null);
+    }
+  }, [profileData.email, user?.email]);
+  
+  // Check if profile can be saved
+  const hasProfileChanges = 
+    profileData.name !== user?.name ||
+    profileData.username !== user?.username ||
+    profileData.email !== user?.email;
+  
+  const isUsernameValid = 
+    profileData.username === user?.username || // unchanged
+    (profileData.username.length >= 3 && usernameAvailable === true); // changed and available
+  
+  const isEmailValid = 
+    profileData.email === user?.email || // unchanged
+    (profileData.email.includes('@') && emailAvailable === true); // changed and available
+  
+  const canSaveProfile = 
+    hasProfileChanges && 
+    isUsernameValid && 
+    isEmailValid && 
+    profileData.name.length >= 2 &&
+    !checkingUsername &&
+    !checkingEmail;
   
   // Password requirements
   const passwordRequirements: PasswordRequirement[] = [
@@ -86,13 +168,13 @@ export default function Settings() {
     setProfileSuccess('');
     
     try {
-      const response = await api.put('/auth/local/profile', {
+      const response = await updateProfile({
         name: profileData.name,
         email: profileData.email,
         username: profileData.username
       });
       
-      if (response.data.success) {
+      if (response.success) {
         setProfileSuccess('Profile updated successfully');
         await checkAuthStatus(); // Refresh user data
         toast({
@@ -100,7 +182,7 @@ export default function Settings() {
           description: "Your profile has been updated successfully.",
         });
       } else {
-        setProfileError(response.data.message || 'Failed to update profile');
+        setProfileError(response.message || 'Failed to update profile');
       }
     } catch (err: any) {
       setProfileError(err.response?.data?.message || 'An error occurred while updating profile');
@@ -128,12 +210,12 @@ export default function Settings() {
     setPasswordSuccess('');
     
     try {
-      const response = await api.put('/auth/local/password', {
-        current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword
+      const response = await updatePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
       });
       
-      if (response.data.success) {
+      if (response.success) {
         setPasswordSuccess('Password updated successfully');
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         toast({
@@ -141,7 +223,7 @@ export default function Settings() {
           description: "Your password has been changed successfully.",
         });
       } else {
-        setPasswordError(response.data.message || 'Failed to update password');
+        setPasswordError(response.message || 'Failed to update password');
       }
     } catch (err: any) {
       setPasswordError(err.response?.data?.message || 'An error occurred while updating password');
@@ -189,62 +271,19 @@ export default function Settings() {
               
               {/* Profile Tab */}
               <TabsContent value="profile">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Profile Card */}
+                <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 max-w-4xl mx-auto">
                   <Card className="bg-background-card shadow-card border-gray-800">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col items-center text-center">
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/25">
-                          <span className="text-3xl font-bold text-white">
-                            {getInitials(user?.name || 'U')}
-                          </span>
-                        </div>
-                        <h3 className="text-xl font-semibold text-white">{user?.name}</h3>
-                        <p className="text-gray-400 text-sm mt-1">@{user?.username}</p>
-                        
-                        <div className="mt-4 flex items-center gap-2">
-                          {isExternalUser ? (
-                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                              <FaUser className="mr-1 h-3 w-3" />
-                              External User
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                              <FaBuilding className="mr-1 h-3 w-3" />
-                              Enterprise SSO
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        <div className="mt-6 w-full pt-6 border-t border-gray-800">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Email</span>
-                            <span className="text-white truncate max-w-[150px]">{user?.email}</span>
-                          </div>
-                          <div className="flex justify-between text-sm mt-2">
-                            <span className="text-gray-400">User ID</span>
-                            <span className="text-white font-mono text-xs truncate max-w-[150px]">{user?.sub?.slice(0, 12)}...</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  {/* Edit Profile Form */}
-                  <Card className="bg-background-card shadow-card border-gray-800 lg:col-span-2">
                     <CardHeader>
-                      <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                      <CardTitle className="text-xl font-semibold text-white flex items-center gap-2">
                         <FaUserEdit className="text-purple-400" />
-                        Edit Profile
+                        Account Settings
                       </CardTitle>
                       <CardDescription className="text-gray-400">
-                        {isExternalUser 
-                          ? "Update your personal information below"
-                          : "Your profile is managed by your enterprise identity provider"
-                        }
+                        Manage your profile information and update your password here.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-8">
+
                       {/* Enterprise User Notice */}
                       {isEnterpriseUser && (
                         <div className="mb-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -253,39 +292,35 @@ export default function Settings() {
                             <div>
                               <h4 className="text-blue-400 font-medium">Enterprise Managed Account</h4>
                               <p className="text-sm text-gray-400 mt-1">
-                                Your profile information is managed by your organization's identity provider (SSO). 
+                                Your profile information is managed by your organization's identity provider (SSO) 
+                                and cannot be edited here.
                               </p>
                             </div>
                           </div>
                         </div>
                       )}
-                      
+
+                      {/* Profile Section */}
                       <form onSubmit={handleUpdateProfile} className="space-y-4">
+                        <h3 className="text-lg font-medium text-white mb-2">Profile Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Full Name */}
                           <div className="space-y-2">
                             <Label htmlFor="name" className="text-gray-300">Full Name</Label>
-                            <div className="relative">
-                              <FaUserEdit className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                              <Input
-                                id="name"
-                                name="name"
-                                type="text"
-                                value={profileData.name}
-                                onChange={handleProfileChange}
-                                disabled={isEnterpriseUser}
-                                className={`pl-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 
-                                  ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : 'focus:border-purple-500'}`}
-                                placeholder="Enter your full name"
-                              />
-                            </div>
+                            <Input
+                              id="name"
+                              name="name"
+                              type="text"
+                              value={profileData.name}
+                              onChange={handleProfileChange}
+                              disabled={isEnterpriseUser}
+                              placeholder="Full Name"
+                              className={`h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500
+                                ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            />
                           </div>
-                          
-                          {/* Username */}
                           <div className="space-y-2">
                             <Label htmlFor="username" className="text-gray-300">Username</Label>
                             <div className="relative">
-                              <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
                               <Input
                                 id="username"
                                 name="username"
@@ -293,19 +328,32 @@ export default function Settings() {
                                 value={profileData.username}
                                 onChange={handleProfileChange}
                                 disabled={isEnterpriseUser}
-                                className={`pl-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 
-                                  ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : 'focus:border-purple-500'}`}
-                                placeholder="Enter your username"
+                                placeholder="Username"
+                                className={`h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500 pr-10
+                                  ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : ''}
+                                  ${profileData.username !== user?.username && usernameAvailable === false ? 'border-red-500' : ''}
+                                  ${profileData.username !== user?.username && usernameAvailable === true ? 'border-green-500' : ''}`}
                               />
+                              {profileData.username !== user?.username && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                  {checkingUsername ? (
+                                    <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                                  ) : usernameAvailable === true ? (
+                                    <FaCheck className="text-green-400" />
+                                  ) : usernameAvailable === false ? (
+                                    <FaTimes className="text-red-400" />
+                                  ) : null}
+                                </div>
+                              )}
                             </div>
+                            {profileData.username !== user?.username && usernameAvailable === false && (
+                              <p className="text-red-400 text-xs mt-1">Username is already taken</p>
+                            )}
                           </div>
                         </div>
-                        
-                        {/* Email */}
                         <div className="space-y-2">
                           <Label htmlFor="email" className="text-gray-300">Email Address</Label>
                           <div className="relative">
-                            <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
                             <Input
                               id="email"
                               name="email"
@@ -313,199 +361,92 @@ export default function Settings() {
                               value={profileData.email}
                               onChange={handleProfileChange}
                               disabled={isEnterpriseUser}
-                              className={`pl-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 
-                                ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : 'focus:border-purple-500'}`}
-                              placeholder="Enter your email"
+                              placeholder="Email"
+                              className={`h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500 pr-10
+                                ${isEnterpriseUser ? 'opacity-60 cursor-not-allowed' : ''}
+                                ${profileData.email !== user?.email && emailAvailable === false ? 'border-red-500' : ''}
+                                ${profileData.email !== user?.email && emailAvailable === true ? 'border-green-500' : ''}`}
                             />
-                          </div>
-                        </div>
-                        
-                        {/* Success/Error Messages */}
-                        {profileError && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2"
-                          >
-                            <FaTimes className="flex-shrink-0" />
-                            {profileError}
-                          </motion.div>
-                        )}
-                        
-                        {profileSuccess && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm flex items-center gap-2"
-                          >
-                            <FaCheck className="flex-shrink-0" />
-                            {profileSuccess}
-                          </motion.div>
-                        )}
-                        
-                        {/* Submit Button */}
-                        {isExternalUser && (
-                          <Button
-                            type="submit"
-                            className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-medium shadow-lg shadow-purple-500/25"
-                            disabled={isUpdatingProfile}
-                          >
-                            {isUpdatingProfile ? (
-                              <div className="flex items-center">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                                Updating...
-                              </div>
-                            ) : (
-                              <div className="flex items-center">
-                                <FaCheck className="mr-2" />
-                                Save Changes
+                            {profileData.email !== user?.email && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                {checkingEmail ? (
+                                  <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                                ) : emailAvailable === true ? (
+                                  <FaCheck className="text-green-400" />
+                                ) : emailAvailable === false ? (
+                                  <FaTimes className="text-red-400" />
+                                ) : null}
                               </div>
                             )}
+                          </div>
+                          {profileData.email !== user?.email && emailAvailable === false && (
+                            <p className="text-red-400 text-xs mt-1">Email is already in use</p>
+                          )}
+                        </div>
+                        {profileError && <p className="text-red-400 text-sm">{profileError}</p>}
+                        {profileSuccess && <p className="text-green-400 text-sm">{profileSuccess}</p>}
+                        {isExternalUser && (
+                          <Button type="submit" disabled={!canSaveProfile || isUpdatingProfile}>
+                            {isUpdatingProfile ? 'Updating...' : checkingUsername || checkingEmail ? 'Checking...' : 'Save Profile'}
                           </Button>
                         )}
                       </form>
-                    </CardContent>
-                  </Card>
-                  
-                  {/* Change Password Card - Only for external users */}
-                  {isExternalUser && (
-                    <Card className="bg-background-card shadow-card border-gray-800 lg:col-span-3">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
-                          <FaKey className="text-purple-400" />
-                          Change Password
-                        </CardTitle>
-                        <CardDescription className="text-gray-400">
-                          Update your password to keep your account secure
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
+
+                      {/* Password Section */}
+                      {isExternalUser && (
                         <form onSubmit={handleUpdatePassword} className="space-y-4">
+                          <h3 className="text-lg font-medium text-white mb-2">Change Password</h3>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Current Password */}
-                            <div className="space-y-2">
-                              <Label htmlFor="currentPassword" className="text-gray-300">Current Password</Label>
-                              <div className="relative">
-                                <FaKey className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                                <Input
-                                  id="currentPassword"
-                                  name="currentPassword"
-                                  type="password"
-                                  value={passwordData.currentPassword}
-                                  onChange={handlePasswordChange}
-                                  className="pl-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
-                                  placeholder="Current password"
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* New Password */}
-                            <div className="space-y-2">
-                              <Label htmlFor="newPassword" className="text-gray-300">New Password</Label>
-                              <div className="relative">
-                                <FaKey className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                                <Input
-                                  id="newPassword"
-                                  name="newPassword"
-                                  type="password"
-                                  value={passwordData.newPassword}
-                                  onChange={handlePasswordChange}
-                                  className="pl-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
-                                  placeholder="New password"
-                                />
-                              </div>
-                              {/* Password requirements */}
-                              {passwordData.newPassword.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                  {passwordRequirements.map((req, idx) => (
-                                    <span key={idx} className={`text-xs px-2 py-1 rounded-full ${req.met ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-500'}`}>
-                                      {req.met ? <FaCheck className="inline h-2 w-2 mr-1" /> : <FaTimes className="inline h-2 w-2 mr-1" />}
-                                      {req.label}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Confirm Password */}
-                            <div className="space-y-2">
-                              <Label htmlFor="confirmPassword" className="text-gray-300">Confirm Password</Label>
-                              <div className="relative">
-                                <FaKey className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                                <Input
-                                  id="confirmPassword"
-                                  name="confirmPassword"
-                                  type="password"
-                                  value={passwordData.confirmPassword}
-                                  onChange={handlePasswordChange}
-                                  className="pl-10 pr-10 h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
-                                  placeholder="Confirm password"
-                                />
-                                {passwordData.confirmPassword.length > 0 && (
-                                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                    {passwordsMatch ? (
-                                      <FaCheck className="text-green-500 h-4 w-4" />
-                                    ) : (
-                                      <FaTimes className="text-red-500 h-4 w-4" />
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              {passwordData.confirmPassword.length > 0 && !passwordsMatch && (
-                                <p className="text-red-400 text-xs">Passwords do not match</p>
-                              )}
-                            </div>
+                            <Input
+                              id="currentPassword"
+                              name="currentPassword"
+                              type="password"
+                              value={passwordData.currentPassword}
+                              onChange={handlePasswordChange}
+                              placeholder="Current password"
+                              className="h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
+                            />
+                            <Input
+                              id="newPassword"
+                              name="newPassword"
+                              type="password"
+                              value={passwordData.newPassword}
+                              onChange={handlePasswordChange}
+                              placeholder="New password"
+                              className="h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
+                            />
+                            <Input
+                              id="confirmPassword"
+                              name="confirmPassword"
+                              type="password"
+                              value={passwordData.confirmPassword}
+                              onChange={handlePasswordChange}
+                              placeholder="Confirm password"
+                              className="h-11 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
+                            />
                           </div>
-                          
-                          {/* Success/Error Messages */}
-                          {passwordError && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2"
-                            >
-                              <FaTimes className="flex-shrink-0" />
-                              {passwordError}
-                            </motion.div>
-                          )}
-                          
-                          {passwordSuccess && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm flex items-center gap-2"
-                            >
-                              <FaCheck className="flex-shrink-0" />
-                              {passwordSuccess}
-                            </motion.div>
-                          )}
-                          
-                          {/* Submit Button */}
-                          <Button
-                            type="submit"
-                            variant="outline"
-                            className="h-11 border-[#3D4450] text-white hover:bg-purple-600 hover:border-purple-600"
-                            disabled={isUpdatingPassword || !allPasswordRequirementsMet || !passwordsMatch || !passwordData.currentPassword}
-                          >
-                            {isUpdatingPassword ? (
-                              <div className="flex items-center">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                                Updating...
-                              </div>
-                            ) : (
-                              <div className="flex items-center">
-                                <FaKey className="mr-2" />
-                                Update Password
-                              </div>
-                            )}
+                          <div className="flex flex-wrap gap-2">
+                            {passwordRequirements.map((req, idx) => (
+                              <Badge
+                                key={idx}
+                                className={req.met ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-500"}
+                              >
+                                {req.label}
+                              </Badge>
+                            ))}
+                          </div>
+                          {passwordError && <p className="text-red-400 text-sm">{passwordError}</p>}
+                          {passwordSuccess && <p className="text-green-400 text-sm">{passwordSuccess}</p>}
+                          <Button type="submit" disabled={!allPasswordRequirementsMet || !passwordsMatch || !passwordData.currentPassword || isUpdatingPassword}>
+                            {isUpdatingPassword ? 'Updating...' : 'Update Password'}
                           </Button>
                         </form>
-                      </CardContent>
-                    </Card>
-                  )}
+                      )}
+
+                    </CardContent>
+                  </Card>
                 </div>
               </TabsContent>
-              
               
               {/* Notifications Tab - Coming Soon */}
               <TabsContent value="notifications">
