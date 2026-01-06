@@ -11,6 +11,7 @@ import GetToKnow from "@/pages/GetToKnow";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import Settings from "@/pages/Settings";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -56,6 +57,7 @@ function AppRoutes() {
       <Route path="/get-to-know" component={GetToKnow} />
       <Route path="/configuration" component={Configuration} />
       <Route path="/guides" component={GuidesPage} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -85,6 +87,35 @@ const AuthRoute: React.FC<{ component: React.ComponentType }> = ({ component: Co
   return <Component />;
 };
 
+// Public auth paths that don't need ProtectedRoute
+const PUBLIC_AUTH_PATHS = ['/login', '/signup'];
+
+function AppContent() {
+  const [location] = useLocation();
+  
+  // Check if current path is a public auth route
+  const isPublicAuthRoute = PUBLIC_AUTH_PATHS.includes(location);
+  
+  if (isPublicAuthRoute) {
+    return (
+      <Switch>
+        <Route path="/login">
+          <AuthRoute component={Login} />
+        </Route>
+        <Route path="/signup">
+          <AuthRoute component={Signup} />
+        </Route>
+      </Switch>
+    );
+  }
+  
+  return (
+    <ProtectedRoute>
+      <AppRoutes />
+    </ProtectedRoute>
+  );
+}
+
 function App() {
   // Set document title
   useEffect(() => {
@@ -97,20 +128,7 @@ function App() {
         <SharedProvider>
           <ProjectProvider>
             <NotificationProvider>
-              
-              <Switch>
-                {/* Public auth routes - outside of ProtectedRoute */}
-                <Route path="/login">
-                  <AuthRoute component={Login} />
-                </Route>
-                <Route path="/signup">
-                  <AuthRoute component={Signup} />
-                </Route>
-
-              </Switch>
-              <ProtectedRoute>
-                <AppRoutes />
-              </ProtectedRoute>
+              <AppContent />
             </NotificationProvider>
           </ProjectProvider>
         </SharedProvider>
