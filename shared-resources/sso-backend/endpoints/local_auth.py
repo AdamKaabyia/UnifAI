@@ -1,250 +1,180 @@
 """
-Local authentication endpoints for external users.
-Provides signup, login, and session management for username/password auth.
+Local Authentication Endpoints
+
+Thin routing layer for local user authentication.
+Business logic is delegated to services following SOLID principles.
 """
 from flask import Blueprint, jsonify, request, session
 from shared.logger import logger
 
-# Create a blueprint for local auth routes
 local_auth_bp = Blueprint('local_auth', __name__)
 
 
-def get_local_auth_manager():
-    """Get the LocalAuthManager from the Flask app context."""
+def get_auth_service():
+    """Get AuthService from Flask app context."""
     from flask import current_app
-    return current_app.extensions.get('local_auth_manager')
+    return current_app.extensions.get('auth_service')
 
+
+def get_profile_service():
+    """Get ProfileService from Flask app context."""
+    from flask import current_app
+    return current_app.extensions.get('profile_service')
+
+
+# ============================================================================
+# Authentication Endpoints
+# ============================================================================
 
 @local_auth_bp.route('/signup', methods=['POST'])
 def signup():
-    """
-    Register a new external user.
+    """Register a new external user."""
+    data = request.get_json() or {}
     
-    Request body:
-    {
-        "username": "string",
-        "email": "string",
-        "password": "string",
-        "name": "string"
-    }
+    auth_service = get_auth_service()
+    if not auth_service:
+        return jsonify({'success': False, 'message': 'Service unavailable'}), 503
     
-    Returns:
-    {
-        "success": bool,
-        "message": "string",
-        "user": { ... } (on success)
-    }
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'message': 'Request body is required'
-            }), 400
-        
-        username = data.get('username', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        name = data.get('name', '').strip()
-        
-        local_auth_manager = get_local_auth_manager()
-        if not local_auth_manager:
-            logger.error("LocalAuthManager not initialized")
-            return jsonify({
-                'success': False,
-                'message': 'Authentication service unavailable'
-            }), 503
-        
-        success, message, user = local_auth_manager.signup(
-            username=username,
-            email=email,
-            password=password,
-            name=name
-        )
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': message,
-                'user': user.to_session_user()
-            }), 201
-        else:
-            return jsonify({
-                'success': False,
-                'message': message
-            }), 400
-            
-    except Exception as e:
-        logger.error(f"Signup error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': 'An error occurred during registration'
-        }), 500
+    result = auth_service.signup(
+        username=data.get('username', '').strip(),
+        email=data.get('email', '').strip().lower(),
+        password=data.get('password', ''),
+        name=data.get('name', '').strip()
+    )
+    
+    status_code = 201 if result.success else 400
+    return jsonify(result.to_dict()), status_code
 
 
 @local_auth_bp.route('/login', methods=['POST'])
-def local_login():
-    """
-    Authenticate an external user with username/email and password.
+def login():
+    """Authenticate user with username/email and password."""
+    data = request.get_json() or {}
     
-    Request body:
-    {
-        "identifier": "string",  // username or email
-        "password": "string"
-    }
+    auth_service = get_auth_service()
+    if not auth_service:
+        return jsonify({'authenticated': False, 'message': 'Service unavailable'}), 503
     
-    Returns:
-    {
-        "authenticated": bool,
-        "message": "string",
-        "user": { ... } (on success)
+    result = auth_service.login(
+        identifier=data.get('identifier', '').strip(),
+        password=data.get('password', '')
+    )
+    
+    # Return authenticated format for login
+    response = {
+        'authenticated': result.success,
+        'message': result.message
     }
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'authenticated': False,
-                'message': 'Request body is required'
-            }), 400
-        
-        identifier = data.get('identifier', '').strip()
-        password = data.get('password', '')
-        
-        local_auth_manager = get_local_auth_manager()
-        if not local_auth_manager:
-            logger.error("LocalAuthManager not initialized")
-            return jsonify({
-                'authenticated': False,
-                'message': 'Authentication service unavailable'
-            }), 503
-        
-        success, message, session_user = local_auth_manager.login(
-            identifier=identifier,
-            password=password
-        )
-        
-        if success:
-            return jsonify({
-                'authenticated': True,
-                'message': message,
-                'user': session_user
-            }), 200
-        else:
-            return jsonify({
-                'authenticated': False,
-                'message': message
-            }), 401
-            
-    except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        return jsonify({
-            'authenticated': False,
-            'message': 'An error occurred during login'
-        }), 500
+    if result.user:
+        response['user'] = result.user
+    
+    status_code = 200 if result.success else 401
+    return jsonify(response), status_code
 
 
 @local_auth_bp.route('/refresh', methods=['POST'])
-def refresh_local_session():
-    """
-    Refresh the session token for a local auth user.
+def refresh():
+    """Refresh session token for local auth user."""
+    auth_service = get_auth_service()
+    if not auth_service:
+        return jsonify({'success': False, 'message': 'Service unavailable'}), 503
     
-    Returns:
-    {
-        "success": bool,
-        "message": "string"
-    }
-    """
-    try:
-        local_auth_manager = get_local_auth_manager()
-        if not local_auth_manager:
-            return jsonify({
-                'success': False,
-                'message': 'Authentication service unavailable'
-            }), 503
-        
-        if not local_auth_manager.is_local_auth_session():
-            return jsonify({
-                'success': False,
-                'message': 'Not a local auth session'
-            }), 400
-        
-        success, message = local_auth_manager.refresh_session()
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': message
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'message': message
-            }), 401
-            
-    except Exception as e:
-        logger.error(f"Session refresh error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': 'An error occurred during session refresh'
-        }), 500
+    if not auth_service.is_local_auth_session():
+        return jsonify({'success': False, 'message': 'Not a local auth session'}), 400
+    
+    result = auth_service.refresh_session()
+    status_code = 200 if result.success else 401
+    return jsonify(result.to_dict()), status_code
 
+
+# ============================================================================
+# Availability Check Endpoints
+# ============================================================================
 
 @local_auth_bp.route('/check-username', methods=['GET'])
 def check_username():
-    """
-    Check if a username is available.
-    
-    Query params:
-        username: The username to check
-        
-    Returns:
-    {
-        "available": bool
-    }
-    """
+    """Check if username is available."""
     username = request.args.get('username', '').strip()
     
-    if not username or len(username) < 3:
+    if len(username) < 3:
         return jsonify({'available': False, 'message': 'Username too short'}), 400
     
-    local_auth_manager = get_local_auth_manager()
-    if not local_auth_manager:
+    auth_service = get_auth_service()
+    if not auth_service:
         return jsonify({'available': False, 'message': 'Service unavailable'}), 503
     
-    is_taken = local_auth_manager.user_repo.username_exists(username)
-    
-    return jsonify({
-        'available': not is_taken
-    }), 200
+    available = auth_service.check_username_available(username)
+    return jsonify({'available': available}), 200
 
 
 @local_auth_bp.route('/check-email', methods=['GET'])
 def check_email():
-    """
-    Check if an email is available.
-    
-    Query params:
-        email: The email to check
-        
-    Returns:
-    {
-        "available": bool
-    }
-    """
+    """Check if email is available."""
     email = request.args.get('email', '').strip().lower()
     
     if not email:
         return jsonify({'available': False, 'message': 'Email required'}), 400
     
-    local_auth_manager = get_local_auth_manager()
-    if not local_auth_manager:
+    auth_service = get_auth_service()
+    if not auth_service:
         return jsonify({'available': False, 'message': 'Service unavailable'}), 503
     
-    is_taken = local_auth_manager.user_repo.email_exists(email)
-    
-    return jsonify({
-        'available': not is_taken
-    }), 200
+    available = auth_service.check_email_available(email)
+    return jsonify({'available': available}), 200
 
+
+# ============================================================================
+# Profile Management Endpoints
+# ============================================================================
+
+@local_auth_bp.route('/profile', methods=['PUT'])
+def update_profile():
+    """Update user profile (local auth only)."""
+    from services.profile_service import ProfileService
+    
+    # Verify session
+    is_valid, user_sub, error = ProfileService.verify_local_auth_session()
+    if not is_valid:
+        status = 403 if 'only available' in error else 401
+        return jsonify({'success': False, 'message': error}), status
+    
+    profile_service = get_profile_service()
+    if not profile_service:
+        return jsonify({'success': False, 'message': 'Service unavailable'}), 503
+    
+    data = request.get_json() or {}
+    result = profile_service.update_profile(
+        user_sub=user_sub,
+        name=data.get('name'),
+        email=data.get('email'),
+        username=data.get('username')
+    )
+    
+    status_code = 200 if result.success else 400
+    return jsonify(result.to_dict()), status_code
+
+
+@local_auth_bp.route('/password', methods=['PUT'])
+def update_password():
+    """Update user password (local auth only)."""
+    from services.profile_service import ProfileService
+    
+    # Verify session
+    is_valid, user_sub, error = ProfileService.verify_local_auth_session()
+    if not is_valid:
+        status = 403 if 'only available' in error else 401
+        return jsonify({'success': False, 'message': error}), status
+    
+    profile_service = get_profile_service()
+    if not profile_service:
+        return jsonify({'success': False, 'message': 'Service unavailable'}), 503
+    
+    data = request.get_json() or {}
+    result = profile_service.update_password(
+        user_sub=user_sub,
+        current_password=data.get('current_password', ''),
+        new_password=data.get('new_password', '')
+    )
+    
+    status_code = 200 if result.success else 400
+    return jsonify(result.to_dict()), status_code

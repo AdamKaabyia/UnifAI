@@ -9,7 +9,9 @@ from flask import Flask
 from flask_cors import CORS
 from global_utils.flask.request_rules import RequestRules
 from utils.auth_manager import AuthManager
-from utils.local_auth_manager import LocalAuthManager
+from models.user import UserRepository
+from services.auth_service import AuthService
+from services.profile_service import ProfileService
 from config.app_config import AppConfig
 
 # Init FLASK
@@ -21,14 +23,25 @@ app.version = config.get("version", "1.0.0")
 # Configure CORS to allow credentials
 CORS(app, supports_credentials=True, origins=os.environ.get("FRONTEND_URL", "http://localhost:5000"))
 
-# Initialize Authentication Managers
-# Keycloak SSO for internal users
+# Initialize Keycloak SSO AuthManager for internal users
 auth_manager = AuthManager(app)
 app.extensions['auth_manager'] = auth_manager
 
-# Local auth for external users
-local_auth_manager = LocalAuthManager(app)
-app.extensions['local_auth_manager'] = local_auth_manager
+# Initialize User Repository for local auth
+user_repo = UserRepository(
+    mongodb_ip=config.get('mongodb_ip', 'localhost'),
+    mongodb_port=config.get('mongodb_port', '27017'),
+    db_name="UnifAI",
+    collection_name="local_users"
+)
+
+# Initialize Services for local auth (SOLID pattern)
+auth_service = AuthService(user_repo)
+profile_service = ProfileService(user_repo)
+
+# Register services in app extensions for endpoint access
+app.extensions['auth_service'] = auth_service
+app.extensions['profile_service'] = profile_service
 
 register_all_endpoints(app)
 

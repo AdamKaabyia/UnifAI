@@ -22,8 +22,6 @@ class LocalUser(BaseModel):
     auth_provider: str = "local"  # 'local' for local auth, 'keycloak' for SSO
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    is_active: bool = True
-    email_verified: bool = False
     
     def to_session_user(self) -> Dict[str, Any]:
         """
@@ -49,8 +47,6 @@ class LocalUser(BaseModel):
             'auth_provider': self.auth_provider,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
-            'is_active': self.is_active,
-            'email_verified': self.email_verified
         }
     
     @classmethod
