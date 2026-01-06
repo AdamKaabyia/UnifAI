@@ -34,10 +34,8 @@ export default function Signup() {
   // Password requirements
   const passwordRequirements: PasswordRequirement[] = [
     { label: 'At least 8 characters', met: formData.password.length >= 8 },
-    { label: 'One uppercase letter', met: /[A-Z]/.test(formData.password) },
-    { label: 'One lowercase letter', met: /[a-z]/.test(formData.password) },
+    { label: 'At least one letter', met: /[a-zA-Z]/.test(formData.password) },
     { label: 'One number', met: /\d/.test(formData.password) },
-    { label: 'One special character', met: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password) }
   ];
 
   const allRequirementsMet = passwordRequirements.every(req => req.met);
@@ -220,7 +218,7 @@ export default function Signup() {
                     placeholder="Choose a username"
                     value={formData.username}
                     onChange={handleChange}
-                    className="pl-10 pr-10 h-12 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
+                    className="pl-10 pr-10 h-12 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-white-500 focus:border-purple-500"
                     required
                     minLength={3}
                   />
@@ -253,7 +251,7 @@ export default function Signup() {
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="pl-10 pr-10 h-12 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-gray-500 focus:border-purple-500"
+                    className="pl-10 pr-10 h-12 bg-[#2A303C] border-[#3D4450] text-white placeholder:text-white-500 focus:border-purple-500"
                     required
                   />
                   {formData.email.includes('@') && (
