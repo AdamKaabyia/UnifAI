@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Trash2, Users, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
 import { useShared } from "@/contexts/SharedContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,6 @@ export default function WorkflowsPanel({
     interactive: true,
   },
 }: WorkflowsPanelProps): React.ReactElement {
-  // State for available graph flows
   const [graphFlows, setGraphFlows] = useState<FlowObject[]>([]);
   const [activeFlowIds, setActiveFlowIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -68,7 +68,12 @@ export default function WorkflowsPanel({
   } | null>(null);
   
   const { user } = useAuth();
+  const { viewMode, selectedTeam } = useView();
   const { openShareForItem } = useShared();
+  
+  const contextUserId = viewMode === "team" && selectedTeam
+    ? selectedTeam.name
+    : (user?.username || "default");
   
   // Blueprint validation hook
   const {
@@ -86,10 +91,7 @@ export default function WorkflowsPanel({
   // Fetch available blueprints from API (resolved – references replaced with actual data)
   const fetchAvailableFlows = async (): Promise<void> => {
     try {
-      const userId = user?.username || "default";
-      // Resolved endpoint so spec_dict contains actual resource names (not $ref: pointers).
-      // Per-flow resolved data is still fetched on selection for the graph + sharing status.
-      const blueprints = await fetchResolvedBlueprints(userId);
+      const blueprints = await fetchResolvedBlueprints(contextUserId);
 
       // Convert the blueprints to the format expected by the component
       const processedFlows = blueprints
@@ -117,8 +119,7 @@ export default function WorkflowsPanel({
     if (!showActiveStatus) return;
 
     try {
-      const userId = user?.username || "default";
-      const activeSessions = await fetchActiveSessions(userId);
+      const activeSessions = await fetchActiveSessions(contextUserId);
       setActiveFlowIds(activeSessions || []);
     } catch (error) {
       console.error("Error fetching active flows:", error);
@@ -126,7 +127,6 @@ export default function WorkflowsPanel({
     }
   };
 
-  // Effect to load graph flows from API
   useEffect(() => {
     setIsLoading(true);
     Promise.all([
@@ -135,7 +135,7 @@ export default function WorkflowsPanel({
     ]).finally(() => {
       setIsLoading(false);
     });
-  }, [user]);
+  }, [contextUserId]);
 
   // Trigger validation when selected flow changes
   useEffect(() => {
@@ -164,8 +164,7 @@ export default function WorkflowsPanel({
 
     const fetchBlueprintData = async () => {
       try {
-        const userId = user?.username || 'default';
-        const blueprint = await fetchResolvedBlueprint(selectedFlow.id, userId);
+        const blueprint = await fetchResolvedBlueprint(selectedFlow.id, contextUserId);
         if (cancelled) return;
         if (blueprint) {
           setSelectedBlueprintData({
@@ -182,7 +181,7 @@ export default function WorkflowsPanel({
 
     fetchBlueprintData();
     return () => { cancelled = true; };
-  }, [selectedFlow?.id, user?.username]);
+  }, [selectedFlow?.id, contextUserId]);
 
   const handleFlowSelect = (flow: FlowObject): void => {
     onFlowSelect(flow);
