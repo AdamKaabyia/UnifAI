@@ -17,6 +17,10 @@ unifai_rag_server:
     ROLE: "flask"
     SHARED_STORAGE: "/app/shared"
     VERSION: ""
+    DOCLING_SERVICE_URL: "https://docling-service-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
+    EMBEDDING_SERVICE_URL: "https://embedding-service-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
+    USE_REMOTE_DOCLING: "True"
+    USE_REMOTE_EMBEDDING: "True"
     #FRONTEND_URL: "http://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
   resources:
     limits:
@@ -38,17 +42,20 @@ unifai_rag_celery:
     ROLE: "celery"
     SHARED_STORAGE: "/app/shared"
     CELERY_QUEUES: "slack_queue,document_queue,slack_events_queue"
-    CELERY_WORKER: 1
+    CELERY_WORKER: 8
+    CELERY_POOL: "prefork"
     VERSION: ""
+    DOCLING_SERVICE_URL: "https://docling-service-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
+    EMBEDDING_SERVICE_URL: "https://embedding-service-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
+    USE_REMOTE_DOCLING: "True"
+    USE_REMOTE_EMBEDDING: "True"
   resources:
     limits:
       cpu: 4
       memory: 8Gi
-      nvidia.com/gpu: 1
     requests:
       cpu: 2
       memory: 4Gi
-      nvidia.com/gpu: 1
   tolerations: []
 
 

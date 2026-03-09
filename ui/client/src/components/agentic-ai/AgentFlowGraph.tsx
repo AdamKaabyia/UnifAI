@@ -9,12 +9,14 @@ type AgentFlowGraphProps = {
   selectedFlow: FlowObject | null;
   setSelectedFlow: (flow: FlowObject | null) => void;
   onValidationChange?: (isValid: boolean, validationResult: BlueprintValidationResult | null, isValidating: boolean) => void;
+  onFlowEdit?: (flow: FlowObject) => void;
 };
 
 export default function AgentFlowGraph({
   selectedFlow,
   setSelectedFlow,
   onValidationChange,
+  onFlowEdit,
 }: AgentFlowGraphProps): React.ReactElement {
   
   const handleFlowSelect = (flow: FlowObject | null): void => {
@@ -41,9 +43,11 @@ export default function AgentFlowGraph({
             selectedFlow={selectedFlow}
             onFlowSelect={handleFlowSelect}
             onFlowDelete={handleFlowDelete}
+            onFlowEdit={onFlowEdit}
             onValidationChange={onValidationChange}
             showActiveStatus={true}
             showDeleteButton={true}
+            showEditButton={true}
             height="100%"
             graphProps={{
               showBackground: true,

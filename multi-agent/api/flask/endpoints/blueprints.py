@@ -174,6 +174,39 @@ def save_blueprint(blueprint_raw=None, user_id="alice", metadata=None):
         return jsonify({"status": "error", "error": str(e)}), 500
 
 
+@blueprints_bp.route("/blueprint.update", methods=["PUT"])
+@from_body({
+    "blueprint_id": fields.Str(data_key="blueprintId", required=True),
+    "blueprint_raw": fields.Str(data_key="blueprintRaw", required=True),
+})
+def update_blueprint(blueprint_id, blueprint_raw):
+    """Update an existing blueprint in-place, keeping the same ID."""
+    try:
+        parsed = _extract_blueprint_data(
+            json_field_value=blueprint_raw,
+            field_name="blueprint_raw"
+        )
+
+        svc = current_app.container.blueprint_service
+        success = svc.update_draft(blueprint_id=blueprint_id, draft_dict=parsed)
+
+        if not success:
+            return jsonify({"status": "error", "error": "Failed to update blueprint"}), 500
+
+        return jsonify({
+            "status": "success",
+            "blueprint_id": blueprint_id,
+        }), 200
+
+    except BlueprintNotFoundError as e:
+        return jsonify({"status": "error", "error": str(e)}), 404
+    except BadRequest as e:
+        return jsonify({"status": "error", "error": str(e)}), 400
+    except Exception as e:
+        logger.exception(f"Unexpected error updating blueprint {blueprint_id}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 @blueprints_bp.route("/blueprint.info.get", methods=["GET"])
 @from_query({
     "blueprint_id": fields.Str(data_key="blueprintId", required=True)

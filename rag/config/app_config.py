@@ -40,3 +40,16 @@ class AppConfig(SharedConfig):
     umami_username: str = "dummy"
     umami_password: str = "dummy"
 
+    # External Docling Service Configuration
+    docling_service_url: str = "http://docling-service:5001"
+    docling_service_timeout: int = 300
+
+    # External Embedding Service Configuration
+    embedding_service_url: str = "http://embedding-service:5002"
+    embedding_service_timeout: int = 60
+    embedding_service_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_dim: int = 384
+
+    # Feature flags to switch between local and remote adapters
+    use_remote_docling: bool = False
+    use_remote_embedding: bool = False

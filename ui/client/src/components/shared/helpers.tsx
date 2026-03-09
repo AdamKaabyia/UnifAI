@@ -1,9 +1,6 @@
 import React from "react";
 import {
   Bot,
-  Settings,
-  MessagesSquare,
-  FileText,
   Brain,
   Wrench,
   Circle,
@@ -24,6 +21,7 @@ export const getCategoryDisplay = (category: string): CategoryDisplay => {
     llms: { icon: <Brain className="w-4 h-4" />, color: "#8A2BE2" },
     tools: { icon: <Wrench className="w-4 h-4" />, color: "#00B0FF" },
     nodes: { icon: <Circle className="w-4 h-4" />, color: "#FFB300" },
+    orchestrators: { icon: <Bot className="w-4 h-4" />, color: "#00BCD4" },
     providers: { icon: <Server className="w-4 h-4" />, color: "#FF5722" },
     retrievers: { icon: <Search className="w-4 h-4" />, color: "#4CAF50" },
     conditions: { icon: <GitBranch className="w-4 h-4" />, color: "#9C27B0" },
@@ -35,6 +33,7 @@ export const getCategoryDisplay = (category: string): CategoryDisplay => {
 export const getCategoryDisplayName = (category: string) => {
   const nameMap: { [key: string]: string } = {
     nodes: "Agents",
+    orchestrators: "Orchestrators",
     llms: "LLMs",
     tools: "Tools",
     retrievers: "Retrievers",

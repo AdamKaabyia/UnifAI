@@ -45,6 +45,7 @@ interface GraphValidationPanelProps {
   validationResult: ValidationResult | null;
   fixSuggestions: FixSuggestion[];
   isValidating: boolean;
+  isLoadingBlueprint?: boolean;
 }
 
 const getValidatorIcon = (validatorName: string) => {
@@ -108,7 +109,26 @@ const GraphValidationPanel: React.FC<GraphValidationPanelProps> = ({
   validationResult,
   fixSuggestions,
   isValidating,
+  isLoadingBlueprint = false,
 }) => {
+  if (isLoadingBlueprint) {
+    return (
+      <Card className="bg-background-card border-gray-800">
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            Loading Workflow...
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          <p className="text-sm text-gray-500">
+            Validation will run once the workflow is loaded.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isValidating) {
     return (
       <Card className="bg-background-card border-gray-800">

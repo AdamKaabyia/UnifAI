@@ -435,3 +435,20 @@ export function buildElementBlockMap(
 
   return map;
 }
+
+// ---------------------------------------------------------------------------
+// Badge grouping utility
+// ---------------------------------------------------------------------------
+
+/** Group overlay badges by their parent node ID for O(1) lookup. */
+export function groupBadgesByNode(
+  badges: OverlayBadge[],
+): Map<string, OverlayBadge[]> {
+  const map = new Map<string, OverlayBadge[]>();
+  for (const b of badges) {
+    const list = map.get(b.nodeId);
+    if (list) list.push(b);
+    else map.set(b.nodeId, [b]);
+  }
+  return map;
+}

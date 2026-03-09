@@ -1,57 +1,60 @@
-import React, { useState, useMemo } from "react";
-import { useGraphLogic, SavedBlueprintInfo } from "@/hooks/use-graph-logic";
-import GraphCanvas from "@/components/agentic-ai/graphs/GraphCanvas";
+import { useState, useMemo } from "react";
+import { useGraphCreationLogic, SavedBlueprintInfo } from "@/hooks/use-graph-creation-logic";
+import GraphCreation from "@/components/agentic-ai/graphs/GraphCreation";
 import BuildingBlocksSidebar from "./BuildingBlocksSidebar";
-import ConditionalEdgeModal from "@/components/agentic-ai/graphs/ConditionalEdgeModal";
 import GraphValidationPanel from "@/components/agentic-ai/graphs/GraphValidationPanel";
 import SaveBlueprintModal from "@/components/agentic-ai/graphs/SaveBlueprintModal";
 
 interface NewGraphProps {
   onBack?: (savedBlueprint?: SavedBlueprintInfo) => void;
+  editBlueprintId?: string | null;
 }
 
-export default function NewGraph({ onBack }: NewGraphProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
+export default function NewGraph({ onBack, editBlueprintId }: NewGraphProps) {
   const {
     nodes,
     edges,
     buildingBlocksData,
+    orchestratorsData,
     conditionsData,
-    allBlocksData,
     isLoadingBlocks,
     yamlFlow,
-    handleNodesChange,
-    handleEdgesChange,
-    onConnect,
     onDrop,
     onDragOver,
     onDragStart,
     clearGraph,
     saveGraph,
+    deleteNode,
     deleteEdge,
+    updateNodePosition,
+    pendingConnectionSource,
+    handleNodeClickForConnection,
+    handlePaneClick,
+    cancelConnectionMode,
     attachConditionToNode,
-    removeConditionFromNode,
-    conditionalEdgeModal,
-    handleConditionalEdgeConfirm,
-    handleConditionalEdgeCancel,
+    onDragEnd,
     isGraphValid,
     validationResult,
     fixSuggestions,
     isValidating,
     isSaving,
-  } = useGraphLogic({ onSaveComplete: onBack });
+    isEditMode,
+    isLoadingBlueprint,
+    editBlueprintName,
+    editBlueprintDescription,
+  } = useGraphCreationLogic({ onSaveComplete: onBack, editBlueprintId });
 
   const [saveModalOpen, setSaveModalOpen] = useState(false);
 
   // Track which building blocks are currently used on the canvas
   const usedElementIds = useMemo(() => {
     const usedIds = new Set<string>();
+    const allSidebarBlocks = [...buildingBlocksData, ...orchestratorsData, ...conditionsData];
     
     nodes.forEach(node => {
       // 1. Track the node itself by workspaceData.rid
       if (node.data?.workspaceData?.rid) {
-        const matchingBlock = [...buildingBlocksData, ...conditionsData].find(
+        const matchingBlock = allSidebarBlocks.find(
           block => block.workspaceData?.rid === node.data.workspaceData?.rid
         );
         if (matchingBlock) {
@@ -75,7 +78,7 @@ export default function NewGraph({ onBack }: NewGraphProps) {
     });
     
     return usedIds;
-  }, [nodes, buildingBlocksData, conditionsData]);
+  }, [nodes, buildingBlocksData, orchestratorsData, conditionsData]);
 
   const handleSaveGraph = async () => {
     setSaveModalOpen(true);
@@ -88,9 +91,10 @@ export default function NewGraph({ onBack }: NewGraphProps) {
   return (
     <div className="h-full max-h-[calc(100vh-100px)] flex bg-background overflow-hidden">
       {/* Sidebar */}
-      <div className="w-80 h-full">
+      <div className="h-full flex-shrink-0">
         <BuildingBlocksSidebar
           buildingBlocks={buildingBlocksData}
+          orchestrators={orchestratorsData}
           conditions={conditionsData}
           isLoading={isLoadingBlocks}
           onDragStart={onDragStart}
@@ -100,22 +104,27 @@ export default function NewGraph({ onBack }: NewGraphProps) {
 
       {/* Main Canvas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <GraphCanvas
+        <GraphCreation
           nodes={nodes}
           edges={edges}
           yamlFlow={yamlFlow}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onClearGraph={handleClearGraph}
           onSaveGraph={handleSaveGraph}
+          onDeleteNode={deleteNode}
           onDeleteEdge={deleteEdge}
           onBack={onBack}
-          onAttachCondition={attachConditionToNode}
-          onRemoveCondition={removeConditionFromNode}
           isGraphValid={isGraphValid}
+          onNodeClick={handleNodeClickForConnection}
+          onPaneClick={handlePaneClick}
+          onNodePositionChange={updateNodePosition}
+          pendingConnectionSource={pendingConnectionSource}
+          onCancelConnection={cancelConnectionMode}
+          onAttachCondition={attachConditionToNode}
+          onDragEnd={onDragEnd}
+          isEditMode={isEditMode}
+          isLoadingBlueprint={isLoadingBlueprint}
         />
       </div>
 
@@ -125,19 +134,9 @@ export default function NewGraph({ onBack }: NewGraphProps) {
           validationResult={validationResult}
           fixSuggestions={fixSuggestions}
           isValidating={isValidating}
+          isLoadingBlueprint={isLoadingBlueprint}
         />
       </div>
-
-      {/* Conditional Edge Modal */}
-      <ConditionalEdgeModal
-        isOpen={conditionalEdgeModal.isOpen}
-        onClose={handleConditionalEdgeCancel}
-        onConfirm={handleConditionalEdgeConfirm}
-        sourceNodeId={conditionalEdgeModal.sourceNodeId}
-        targetNodeId={conditionalEdgeModal.targetNodeId}
-        conditionType={conditionalEdgeModal.conditionType}
-        existingBranches={conditionalEdgeModal.existingBranches}
-      />
 
       {/* Save Blueprint Modal */}
       <SaveBlueprintModal
@@ -145,6 +144,9 @@ export default function NewGraph({ onBack }: NewGraphProps) {
         onClose={() => setSaveModalOpen(false)}
         onSave={saveGraph}
         isLoading={isSaving}
+        isEditMode={isEditMode}
+        currentName={editBlueprintName}
+        currentDescription={editBlueprintDescription}
       />
     </div>
   );

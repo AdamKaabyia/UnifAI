@@ -126,6 +126,20 @@ export async function saveBlueprint(
   return data;
 }
 
+/**
+ * Update an existing blueprint in-place (keeps the same ID)
+ */
+export async function updateBlueprint(
+  blueprintId: string,
+  blueprintRaw: string,
+): Promise<SaveBlueprintResponse> {
+  const { data } = await axios.put<SaveBlueprintResponse>('/blueprints/blueprint.update', {
+    blueprintId,
+    blueprintRaw,
+  });
+  return data;
+}
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Blueprint Metadata & Sharing
 // ────────────────────────────────────────────────────────────────────────────────

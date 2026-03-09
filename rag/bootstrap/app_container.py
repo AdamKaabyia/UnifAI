@@ -200,9 +200,15 @@ def slack_connector(project_id: str):
 
 @lru_cache(maxsize=1)
 def document_connector():
-    """Document connector for PDF and other document formats."""
-    from infrastructure.sources.document.connector import DocumentConnector
-    return DocumentConnector()
+    """Document connector for PDF and other document formats.
+
+    Uses local docling library by default.
+    Set USE_REMOTE_DOCLING=true to use the remote docling service.
+    """
+    from bootstrap.factories import DocumentConnectorFactory
+    from config.app_config import AppConfig
+
+    return DocumentConnectorFactory.from_app_config(AppConfig.get_instance())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -390,6 +396,28 @@ def terms_approval_service():
     return TermsApprovalService(approval_repo=terms_approval_repository())
 
 
+@lru_cache(maxsize=1)
+def remote_services_health():
+    """
+    Services health service for checking external service availability.
+
+    Checks Docling and Embedding services to determine if document upload
+    should be enabled. Used by the /service.readiness.get endpoint.
+
+    Reuses document_connector() and embedding_generator() - the same instances
+    used by the pipeline - so health checks reflect actual runtime configuration.
+    Each port self-reports is_remote; no config flags are read here.
+
+    Adding a new service (e.g. OCR, reranker) is a one-line registration.
+    """
+    from core.health.service import ServicesHealthService
+
+    service = ServicesHealthService()
+    service.register("docling", document_connector())
+    service.register("embedding", embedding_generator())
+    return service
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SLACK EVENTS (Application layer - event handling)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -419,9 +447,15 @@ def slack_event_service():
 
 @lru_cache(maxsize=1)
 def embedding_generator():
-    """Shared embedding generator (sentence transformer)."""
+    """Shared embedding generator.
+
+    Uses local SentenceTransformer by default.
+    Set USE_REMOTE_EMBEDDING=true to use the remote embedding service.
+    """
     from bootstrap.factories import EmbeddingGeneratorFactory
-    return EmbeddingGeneratorFactory.create({"type": "sentence_transformer"})
+    from config.app_config import AppConfig
+
+    return EmbeddingGeneratorFactory.from_app_config(AppConfig.get_instance())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -580,6 +614,7 @@ def clear_all_caches():
     monitoring_service.cache_clear()
     data_source_service.cache_clear()
     terms_approval_service.cache_clear()
+    remote_services_health.cache_clear()
     # Registration & Dispatch
     doc_validators.cache_clear()
     slack_validators.cache_clear()
@@ -605,4 +640,3 @@ def clear_all_caches():
     slack_pipeline_handler.cache_clear()
     document_pipeline_handler.cache_clear()
     pipeline_executor.cache_clear()
-

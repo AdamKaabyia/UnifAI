@@ -1,10 +1,11 @@
 """Document Pipeline Handler - Source-specific pipeline operations for Documents."""
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from core.pipeline.domain.port import SourcePipelinePort, PipelineContext
 from core.vector.domain.embedder import EmbeddingGenerator
 from core.vector.domain.model import VectorChunk
 from core.data_sources.types.document.domain.processor import DocumentProcessor
+from core.data_sources.types.document.domain.processed_document import ProcessedDocument
 from infrastructure.sources.document.connector import DocumentConnector
 from infrastructure.sources.document.chunker import PDFChunkerStrategy
 from shared.logger import logger
@@ -46,7 +47,7 @@ class DocumentPipelineHandler(SourcePipelinePort):
         self._processor = processor
         self._chunker = chunker
         self._embedder = embedder
-        self._cached_collected = None
+        self._cached_collected: Optional[ProcessedDocument] = None
     
     @property
     def source_type(self) -> str:
@@ -56,20 +57,20 @@ class DocumentPipelineHandler(SourcePipelinePort):
     def collect(self, context: PipelineContext) -> Dict:
         """
         Collect document content.
-        
+
         Args:
             context: Pipeline context with document path information
-            
+
         Returns:
             Document data dictionary with content and metadata
         """
         logger.info(f"Collecting document: {context.metadata.get('doc_path')}")
-        
+
         self._cached_collected = self._connector.process_document(
             document_path=context.metadata.get("doc_path"),
             upload_by=context.metadata.get("upload_by"),
         )
-        return self._cached_collected
+        return self._cached_collected.to_dict()
     
     def process(self, context: PipelineContext, raw_data: Dict) -> Dict:
         """
@@ -139,9 +140,9 @@ class DocumentPipelineHandler(SourcePipelinePort):
         """
         if self._cached_collected:
             return {
-                "page_count": self._cached_collected.get("metadata", {}).get("page_count", 0),
-                "full_text": self._cached_collected.get("text", ""),
-                "file_size": self._cached_collected.get("metadata", {}).get("file_size", 0),
+                "page_count": self._cached_collected.metadata.get("page_count", 0),
+                "full_text": self._cached_collected.text,
+                "file_size": self._cached_collected.metadata.get("file_size", 0),
             }
         return {
             "page_count": 0,

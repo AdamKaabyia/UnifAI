@@ -86,7 +86,7 @@ class EarlyStoppingPolicy(Enum):
 
 class ExecutionDefaults:
     """Default values for execution configuration."""
-    MAX_EXECUTION_TIME = 600.0  # 10 minutes
+    MAX_EXECUTION_TIME = 3600 # 1 hour
     MAX_ACTIONS_PER_MINUTE = 60
     TIMEOUT_MESSAGE = "Agent execution timed out"
     MAX_CONSECUTIVE_ERRORS = 3

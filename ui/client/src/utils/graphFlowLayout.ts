@@ -86,7 +86,7 @@ interface DefEntry { rid: string; name: string; }
 
 /**
  * Recursively extract all $ref: IDs from a config object.
- * Same generic approach used by CustomNode.tsx – future-proof for new resource types.
+ * Same generic approach used by the graph canvas – future-proof for new resource types.
  */
 function extractAllRefs(config: Record<string, unknown>): string[] {
   const refs: string[] = [];

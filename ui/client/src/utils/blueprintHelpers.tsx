@@ -51,10 +51,6 @@ export const convertGraphFlowToFlowObject = (
     name,
     description,
     icon: <IconComponent className="h-4 w-4 mr-2" />,
-    flow: {
-      nodes: [],
-      edges: [],
-    },
   };
 };
 

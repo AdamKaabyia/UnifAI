@@ -10,6 +10,7 @@ interface GraphHeaderProps {
   onSaveGraph: () => void;
   onBack?: () => void;
   isGraphValid?: boolean;
+  isEditMode?: boolean;
 }
 
 const GraphHeader: React.FC<GraphHeaderProps> = ({
@@ -17,6 +18,7 @@ const GraphHeader: React.FC<GraphHeaderProps> = ({
   onSaveGraph,
   onBack,
   isGraphValid = false,
+  isEditMode = false,
 }) => {
   return (
     <CardHeader className="py-3 px-6 border-b border-gray-800">
@@ -27,7 +29,7 @@ const GraphHeader: React.FC<GraphHeaderProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onBack}
+                onClick={() => onBack()}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -55,7 +57,7 @@ const GraphHeader: React.FC<GraphHeaderProps> = ({
               className="bg-primary hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4 mr-2" />
-              Save Workflow
+              {isEditMode ? "Update Workflow" : "Save Workflow"}
             </Button>
         </div>
       </div>

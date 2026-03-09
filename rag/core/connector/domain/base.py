@@ -36,15 +36,15 @@ class DataConnector(ABC):
         """Get the list of available API endpoints."""
         return self._available_apis
     
-    @abstractmethod
     def authenticate(self) -> bool:
         """
         Authenticate with the data source.
-        
+
         Returns:
-            True if authentication was successful, False otherwise
+            True if authentication was successful, False otherwise.
+            Connectors that require no authentication may rely on this default.
         """
-        pass
+        return True
     
     @abstractmethod
     def test_connection(self) -> bool:

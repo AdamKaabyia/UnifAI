@@ -1,7 +1,7 @@
 /**
- * useJointGraph – custom hook encapsulating the imperative JointJS graph
- * initialisation, data-fetching, layout, SVG injection, and sizing logic that
- * was previously inlined in the main useEffect of GraphDisplay.
+ * useGraphDisplay – custom hook encapsulating the imperative JointJS graph
+ * initialisation, data-fetching, layout, SVG injection, and sizing logic
+ * for the read-only GraphDisplay component.
  *
  * Keeps GraphDisplay lean by separating React rendering from the imperative
  * JointJS/DOM manipulation.
@@ -43,7 +43,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface UseJointGraphOptions {
+export interface UseGraphDisplayOptions {
   blueprintId?: string;
   primaryHex?: string;
   /** Pre-fetched spec_dict – when provided, skips the network fetch entirely. */
@@ -54,7 +54,7 @@ export interface UseJointGraphOptions {
   animated?: boolean;
 }
 
-export interface UseJointGraphReturn {
+export interface UseGraphDisplayReturn {
   containerRef: React.RefObject<HTMLDivElement>;
   graphRef: React.MutableRefObject<dia.Graph | null>;
   paperRef: React.MutableRefObject<dia.Paper | null>;
@@ -79,7 +79,7 @@ function normalizePrimaryHex(raw: string | undefined | null): string {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useJointGraph({
+export function useGraphDisplay({
   blueprintId,
   primaryHex,
   specDict,
@@ -87,7 +87,7 @@ export function useJointGraph({
   interactive = false,
   centerInView = false,
   animated = false,
-}: UseJointGraphOptions): UseJointGraphReturn {
+}: UseGraphDisplayOptions): UseGraphDisplayReturn {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<dia.Graph | null>(null);
   const layoutNodesRef = useRef<LayoutNode[]>([]);
@@ -386,7 +386,7 @@ export function useJointGraph({
                 strokeWidth: isCond ? 1.5 : 2,
                 opacity: isCond ? 1 : 0.9,
                 sourceMarker: mkMarker(c, isCond ? 3 : 4),
-                targetMarker: { type: "classic", size: isCond ? 10 : 12, fill: c },
+                targetMarker: { type: "path", size: isCond ? 10 : 12, fill: c },
               },
             },
           }).addTo(graph);
@@ -455,7 +455,7 @@ export function useJointGraph({
             );
           }
         } catch (e) {
-          console.warn("[useJointGraph] initial fit: container may not be visible yet", e);
+          console.warn("[useGraphDisplay] initial fit: container may not be visible yet", e);
         }
 
         // All geometry is settled — unfreeze the paper so JointJS renders
@@ -513,7 +513,7 @@ export function useJointGraph({
         link.attr("line/targetMarker/fill", linkColor);
       }
     } catch (e) {
-      console.warn("[useJointGraph] theme update: SVGMatrix non-invertible (container likely collapsed)", e);
+      console.warn("[useGraphDisplay] theme update: SVGMatrix non-invertible (container likely collapsed)", e);
     }
   }, [primaryHex]);
 
@@ -553,7 +553,7 @@ export function useJointGraph({
           paper.setDimensions(cw, ch);
           paper.transformToFitContent(SCALE_CONTENT_TO_FIT_OPTS);
         } catch (e) {
-          console.warn("[useJointGraph] resize refit: SVGMatrix error during CSS transition", e);
+          console.warn("[useGraphDisplay] resize refit: SVGMatrix error during CSS transition", e);
           return;
         }
 

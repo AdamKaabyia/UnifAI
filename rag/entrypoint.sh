@@ -14,8 +14,18 @@ case "$ROLE" in
     ;;
     
   celery)
-    echo "🔧 Starting Slack Celery worker with tasks concurrently : $CELERY_WORKER"
-    exec venv/bin/celery -A infrastructure.celery.app worker -c $CELERY_WORKER --pool=solo --loglevel=info -Q $CELERY_QUEUES -n data_sources
+    # threads: safe only when all adapters are remote (stateless HTTP, I/O-bound).
+    # solo:    single-process, single-thread — required for local adapters.
+    #          Avoids CUDA context conflicts and loads the model only once.
+    #          No parallelism, but safe and memory-efficient for local inference.
+    # CELERY_POOL can always be overridden explicitly by the operator.
+    if [ "${USE_REMOTE_DOCLING:-false}" = "true" ] && [ "${USE_REMOTE_EMBEDDING:-false}" = "true" ]; then
+      CELERY_POOL="${CELERY_POOL:-threads}"
+    else
+      CELERY_POOL="${CELERY_POOL:-solo}"
+    fi
+    echo "🔧 Starting Celery worker: concurrency=$CELERY_WORKER, pool=$CELERY_POOL, queues=$CELERY_QUEUES"
+    exec venv/bin/celery -A infrastructure.celery.app worker -c $CELERY_WORKER --pool=$CELERY_POOL --loglevel=info -Q $CELERY_QUEUES -n data_sources
     ;;
 
   debug)

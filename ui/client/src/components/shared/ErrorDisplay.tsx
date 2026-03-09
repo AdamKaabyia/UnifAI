@@ -12,6 +12,8 @@ interface ErrorDisplayProps {
   onRetry?: () => void;
   /** Optional retry button label (defaults to "Retry") */
   retryLabel?: string;
+  /** Optional: when true, disables retry button and shows loading state */
+  isRetrying?: boolean;
   /** Optional custom className for the container */
   className?: string;
   /** Optional custom className for the card */
@@ -45,6 +47,7 @@ export function ErrorDisplay({
   title = "Error",
   onRetry,
   retryLabel = "Retry",
+  isRetrying = false,
   className,
   cardClassName,
   titleClassName,
@@ -86,12 +89,13 @@ export function ErrorDisplay({
           {onRetry && (
             <Button 
               onClick={onRetry} 
+              disabled={isRetrying}
               className={cn(
                 "px-4 py-2 bg-primary hover:bg-opacity-80 rounded-md text-sm font-medium transition-colors",
                 buttonClassName
               )}
             >
-              {retryLabel}
+              {isRetrying ? "Checking..." : retryLabel}
             </Button>
           )}
         </div>

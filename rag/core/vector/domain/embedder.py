@@ -1,30 +1,91 @@
+"""Embedding domain - ports and exceptions for embedding generation."""
+
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, Iterator
+from typing import Dict, List, Any
+
+
+class EmbeddingPort(ABC):
+    """
+    Abstract interface for embedding generation.
+    
+    This port defines the contract for generating vector embeddings from text.
+    Implementations can be local (SentenceTransformers) or remote (HTTP service).
+    """
+
+    @property
+    @abstractmethod
+    def is_remote(self) -> bool:
+        """True if this adapter calls an external service; False if purely local."""
+        ...
+
+    @property
+    @abstractmethod
+    def embedding_dim(self) -> int:
+        """Get the dimension of generated embeddings."""
+        pass
+    
+    @abstractmethod
+    def encode_texts(self, texts: List[str]) -> List[np.ndarray]:
+        """
+        Encode multiple texts into embeddings.
+        
+        Args:
+            texts: List of text strings to encode
+            
+        Returns:
+            List of embedding vectors as numpy arrays
+        """
+        pass
+    
+    @abstractmethod
+    def encode_single(self, text: str) -> np.ndarray:
+        """
+        Encode a single text into an embedding.
+        
+        Args:
+            text: Text string to encode
+            
+        Returns:
+            Embedding vector as numpy array
+        """
+        pass
+    
+    @abstractmethod
+    def test_connection(self) -> bool:
+        """
+        Test if the embedding generator is available.
+        
+        Returns:
+            True if available, False otherwise
+        """
+        pass
+
 
 class EmbeddingGenerator(ABC):
     """
-    Abstract base class for embedding generation.
+    Application-level port for embedding generation with batching.
     
-    This class defines the common interface and shared functionality
-    for creating vector embeddings from text chunks.
+    Consumers depend on this ABC; concrete implementation
+    (batch processing, error recovery, logging) lives in infrastructure.
     """
+
+    @property
+    @abstractmethod
+    def is_remote(self) -> bool:
+        """True if the underlying adapter calls an external service."""
+        ...
+
+    @property
+    @abstractmethod
+    def embedding_dim(self) -> int:
+        """Get the embedding dimension."""
+        pass
     
-    def __init__(self, batch_size: int = 32, embedding_dim: Optional[int] = None):
-        """
-        Initialize the embedding generator.
-        
-        Args:
-            batch_size: Number of chunks to process in a single batch
-            embedding_dim: Dimension of the generated embeddings (model specific)
-        """
-        self.batch_size = batch_size
-        self.embedding_dim = embedding_dim
-        
     @abstractmethod
     def generate_embeddings(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Generate embeddings for a list of text chunks.
+        Generate embeddings for all chunks.
         
         Args:
             chunks: List of chunks with text and metadata
@@ -47,16 +108,17 @@ class EmbeddingGenerator(ABC):
         """
         pass
     
-    def _batch_generator(self, chunks: List[Dict[str, Any]]) -> Iterator[List[Dict[str, Any]]]:
+    @abstractmethod
+    def test_connection(self) -> bool:
         """
-        Split chunks into batches for efficient processing.
+        Test if the embedding service is available.
         
-        Args:
-            chunks: List of chunks to batch
-            
-        Yields:
-            Batches of chunks
+        Returns:
+            True if available, False otherwise
         """
-        for i in range(0, len(chunks), self.batch_size):
-            yield chunks[i:i + self.batch_size]
+        pass
 
+
+class EmbeddingGenerationError(Exception):
+    """Raised when embedding generation fails."""
+    pass

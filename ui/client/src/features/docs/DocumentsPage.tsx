@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { FaTh, FaList } from "react-icons/fa";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Document } from "@/types";
 import { UploadTab } from "./UploadTab";
 import Sidebar from "@/components/layout/Sidebar";
@@ -20,6 +20,9 @@ import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { Pagination } from "@/components/shared/Pagination";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
+import { useRemoteServicesHealth } from '@/hooks/use-remote-services-health';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ErrorDisplay } from '@/components/shared/ErrorDisplay';
 
 export default function Documents() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,12 +43,58 @@ export default function Documents() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { uploadEnabled, isLoading: healthLoading, docling, embedding, refresh, isRefetching } = useRemoteServicesHealth();
+
+  /**
+   * Build a human-readable message describing which services are unavailable.
+   * @param detailed - If true, appends the upload-disabled notice.
+   */
+  const getServiceUnavailableMessage = useCallback((detailed: boolean = false): string => {
+    const suffix = detailed ? ' Document upload is temporarily disabled.' : '';
+    if (docling?.status === 'unhealthy' && embedding?.status === 'unhealthy') {
+      return `Document processing and embedding services are currently unavailable.${suffix}`;
+    }
+    if (docling?.status === 'unhealthy') {
+      return `Document processing service is currently unavailable.${suffix}`;
+    }
+    if (embedding?.status === 'unhealthy') {
+      return `Embedding service is currently unavailable.${suffix}`;
+    }
+    return `Required services are currently unavailable.${suffix}`;
+  }, [docling, embedding]);
+
+  // Track previous uploadEnabled state to detect changes
+  const prevUploadEnabled = useRef<boolean | null>(null);
+
+  // Show toast when service status changes
+  useEffect(() => {
+    // Skip initial load
+    if (healthLoading) return;
+    
+    // Show toast when transitioning from enabled to disabled (service went down)
+    if (prevUploadEnabled.current === true && !uploadEnabled) {
+      toast({
+        title: "Service Unavailable",
+        description: getServiceUnavailableMessage(),
+        variant: "destructive",
+      });
+    }
+    
+    // Show toast when transitioning from disabled to enabled (service restored)
+    if (prevUploadEnabled.current === false && uploadEnabled) {
+      toast({
+        title: "Services Restored",
+        description: "Document upload is now available.",
+      });
+    }
+    
+    prevUploadEnabled.current = uploadEnabled;
+  }, [uploadEnabled, healthLoading, getServiceUnavailableMessage, toast]);
 
   const {
     bulkDeleteConfirm,
     setBulkDeleteConfirm,
     bulkDeleteLoading,
-    handleDeleteSelected: handleDeleteSelectedBase,
     confirmBulkDelete: confirmBulkDeleteBase,
   } = useBulkDelete({
     deleteFunction: deleteDocs,
@@ -123,11 +172,27 @@ export default function Documents() {
             itemName={selectedCount === 1 ? "document" : "documents"}
           />
         )}
-        <UmamiTrack 
-          event={UmamiEvents.UPLOAD_DOCUMENT_BUTTON}
-        >
-      <Button onClick={() => setShowUploadModal(true)}>Upload Document</Button>
-      </UmamiTrack>
+        <UmamiTrack event={UmamiEvents.UPLOAD_DOCUMENT_BUTTON}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button 
+                    onClick={() => setShowUploadModal(true)}
+                    disabled={!uploadEnabled || healthLoading}
+                  >
+                    Upload Document
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!uploadEnabled && !healthLoading && (
+                <TooltipContent>
+                  <p>{getServiceUnavailableMessage()}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        </UmamiTrack>
       <div className="flex">
         <UmamiTrack 
           event={UmamiEvents.VIEW_DOCUMENT_LIST_BUTTON}
@@ -223,6 +288,22 @@ export default function Documents() {
         />
 
         <div className="flex-1 overflow-auto px-6 pb-6">
+          {/* Service Unavailable Alert Banner */}
+          {!uploadEnabled && !healthLoading && (
+            <ErrorDisplay
+              variant="inline"
+              title="Service Unavailable"
+              errorMessage={getServiceUnavailableMessage(true)}
+              onRetry={refresh}
+              retryLabel="Check again"
+              isRetrying={isRefetching}
+              className="mt-4"
+              cardClassName="border-red-500/60 bg-red-950/40"
+              titleClassName="text-red-400 font-medium"
+              messageClassName="text-red-300"
+            />
+          )}
+
           {showUploadModal ? (
             <UploadTab setShowUploadModal={setShowUploadModal} fetchDocuments={refetch} />
           ) : (

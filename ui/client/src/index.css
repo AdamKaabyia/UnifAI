@@ -167,31 +167,6 @@
     color: white !important;
   }
 
-  /* React Flow styles */
-.react-flow__handle {
-  width: 8px !important;
-  height: 8px !important;
-  background: #8A2BE2 !important;
-  border: 2px solid #ffffff !important;
-}
-
-.react-flow__handle-connecting {
-  background: #ff6b6b !important;
-}
-
-/* Custom edge delete button visibility */
-.react-flow__edge:hover .edgebutton-foreignobject button {
-  opacity: 1 !important;
-}
-
-.edgebutton-foreignobject button {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.edgebutton-foreignobject button:hover {
-  opacity: 1 !important;
-}
 
   /* Utility: hide scrollbars but keep scroll functionality */
   .no-scrollbar {
@@ -301,10 +276,23 @@
     border-color: rgba(255, 255, 255, 0.22) !important;
   }
 
+  /* Pulsing glow for the active connection-source node */
+  @keyframes node-connection-glow {
+    0%, 100% {
+      box-shadow: 0 0 8px 2px var(--node-glow-color, rgba(99,102,241,0.5));
+    }
+    50% {
+      box-shadow: 0 0 20px 6px var(--node-glow-color, rgba(99,102,241,0.5)),
+                  0 0 40px 10px var(--node-glow-color, rgba(99,102,241,0.25));
+    }
+  }
+
   /* Respect users' reduced-motion preferences */
   @media (prefers-reduced-motion: reduce) {
-    .workflow-graph-animated {
-      animation: none;
+    .workflow-graph-animated,
+    .node-glow-animation {
+      animation: none !important;
+      animation-name: none !important;
     }
   }
 }

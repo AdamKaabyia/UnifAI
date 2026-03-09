@@ -47,11 +47,10 @@ UnifAI UI is a modern React-based web application focused on **Agentic AI workfl
 - **React Context API** - Global contexts (Auth, Theme, Notifications, Project, Shared)
 
 ### Graph & Visualization
-- **ReactFlow 11.11.4** - Flow/graph visualization library for the **edit-mode** workflow builder (`NewGraph.tsx`, `use-graph-logic.ts`)
-- **JointJS (@joint/core + @joint/layout-directed-graph)** - SVG graph rendering library for **read-only / view-mode** workflow display (`GraphDisplay.tsx`, `useJointGraph` hook). Chosen for its lightweight rendering pipeline and auto-layout support when interactive editing is not required.
+- **JointJS (@joint/core + @joint/layout-directed-graph)** - SVG graph rendering library used for **both** the creation canvas (`GraphCreation.tsx`, `useGraphCreationCanvas` hook) and the read-only display (`GraphDisplay.tsx`, `useGraphDisplay` hook). Chosen for its lightweight rendering pipeline, imperative control over layout and SVG injection, and auto-layout support.
 - **Recharts 2.15.2** - Chart library for dashboard visualizations
 
-> **Note – dual graph library strategy:** ReactFlow is used wherever the user edits the graph (drag-and-drop nodes, connect edges, etc.). JointJS is used for the read-only display of saved blueprints (e.g. execution panel, overview modal) because it offers simple imperative control over layout and SVG injection without React node overhead. This split is intentional; both libraries must be maintained.
+> **Note – graph library strategy:** JointJS is the primary graph library, powering both creation and display canvases. The graph-builder state (`use-graph-creation-logic.ts`) uses library-agnostic `CanvasNode` / `CanvasEdge` types (defined in `types/graph.ts`) so the rendering layer can be swapped without touching business logic.
 
 ### Data Handling
 - **Axios 1.9.0** - HTTP client
@@ -111,7 +110,7 @@ ui/
 │   │   │   ├── docs/                # Document upload/management
 │   │   │   └── slack/               # Slack integration
 │   │   ├── hooks/                   # Custom React hooks
-│   │   │   ├── use-graph-logic.ts   # ⭐ Graph builder logic
+│   │   │   ├── use-graph-creation-logic.ts  # ⭐ Graph builder logic
 │   │   │   ├── use-mobile.tsx       # Mobile detection
 │   │   │   ├── use-toast.ts         # Toast notifications
 │   │   │   └── use-workspace-data.ts  # ⭐ Workspace data management
@@ -122,7 +121,7 @@ ui/
 │   │   ├── lib/                     # Utility libraries
 │   │   │   └── utils.ts             # cn() helper for Tailwind
 │   │   ├── pages/                   # Page components (routes)
-│   │   │   ├── AgenticAI.tsx        # ⭐ Workflow configuration page
+│   │   │   ├── AgenticWorkflows.tsx  # ⭐ Workflow configuration page
 │   │   │   ├── AgenticChats.tsx     # ⭐ Chat/execution page
 │   │   │   ├── AgentRepository.tsx  # Agent inventory
 │   │   │   ├── Configuration.tsx    # Settings
@@ -257,7 +256,7 @@ The **Agentic AI system** is the core feature, enabling users to build, validate
 
 ### Key Components
 
-#### 1. **Workflow Configuration (`AgenticAI.tsx` page)**
+#### 1. **Workflow Configuration (`AgenticWorkflows.tsx` page)**
 
 **Route:** `/agentic-ai` (also root `/`)
 
@@ -283,38 +282,40 @@ handleBuildGraph() {
 }
 ```
 
-#### 2. **Graph Builder (`NewGraph.tsx` + `use-graph-logic.ts`)**
+#### 2. **Graph Builder (`NewGraph.tsx` + `use-graph-creation-logic.ts`)**
 
 **Architecture:** 3-panel layout
-1. **Left Panel:** Building blocks sidebar (nodes, conditions)
-2. **Center Panel:** ReactFlow canvas for visual workflow design
+1. **Left Panel:** Building blocks sidebar (agents, orchestrators, conditions)
+2. **Center Panel:** JointJS canvas for visual workflow design with click-to-connect UX
 3. **Right Panel:** Real-time validation panel
 
-**Core Hook: `use-graph-logic.ts`** (~1250 lines)
+**Core Hook: `use-graph-creation-logic.ts`** (~1250 lines)
 
 This custom hook manages the entire graph builder state machine:
 
 **State Management:**
 ```typescript
 const {
-  nodes, edges,                    // ReactFlow state
+  nodes, edges,                    // CanvasNode[] / CanvasEdge[] state
   yamlFlow,                        // YAML representation (source of truth)
-  buildingBlocksData,              // Available nodes (category=nodes)
+  buildingBlocksData,              // Available agent nodes (category=nodes)
+  orchestratorsData,               // Available orchestrator nodes
   conditionsData,                  // Available conditions (category=conditions)
   allBlocksData,                   // All workspace resources
   isGraphValid,                    // Validation status
   validationResult,                // Validation errors/warnings
+  pendingConnectionSource,         // Click-to-connect state
   
   // Actions
   onDrop,                          // Drag-and-drop handler
-  onConnect,                       // Edge creation handler
+  handleNodeClickForConnection,    // Click-to-connect handler
   attachConditionToNode,           // Attach condition to node
   removeConditionFromNode,         // Remove condition
   saveGraph,                       // Save blueprint as YAML
   validateGraph,                   // Trigger validation
   clearGraph,                      // Reset to default nodes
   deleteEdge, deleteNode,          // Deletion handlers
-} = useGraphLogic();
+} = useGraphCreationLogic();
 ```
 
 **Default Nodes:**
@@ -638,16 +639,12 @@ setYamlFlow(prev => ({
 
 **Conditional Edge Creation:**
 
-When connecting from a node with a condition, modal prompts for branch selection:
+When connecting from a node with a condition, branch keys are automatically assigned based on condition type:
 
 ```typescript
-<ConditionalEdgeModal
-  conditionType="router_boolean"
-  existingBranches={["true"]}
-  onConfirm={(branchConfig) => {
-    createEdge({ branch: "false", target: targetNode });
-  }}
-/>
+// router_boolean: assigns "true", then "false", then "branch_2", etc.
+// router_direct: uses the target node ID as the branch key
+createConditionalEdge(sourceId, targetId, condition);
 ```
 
 **Branch Mapping in YAML:**
@@ -671,7 +668,7 @@ plan:
 | Type | Convention | Example |
 |------|-----------|---------|
 | Components | PascalCase.tsx | `AgentFlowGraph.tsx` |
-| Hooks | camelCase.ts with `use-` prefix | `use-graph-logic.ts` |
+| Hooks | kebab-case.ts with `use-` prefix | `use-graph-creation-logic.ts` |
 | Contexts | PascalCase.tsx with `Context` suffix | `AuthContext.tsx` |
 | Types | camelCase.ts | `graph.ts`, `workspace.ts` |
 | Utils | camelCase.ts | `guideLoader.ts` |
@@ -1126,10 +1123,12 @@ const { currentPage, setCurrentPage } = usePaginationStore();
 
 **Major custom hooks:**
 
-1. **`use-graph-logic.ts`** - Graph builder state machine (~1250 lines)
-2. **`use-workspace-data.ts`** - Workspace resource management (~410 lines)
-3. **`use-toast.ts`** - Toast notification system
-4. **`use-mobile.tsx`** - Mobile detection
+1. **`use-graph-creation-logic.ts`** - Graph builder state machine (~1250 lines)
+2. **`use-graph-creation-canvas.ts`** - JointJS paper hook for creation canvas (~740 lines)
+3. **`use-graph-display.ts`** - JointJS paper hook for read-only display
+4. **`use-workspace-data.ts`** - Workspace resource management (~410 lines)
+5. **`use-toast.ts`** - Toast notification system
+6. **`use-mobile.tsx`** - Mobile detection
 
 **Hook pattern:**
 
@@ -1720,7 +1719,7 @@ For questions about this architecture document or UI conventions:
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** November 23, 2025  
+**Last Updated:** March 3, 2026  
 **Maintainer:** UnifAI Development Team
 
 

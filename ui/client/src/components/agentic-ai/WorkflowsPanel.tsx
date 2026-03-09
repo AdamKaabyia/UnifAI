@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Trash2, Users } from "lucide-react";
+import { Trash2, Users, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useShared } from "@/contexts/SharedContext";
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,11 @@ export interface WorkflowsPanelProps {
   selectedFlow: FlowObject | null;
   onFlowSelect: (flow: FlowObject | null) => void;
   onFlowDelete?: (flow: FlowObject) => void;
+  onFlowEdit?: (flow: FlowObject) => void;
   onValidationChange?: (isValid: boolean, validationResult: BlueprintValidationResult | null, isValidating: boolean) => void;
   showActiveStatus?: boolean;
   showDeleteButton?: boolean;
+  showEditButton?: boolean;
   className?: string;
   height?: string;
   graphProps?: {
@@ -41,9 +43,11 @@ export default function WorkflowsPanel({
   selectedFlow,
   onFlowSelect,
   onFlowDelete,
+  onFlowEdit,
   onValidationChange,
   showActiveStatus = false,
   showDeleteButton = false,
+  showEditButton = false,
   className = "",
   height = "100%",
   graphProps = {
@@ -74,6 +78,7 @@ export default function WorkflowsPanel({
     validateBlueprint: validateSelectedBlueprint,
     clearValidation,
   } = useBlueprintValidation({
+    activeBlueprintId: selectedFlow?.id ?? null,
     onValidationChange,
     showToastOnFailure: true,
   });
@@ -193,6 +198,13 @@ export default function WorkflowsPanel({
     setShowDeleteModal(true);
   };
 
+  const handleEditClick = (flow: FlowObject, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (onFlowEdit) {
+      onFlowEdit(flow);
+    }
+  };
+
   const handleShareClick = (flow: FlowObject, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent flow selection when clicking share
     openShareForItem({
@@ -301,6 +313,18 @@ export default function WorkflowsPanel({
                         <span className="text-xs bg-primary text-white px-2 py-1 rounded-full">
                           Active
                         </span>
+                      )}
+                      {showEditButton && (
+                        <SimpleTooltip content={<p>Edit this workflow</p>}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
+                            onClick={(e) => handleEditClick(flow, e)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </SimpleTooltip>
                       )}
                       <SimpleTooltip content={<p>Share this workflow</p>}>
                         <Button

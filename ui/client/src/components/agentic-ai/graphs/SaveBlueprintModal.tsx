@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,9 @@ interface SaveBlueprintModalProps {
   onClose: () => void;
   onSave: (name: string, description: string) => void;
   isLoading?: boolean;
+  isEditMode?: boolean;
+  currentName?: string;
+  currentDescription?: string;
 }
 
 const SaveBlueprintModal: React.FC<SaveBlueprintModalProps> = ({
@@ -26,9 +29,19 @@ const SaveBlueprintModal: React.FC<SaveBlueprintModalProps> = ({
   onClose,
   onSave,
   isLoading = false,
+  isEditMode = false,
+  currentName = "",
+  currentDescription = "",
 }) => {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(currentName);
+  const [description, setDescription] = useState(currentDescription);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(currentName);
+      setDescription(currentDescription);
+    }
+  }, [isOpen]);
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -38,8 +51,8 @@ const SaveBlueprintModal: React.FC<SaveBlueprintModalProps> = ({
   };
 
   const handleClose = () => {
-    setName("");
-    setDescription("");
+    setName(isEditMode ? currentName : "");
+    setDescription(isEditMode ? currentDescription : "");
     onClose();
   };
 
@@ -49,7 +62,9 @@ const SaveBlueprintModal: React.FC<SaveBlueprintModalProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-700">
         <DialogHeader>
-          <DialogTitle className="text-white">Save Workflow</DialogTitle>
+          <DialogTitle className="text-white">
+            {isEditMode ? "Update Workflow" : "Save Workflow"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -103,10 +118,10 @@ const SaveBlueprintModal: React.FC<SaveBlueprintModalProps> = ({
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Saving...
+                  {isEditMode ? "Updating..." : "Saving..."}
                 </div>
               ) : (
-                "Save Workflow"
+                isEditMode ? "Update Workflow" : "Save Workflow"
               )}
             </Button>
           </UmamiTrack>

@@ -4,6 +4,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAgenticAI } from '@/contexts/AgenticAIContext';
 
 export interface UseBlueprintValidationOptions {
+  /** The currently selected blueprint ID. Kept in sync with
+   *  latestBlueprintIdRef during render so that stale promise
+   *  continuations that resolve between a render and its effects
+   *  are immediately rejected. */
+  activeBlueprintId?: string | null;
   /** Callback when validation state changes */
   onValidationChange?: (isValid: boolean, validationResult: BlueprintValidationResult | null, isValidating: boolean) => void;
   /** Whether to show toast notifications on validation failure */
@@ -34,6 +39,7 @@ export function useBlueprintValidation(
   options: UseBlueprintValidationOptions = {}
 ): UseBlueprintValidationResult {
   const { 
+    activeBlueprintId,
     onValidationChange, 
     showToastOnFailure = true,
     skipCache = false,
@@ -48,6 +54,16 @@ export function useBlueprintValidation(
 
   // Track the latest requested blueprintId so stale responses are discarded.
   const latestBlueprintIdRef = useRef<string | null>(null);
+
+  // Synchronize the ref with the caller's active blueprint during render.
+  // This is critical: useEffect runs AFTER render, but stale promise
+  // continuations can resolve BETWEEN a render and its effects. Without
+  // this, a response for the previous blueprint could slip through the
+  // latestBlueprintIdRef guard and briefly apply invalid state to the
+  // newly-selected blueprint.
+  if (activeBlueprintId !== undefined) {
+    latestBlueprintIdRef.current = activeBlueprintId;
+  }
 
   const clearValidation = useCallback(() => {
     latestBlueprintIdRef.current = null;
@@ -65,12 +81,16 @@ export function useBlueprintValidation(
     // Check if we have a cache hit (valid result within TTL)
     const isCacheHit = !skipCache && isBlueprintValidationCacheHit(blueprintId);
     
-    // Only show loading state if we're actually going to fetch from API (no cache hit)
+    // Always clear stale results from the previous flow to prevent them
+    // from leaking into the UI while the new result (cached or not) resolves.
+    setValidationResults({});
+    setIsValid(true);
+
     if (!isCacheHit) {
       setIsValidating(true);
-      setValidationResults({});
-      setIsValid(true); // Assume valid until proven otherwise
       onValidationChange?.(true, null, true);
+    } else {
+      onValidationChange?.(true, null, false);
     }
     
     try {
