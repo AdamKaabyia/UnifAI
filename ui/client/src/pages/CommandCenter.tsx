@@ -20,6 +20,7 @@ import {
   Send,
   Link2,
   ChevronRight,
+  ChevronDown,
   Radio,
   Crown,
   Medal,
@@ -47,6 +48,11 @@ const MOCK_TEAM_MEMBERS = [
   { id: "4", name: "James C.", initials: "JC", color: "from-orange-500 to-orange-600" },
   { id: "5", name: "Alex K.", initials: "AK", color: "from-violet-500 to-violet-600" },
   { id: "6", name: "Maria T.", initials: "MT", color: "from-cyan-500 to-cyan-600" },
+];
+
+const MOCK_TEAMS = [
+  { id: "team-1", name: "Platform Engineering", members: [MOCK_TEAM_MEMBERS[0], MOCK_TEAM_MEMBERS[1], MOCK_TEAM_MEMBERS[2], MOCK_TEAM_MEMBERS[3], MOCK_TEAM_MEMBERS[4], MOCK_TEAM_MEMBERS[5]] },
+  { id: "team-2", name: "SRE", members: [MOCK_TEAM_MEMBERS[0], MOCK_TEAM_MEMBERS[4], MOCK_TEAM_MEMBERS[5]] },
 ];
 
 const MOCK_ACTIVITY = [
@@ -153,6 +159,8 @@ export default function CommandCenter() {
   const [activeSession, setActiveSession] = useState(0);
   const [registryFilter, setRegistryFilter] = useState<"all" | AssetKind>("all");
   const [registryScope, setRegistryScope] = useState<"team" | "mine">("team");
+  const [selectedTeam, setSelectedTeam] = useState(MOCK_TEAMS[0]);
+  const [teamSelectorOpen, setTeamSelectorOpen] = useState(false);
 
   const { user } = useAuth();
 
@@ -172,7 +180,7 @@ export default function CommandCenter() {
         <Header title="AI Command Center" onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
         <Tabs defaultValue="dashboard" className="flex-1 flex flex-col overflow-hidden">
-          <div className="border-b border-gray-800 bg-background-surface px-6">
+          <div className="border-b border-gray-800 bg-background-surface px-6 flex items-center justify-between">
             <TabsList className="bg-transparent h-11 gap-1 p-0">
               <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4">
                 <Activity className="w-3.5 h-3.5 mr-2" />Dashboard
@@ -189,6 +197,69 @@ export default function CommandCenter() {
                 )}
               </TabsTrigger>
             </TabsList>
+
+            {/* Team Selector */}
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setTeamSelectorOpen(!teamSelectorOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-800 bg-background-card hover:border-gray-700 transition-colors"
+              >
+                <Users className="w-3.5 h-3.5 text-primary" />
+                <span className="font-medium text-white text-xs">{selectedTeam.name}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${teamSelectorOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              <AnimatePresence>
+                {teamSelectorOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setTeamSelectorOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-72 bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="p-2 border-b border-gray-800">
+                        <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">Your Teams</div>
+                        {MOCK_TEAMS.map((team) => (
+                          <button
+                            key={team.id}
+                            onClick={() => { setSelectedTeam(team); setTeamSelectorOpen(false); }}
+                            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors ${selectedTeam.id === team.id ? "bg-primary/10" : "hover:bg-white/[.03]"}`}
+                          >
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedTeam.id === team.id ? "bg-primary" : "bg-gray-700"}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-xs font-semibold truncate ${selectedTeam.id === team.id ? "text-primary" : "text-gray-300"}`}>{team.name}</div>
+                              <div className="text-[10px] text-gray-600">{team.members.length} members</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="p-3">
+                        <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                          Members &mdash; {selectedTeam.name}
+                        </div>
+                        <div className="space-y-1.5">
+                          {selectedTeam.members.map((m) => (
+                            <div key={m.id} className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                              <Avatar member={m} size="xs" />
+                              <span className="text-xs text-gray-300">{m.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="px-3 py-2 border-t border-gray-800 bg-gray-900/30">
+                        <p className="text-[10px] text-gray-600 italic">Manage teams in the Configuration tab</p>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* ══════════════ DASHBOARD TAB ══════════════ */}
@@ -349,8 +420,8 @@ export default function CommandCenter() {
                 </div>
 
                 <div className="flex bg-background-card border border-gray-800 rounded-lg p-0.5 gap-0.5">
-                  <button onClick={() => setRegistryScope("team")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${registryScope === "team" ? "bg-primary/15 text-primary" : "text-gray-500 hover:text-gray-300"}`}>
-                    Team Assets
+                  <button onClick={() => setRegistryScope("team")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors truncate max-w-[160px] ${registryScope === "team" ? "bg-primary/15 text-primary" : "text-gray-500 hover:text-gray-300"}`}>
+                    {selectedTeam.name}
                   </button>
                   <button onClick={() => setRegistryScope("mine")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${registryScope === "mine" ? "bg-primary/15 text-primary" : "text-gray-500 hover:text-gray-300"}`}>
                     My Assets
@@ -376,7 +447,7 @@ export default function CommandCenter() {
                             </span>
                             <div className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                               {asset.visibility === "team" ? (
-                                <><Eye className="w-3 h-3" />Team</>
+                                <><Eye className="w-3 h-3" />{selectedTeam.name}</>
                               ) : (
                                 <><Lock className="w-3 h-3" />Private</>
                               )}

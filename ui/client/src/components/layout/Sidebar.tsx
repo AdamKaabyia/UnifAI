@@ -102,6 +102,27 @@ export default function Sidebar() {
             initial={false}
             animate={{ opacity: isCollapsed ? 0 : 1 }}
             transition={{ duration: 0.2 }}
+            className="px-3 mb-2"
+          >
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Team</span>
+          </motion.div>
+        )}
+        <ul>
+          <NavItem 
+            icon={<FaProjectDiagram className="sidebar-icon" />} 
+            label="Command Center" 
+            to="/command-center"
+            isActive={location === '/command-center'}
+            status="New"
+            isCollapsed={isCollapsed}
+          />
+        </ul>
+        
+        {!isCollapsed && (
+          <motion.div 
+            initial={false}
+            animate={{ opacity: isCollapsed ? 0 : 1 }}
+            transition={{ duration: 0.2 }}
             className="px-3 mt-6 mb-2"
           >
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Agentic AI</span>
