@@ -8,6 +8,7 @@ import {
   CatalogResponse,
 } from "../types/workspace";
 import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
 import { useToast } from "./use-toast";
 import { catalogService } from "@/api/catalog";
 import { useAgenticAI } from "@/contexts/AgenticAIContext";
@@ -52,7 +53,10 @@ export const useWorkspaceData = () => {
   const { addOrUpdateResource, removeResource, revalidateResourceAndAncestors } = useAgenticAI();
 
   const { user } = useAuth();
-  const USER_ID = user?.username || "default";
+  const { viewMode, selectedTeam } = useView();
+  const USER_ID = viewMode === "team" && selectedTeam
+    ? selectedTeam.name
+    : (user?.username || "default");
 
   // Fetch all available categories and element types
   const fetchCategories = useCallback(async () => {
@@ -136,7 +140,7 @@ export const useWorkspaceData = () => {
         setIsLoadingInstances(false);
       }
     },
-    [toast],
+    [toast, USER_ID],
   );
 
   // Fetch single resource by ID
@@ -195,7 +199,7 @@ export const useWorkspaceData = () => {
         return [];
       }
     },
-    [toast],
+    [toast, USER_ID],
   );
 
   // Fetch element schema for form generation (combines resource schema + element-specific schema)

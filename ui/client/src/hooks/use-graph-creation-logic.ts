@@ -9,6 +9,7 @@ import {
 } from "@/types/graph";
 import { getCategoryDisplay } from "@/components/shared/helpers";
 import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { deriveThemeColors } from "@/lib/colorUtils";
 import axios from "../http/axiosAgentConfig";
@@ -120,7 +121,10 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   const blueprintLoadedRef = useRef(false);
 
   const { user } = useAuth();
-  const USER_ID = user?.username || "default";
+  const { viewMode, selectedTeam } = useView();
+  const USER_ID = viewMode === "team" && selectedTeam
+    ? selectedTeam.name
+    : (user?.username || "default");
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)
   const deleteNodeRef = useRef<(id: string) => void>(() => {});

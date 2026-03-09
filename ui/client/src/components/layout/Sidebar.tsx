@@ -6,26 +6,28 @@ import {
   FaChartLine, FaUserShield, FaCog,
   FaRobot, FaFile, FaChevronLeft, FaChevronRight,
   FaInfoCircle, FaBook, FaComment, FaPuzzlePiece,
-  FaProjectDiagram
 } from "react-icons/fa";
 import { FaSlack, FaBars } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { useAuth, User } from '@/contexts/AuthContext';
+import { useView } from '@/contexts/ViewContext';
+import { Users, ChevronDown, User as UserIcon } from "lucide-react";
 
 export default function Sidebar() {
   const [location] = useLocation();
   const { currentProject } = useProject();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
 
-  // Save collapse state when it changes
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
 
-    const { user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { viewMode, setViewMode, selectedTeam, setSelectedTeam, teams } = useView();
 
   const getInitials = (name: string): string => {
     return name
@@ -95,8 +97,107 @@ export default function Sidebar() {
         </div>
       </div> */}
 
+      {/* View Switcher */}
+      <div className={`${isCollapsed ? 'px-2' : 'px-3'} mt-2 mb-2`}>
+        {isCollapsed ? (
+          <SimpleTooltip content={<p>{viewMode === 'private' ? 'My Workspace' : (selectedTeam?.name ?? 'Team')}</p>}>
+            <button
+              onClick={() => setViewMode(viewMode === 'private' ? 'team' : 'private')}
+              className={`w-full flex items-center justify-center py-2 rounded-lg transition-colors ${
+                viewMode === 'team'
+                  ? 'bg-primary/15 text-primary'
+                  : 'bg-background-card text-gray-400 hover:text-white'
+              }`}
+            >
+              {viewMode === 'private' ? <UserIcon className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+            </button>
+          </SimpleTooltip>
+        ) : (
+          <div className="relative">
+            <div className="flex bg-background-card border border-gray-800 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setViewMode('private')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'private'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <UserIcon className="w-3 h-3" />
+                My Workspace
+              </button>
+              <button
+                onClick={() => { setViewMode('team'); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'team'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Users className="w-3 h-3" />
+                Team
+              </button>
+            </div>
+
+            {/* Team selector dropdown (only visible in team mode) */}
+            <AnimatePresence>
+              {viewMode === 'team' && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <button
+                    onClick={() => setTeamDropdownOpen(!teamDropdownOpen)}
+                    className="w-full mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-gray-800 bg-background-card hover:border-gray-700 transition-colors"
+                  >
+                    <span className="text-xs font-medium text-white truncate">{selectedTeam?.name ?? 'Select team'}</span>
+                    <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform flex-shrink-0 ${teamDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {teamDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setTeamDropdownOpen(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute left-0 right-0 mt-1 bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+                        >
+                          <div className="p-1.5">
+                            {teams.map((team) => (
+                              <button
+                                key={team.id}
+                                onClick={() => { setSelectedTeam(team); setTeamDropdownOpen(false); }}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                  selectedTeam?.id === team.id ? 'bg-primary/10' : 'hover:bg-white/[.03]'
+                                }`}
+                              >
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedTeam?.id === team.id ? 'bg-primary' : 'bg-gray-700'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-xs font-semibold truncate ${selectedTeam?.id === team.id ? 'text-primary' : 'text-gray-300'}`}>{team.name}</div>
+                                  <div className="text-[10px] text-gray-600">{team.members.length} members</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
       {/* Navigation Menu */}
-      <nav className="mt-4 flex-grow">
+      <nav className="mt-2 flex-grow">
         {!isCollapsed && (
           <motion.div 
             initial={false}
@@ -104,34 +205,15 @@ export default function Sidebar() {
             transition={{ duration: 0.2 }}
             className="px-3 mb-2"
           >
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Team</span>
-          </motion.div>
-        )}
-        <ul>
-          <NavItem 
-            icon={<FaProjectDiagram className="sidebar-icon" />} 
-            label="Command Center" 
-            to="/command-center"
-            isActive={location === '/command-center'}
-            status="New"
-            isCollapsed={isCollapsed}
-          />
-        </ul>
-        
-        {!isCollapsed && (
-          <motion.div 
-            initial={false}
-            animate={{ opacity: isCollapsed ? 0 : 1 }}
-            transition={{ duration: 0.2 }}
-            className="px-3 mt-6 mb-2"
-          >
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Agentic AI</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              {viewMode === 'team' ? (selectedTeam?.name ?? 'Team') : 'Agentic AI'}
+            </span>
           </motion.div>
         )}
         <ul>
           <NavItem 
             icon={<FaTachometerAlt className="sidebar-icon" />} 
-            label="Agentic AI Overview" 
+            label={viewMode === 'team' ? 'Team Dashboard' : 'Agentic AI Overview'}
             to="/agentic-overview"
             isActive={location === '/agentic-overview'}
             status={null}
@@ -159,12 +241,11 @@ export default function Sidebar() {
             to="/agentic-ai"
             isActive={location === '/agentic-ai'}
             status={null}
-            // status="New"
             isCollapsed={isCollapsed}
           />
           <NavItem 
             icon={<FaComment className="sidebar-icon" />} 
-            label="Agentic Chats" 
+            label={viewMode === 'team' ? 'War Room' : 'Agentic Chats'}
             to="/agentic-chats"
             isActive={location === '/agentic-chats'}
             status={null}
@@ -247,7 +328,6 @@ export default function Sidebar() {
             isActive={location === '/configuration'}
             status={null}
             isCollapsed={isCollapsed}
-            disabled={true}
           />
           {user?.is_admin && (
           <NavItem 

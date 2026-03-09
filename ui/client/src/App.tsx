@@ -7,7 +7,6 @@ import AgenticWorkflows from "@/pages/AgenticWorkflows";
 import AgentRepository from "@/pages/AgentRepository";
 import AgenticChats from "@/pages/AgenticChats";
 import AgenticTemplates from "@/pages/AgenticTemplates";
-import CommandCenter from "@/pages/CommandCenter";
 import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
@@ -16,6 +15,7 @@ import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SharedProvider } from '@/contexts/SharedContext';
+import { ViewProvider } from '@/contexts/ViewContext';
 import DocumentsPage from "./features/docs/DocumentsPage";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AgenticAIProvider } from '@/contexts/AgenticAIContext';
@@ -25,8 +25,8 @@ import SlackIntegration from "./features/slack/SlackIntegration";
 import SlackAddSourcePage from "./features/slack/SlackAddSourcePage";
 import GuidesPage from "./components/guides/GuidesPage";
 import PublicChat from "./components/agentic-ai/chat/PublicChat";
+import AgenticLayout from "./components/layout/AgenticLayout";
 
-// Routes component that conditionally wraps agentic routes with the shared provider
 function AppRoutes() {
   const [isChat] = useRoute("/chat/:token");
   const [isAgenticOverview] = useRoute("/agentic-overview");
@@ -34,22 +34,22 @@ function AppRoutes() {
   const [isInventory] = useRoute("/inventory");
   const [isAgenticChats] = useRoute("/agentic-chats");
   const [isTemplates] = useRoute("/templates");
-  const [isCommandCenter] = useRoute("/command-center");
 
-  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates || isCommandCenter;
+  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
 
   if (isAgenticRoute) {
     return (
       <AgenticAIProvider>
-        <Switch>
-          <Route path="/agentic-overview" component={AgenticOverview} />
-          <Route path="/agentic-ai" component={AgenticWorkflows} />
-          <Route path="/inventory" component={AgentRepository} />
-          <Route path="/agentic-chats" component={AgenticChats} />
-          <Route path="/templates" component={AgenticTemplates} />
-          <Route path="/command-center" component={CommandCenter} />
-          <Route path="/chat/:token" component={PublicChat} />
-        </Switch>
+        <AgenticLayout>
+          <Switch>
+            <Route path="/agentic-overview" component={AgenticOverview} />
+            <Route path="/agentic-ai" component={AgenticWorkflows} />
+            <Route path="/inventory" component={AgentRepository} />
+            <Route path="/agentic-chats" component={AgenticChats} />
+            <Route path="/templates" component={AgenticTemplates} />
+            <Route path="/chat/:token" component={PublicChat} />
+          </Switch>
+        </AgenticLayout>
       </AgenticAIProvider>
     );
   }
@@ -82,15 +82,17 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <SharedProvider>
-          <ProjectProvider>
-            <NotificationProvider>
-              <ProtectedRoute>
-                <TermsApproval>
-                  <AppRoutes />
-                </TermsApproval>
-              </ProtectedRoute>
-            </NotificationProvider>
-          </ProjectProvider>
+          <ViewProvider>
+            <ProjectProvider>
+              <NotificationProvider>
+                <ProtectedRoute>
+                  <TermsApproval>
+                    <AppRoutes />
+                  </TermsApproval>
+                </ProtectedRoute>
+              </NotificationProvider>
+            </ProjectProvider>
+          </ViewProvider>
         </SharedProvider>
       </AuthProvider>
     </ThemeProvider>

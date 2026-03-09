@@ -1,37 +1,88 @@
 import { useState, useMemo } from "react";
-import { FaProjectDiagram, FaChartPie, FaPlayCircle, FaBoxes } from "react-icons/fa";
+import { FaProjectDiagram, FaChartPie, FaPlayCircle, FaBoxes, FaTrophy } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { getPaletteColor } from "@/lib/colorUtils";
 
-// Layout components
-import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import StatusBar from "@/components/layout/StatusBar";
 
-// Agentic Overview components
 import GlassPanel from "@/components/ui/GlassPanel";
 import { StatCard } from "@/components/ui/stat-card";
 import { ResourceDistributionChart } from "@/components/ui/resource-distribution-chart";
 import { WorkflowList } from "@/components/dashboard/WorkflowList";
 import { WorkflowBlueprint } from "@/api/blueprints";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Workflow, Database, Zap, TrendingUp } from "lucide-react";
+import { useView } from "@/contexts/ViewContext";
+import {
+  Workflow, Database, Zap, TrendingUp, Users, Share2, Radio,
+  Activity, Crown, Medal, Award, CircleDot,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import GraphDisplay from "@/components/agentic-ai/graphs/GraphDisplay";
 
-// Custom hooks
 import { useAgenticData } from "@/hooks/use-agentic-data";
 import { useWorkflowCalculations } from "@/hooks/use-workflow-calculations";
 import { useResourceDistribution } from "@/hooks/use-resource-distribution";
+
+// ─── Team Dashboard Mock Data ────────────────────────────────────────────────
+
+const DASHBOARD_MOCK_MEMBERS = [
+  { id: "1", name: "Sarah K.", initials: "SK", color: "from-blue-500 to-blue-600" },
+  { id: "2", name: "David M.", initials: "DM", color: "from-emerald-500 to-emerald-600" },
+  { id: "3", name: "Lisa R.", initials: "LR", color: "from-pink-500 to-pink-600" },
+  { id: "4", name: "James C.", initials: "JC", color: "from-orange-500 to-orange-600" },
+  { id: "5", name: "Alex K.", initials: "AK", color: "from-violet-500 to-violet-600" },
+  { id: "6", name: "Maria T.", initials: "MT", color: "from-cyan-500 to-cyan-600" },
+];
+
+const MOCK_ACTIVITY = [
+  { user: DASHBOARD_MOCK_MEMBERS[0], action: "joined War Room", target: "Incident Triage", time: "Just now" },
+  { user: DASHBOARD_MOCK_MEMBERS[1], action: "published", target: "OpenShift Retrieval Tool", suffix: "to Team Registry", time: "2m ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[2], action: "forked", target: "SRE Auto-Medic", time: "8m ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[3], action: "started", target: "Compliance Audit", time: "15m ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[4], action: "deployed", target: "Jira Story Generator", suffix: "v2.1", time: "32m ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[5], action: "shared", target: "RHEL Diagnostics MCP", suffix: "with team", time: "1h ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[0], action: "ran", target: "SRE Auto-Medic", suffix: "(42nd run!)", time: "1h ago" },
+  { user: DASHBOARD_MOCK_MEMBERS[1], action: "added prompt", target: "Jira Summarizer", suffix: "to Team Registry", time: "2h ago" },
+];
+
+const MOCK_LEADERBOARD = [
+  { name: "SRE Auto-Medic", runs: 42, users: 6, forks: 3, saved: "~18 hrs", pct: 100 },
+  { name: "Compliance Auditor", runs: 28, users: 4, forks: 1, saved: "~8 hrs", pct: 67 },
+  { name: "Jira Story Generator", runs: 15, users: 5, forks: 2, saved: "~3 hrs", pct: 36 },
+  { name: "OpenShift Retrieval Agent", runs: 8, users: 3, forks: 0, saved: "~2 hrs", pct: 19 },
+];
+
+const MOCK_LIVE_SESSIONS = [
+  { name: "Incident Triage — PROD-4521", blueprint: "SRE Auto-Medic", duration: "12m", participants: [DASHBOARD_MOCK_MEMBERS[0], DASHBOARD_MOCK_MEMBERS[1], DASHBOARD_MOCK_MEMBERS[2]] },
+  { name: "Compliance Audit — Q1 Review", blueprint: "Compliance Auditor", duration: "4m", participants: [DASHBOARD_MOCK_MEMBERS[3]] },
+];
+
+const RANK_STYLES = [
+  "bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950",
+  "bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900",
+  "bg-gradient-to-br from-orange-500 to-orange-700 text-white",
+];
+const RANK_ICONS = [Crown, Medal, Award];
+
+function TeamAvatar({ member, size = "sm" }: { member: (typeof DASHBOARD_MOCK_MEMBERS)[number]; size?: "xs" | "sm" }) {
+  const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
+  return (
+    <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
+      {member.initials}
+    </div>
+  );
+}
 
 export default function AgenticOverview() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowBlueprint | null>(null);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
   const { primaryHex } = useTheme();
+  const { viewMode, selectedTeam } = useView();
 
-  // Fetch all agentic data using custom hook
   const {
     agenticStats,
     workflows,
@@ -41,7 +92,6 @@ export default function AgenticOverview() {
     resourceCategories,
   } = useAgenticData();
 
-  // Calculate theme colors once using useMemo
   const themeColors = useMemo(() => {
     const primary = primaryHex || "#A60000";
     return {
@@ -51,196 +101,299 @@ export default function AgenticOverview() {
     };
   }, [primaryHex]);
 
-  // Calculate resource distribution using custom hook
   const resourceDistribution = useResourceDistribution(
     resourceCategories.data,
     agenticStats.data?.resourcesByCategory || []
   );
 
-  // Calculate workflow statistics using custom hook
   const { mostUsedWorkflows, unusedWorkflows } = useWorkflowCalculations(
     workflows.data,
     activeSessions.data,
     blueprintSessionCounts.data
   );
 
-  // Handle workflow click
   const handleWorkflowClick = (workflow: WorkflowBlueprint) => {
     setSelectedWorkflow(workflow);
     setIsWorkflowModalOpen(true);
   };
 
-  // Handle modal close
   const handleCloseModal = () => {
     setIsWorkflowModalOpen(false);
     setSelectedWorkflow(null);
   };
 
+  const isTeam = viewMode === "team";
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar />
-      
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <Header title="Agentic AI Overview" onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-transparent">
-          {/* Top row: Key Metrics */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
-          >
-            {/* Total Workflows */}
-            <GlassPanel className="h-full">
-              <StatCard
-                icon={<Workflow className="w-4 h-4" />}
-                title={
-                  <span className="flex items-center">
-                    <FaProjectDiagram className="text-primary mr-3 h-5 w-5" />
-                    Workflows
-                  </span>
-                }
-                value={agenticStats.data?.totalWorkflows || 0}
-                subtext="Total blueprints available"
-                isLoading={agenticStats.isLoading}
-                error={agenticStats.error}
-              />
-            </GlassPanel>
+    <>
+      <Header
+        title={isTeam ? "Team Dashboard" : "Agentic AI Overview"}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+      />
 
-            {/* Active Sessions */}
-            <GlassPanel className="h-full">
-              <StatCard
-                icon={<Zap className="w-4 h-4" />}
-                title={
-                  <span className="flex items-center">
-                    <FaPlayCircle className="mr-3 h-5 w-5" style={{ color: themeColors.sessions }} />
-                    Active Workflows
-                  </span>
-                }
-                value={agenticStats.data?.activeSessions || 0}
-                subtext="Currently running"
-                isLoading={activeSessions.isLoading}
-                error={activeSessions.error}
-                iconColor={themeColors.sessions}
-                iconBgColor={`${themeColors.sessions}33`}
-              />
-            </GlassPanel>
+        {isTeam ? (
+          /* ═══════ TEAM DASHBOARD VIEW ═══════ */
+          <div className="flex h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* ROI Banner */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }}>
+                <Card className="mb-6 border-gray-800 bg-gradient-to-r from-primary/10 via-transparent to-pink-500/5 overflow-hidden">
+                  <CardContent className="p-5 flex items-center gap-5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-white text-base">Team AI Impact This Week</h3>
+                      <p className="text-xs text-gray-400">Across 6 engineers running 58 sessions on 14 shared workflows</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-3xl font-extrabold text-emerald-400 tracking-tight">31 hrs</div>
+                      <div className="text-[11px] text-gray-500">estimated saved</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
-            {/* Total Resources */}
-            <GlassPanel className="h-full">
-              <StatCard
-                icon={<Database className="w-4 h-4" />}
-                title={
-                  <span className="flex items-center">
-                    <FaBoxes className="mr-3 h-5 w-5" style={{ color: themeColors.resources }} />
-                    Inventory
-                  </span>
-                }
-                value={agenticStats.data?.totalResources || 0}
-                subtext="Total resources configured"
-                isLoading={resources.isLoading}
-                error={resources.error}
-                iconColor={themeColors.resources}
-                iconBgColor={`${themeColors.resources}33`}
-              />
-            </GlassPanel>
+              {/* Stat Cards */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Share2 className="w-4 h-4" />} title={<span className="flex items-center"><FaProjectDiagram className="text-primary mr-3 h-5 w-5" />Shared Workflows</span>} value={14} subtext="+3 this week" />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={selectedTeam?.members.length ?? 0} subtext={`${selectedTeam?.members.length ?? 0} active today`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Radio className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={MOCK_LIVE_SESSIONS.length} subtext="War Rooms open" iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<TrendingUp className="w-4 h-4" />} title={<span className="flex items-center"><FaTrophy className="text-amber-400 mr-3 h-5 w-5" />Total Runs (7d)</span>} value={58} subtext="+22% vs last week" iconColor="#fbbf24" iconBgColor="rgba(251,191,36,.15)" />
+                </GlassPanel>
+              </motion.div>
 
-            {/* Resource Categories */}
-            <GlassPanel className="h-full">
-              <StatCard
-                icon={<TrendingUp className="w-4 h-4" />}
-                title={
-                  <span className="flex items-center">
-                    <FaChartPie className="mr-3 h-5 w-5" style={{ color: themeColors.categories }} />
-                    Categories
-                  </span>
-                }
-                value={agenticStats.data?.categoriesInUse || 0}
-                subtext="Categories in use"
-                isLoading={agenticStats.isLoading}
-                error={agenticStats.error}
-                iconColor={themeColors.categories}
-                iconBgColor={`${themeColors.categories}33`}
-              />
-            </GlassPanel>
-          </motion.div>
+              {/* Live Sessions */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="mb-6">
+                <GlassPanel>
+                  <Card className="bg-transparent border-0 shadow-none">
+                    <CardHeader className="px-4 py-3 border-b border-gray-800/50">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <motion.div className="w-2 h-2 rounded-full bg-emerald-400" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+                        Live War Room Sessions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {MOCK_LIVE_SESSIONS.map((session, i) => (
+                        <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
+                          <motion.div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-white truncate">{session.name}</div>
+                            <div className="text-xs text-gray-500">{session.blueprint} · running for {session.duration}</div>
+                          </div>
+                          <div className="flex items-center -space-x-1.5">
+                            {session.participants.map((p) => (
+                              <div key={p.id} className="ring-2 ring-background-card rounded-full"><TeamAvatar member={p} size="xs" /></div>
+                            ))}
+                          </div>
+                          <Button size="sm" className="bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 text-xs h-7 px-3">
+                            Join
+                          </Button>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </GlassPanel>
+              </motion.div>
 
-          {/* Middle row: Resource Distribution */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mb-8"
-          >
-            {/* Resource Distribution Chart */}
-            <GlassPanel style={{ height: 400 }}>
-              <Card className="shadow-card border-gray-800 h-full flex flex-col bg-transparent border-0">
-                <CardHeader className="py-4 px-6">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <FaChartPie className="text-primary" />
-                      Resource Distribution
-                    </CardTitle>
-                    <span className="text-sm text-gray-400">By Category</span>
+              {/* Leaderboard */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+                <GlassPanel>
+                  <Card className="bg-transparent border-0 shadow-none">
+                    <CardHeader className="px-4 py-3 border-b border-gray-800/50">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <FaTrophy className="text-amber-400" />
+                          Top Workflows — Team Impact
+                        </CardTitle>
+                        <span className="text-[11px] text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded">Last 7 days</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {MOCK_LEADERBOARD.map((item, i) => {
+                        const RankIcon = RANK_ICONS[i] ?? CircleDot;
+                        return (
+                          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${i < 3 ? RANK_STYLES[i] : "bg-gray-800 text-gray-500"}`}>
+                              {i < 3 ? <RankIcon className="w-3.5 h-3.5" /> : <span className="text-xs font-bold">{i + 1}</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-white">{item.name}</div>
+                              <div className="text-xs text-gray-500">{item.runs} runs · {item.users} engineers{item.forks > 0 ? ` · ${item.forks} forks` : ""}</div>
+                            </div>
+                            <div className="w-28 flex-shrink-0">
+                              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <motion.div className="h-full rounded-full bg-gradient-to-r from-primary to-pink-500" initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={{ duration: 0.8, delay: 0.3 + i * 0.1 }} />
+                              </div>
+                              <div className="text-[10px] text-gray-600 text-right mt-0.5">{item.runs} runs</div>
+                            </div>
+                            <div className="text-right flex-shrink-0 w-16">
+                              <div className="text-sm font-bold text-emerald-400">{item.saved}</div>
+                              <div className="text-[10px] text-gray-600">saved</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </GlassPanel>
+              </motion.div>
+            </div>
+
+            {/* Activity Feed Panel */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="w-[280px] border-l border-gray-800 bg-background-card flex-col flex-shrink-0 hidden xl:flex">
+              <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
+                <motion.div className="w-2 h-2 rounded-full bg-emerald-400" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+                <span className="font-semibold text-sm text-white">Live Activity</span>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {MOCK_ACTIVITY.map((evt, i) => (
+                  <div key={i} className="flex gap-2.5 px-4 py-2.5 border-b border-gray-800/40 hover:bg-white/[.02] transition-colors">
+                    <TeamAvatar member={evt.user} size="xs" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs leading-relaxed">
+                        <span className="font-semibold text-gray-200">{evt.user.name}</span>{" "}
+                        <span className="text-gray-500">{evt.action} </span>
+                        <span className="text-primary font-medium">{evt.target}</span>
+                        {evt.suffix && <span className="text-gray-500"> {evt.suffix}</span>}
+                      </p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">{evt.time}</p>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 flex-1 overflow-hidden flex flex-col min-h-0">
-                  <ResourceDistributionChart
-                    data={resourceDistribution}
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        ) : (
+          /* ═══════ PRIVATE OVERVIEW VIEW ═══════ */
+          <>
+            <main className="flex-1 overflow-y-auto p-6 bg-transparent">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
+              >
+                <GlassPanel className="h-full">
+                  <StatCard
+                    icon={<Workflow className="w-4 h-4" />}
+                    title={<span className="flex items-center"><FaProjectDiagram className="text-primary mr-3 h-5 w-5" />Workflows</span>}
+                    value={agenticStats.data?.totalWorkflows || 0}
+                    subtext="Total blueprints available"
                     isLoading={agenticStats.isLoading}
-                    primaryColor={primaryHex || "#A60000"}
+                    error={agenticStats.error}
                   />
-                </CardContent>
-              </Card>
-            </GlassPanel>
-          </motion.div>
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard
+                    icon={<Zap className="w-4 h-4" />}
+                    title={<span className="flex items-center"><FaPlayCircle className="mr-3 h-5 w-5" style={{ color: themeColors.sessions }} />Active Workflows</span>}
+                    value={agenticStats.data?.activeSessions || 0}
+                    subtext="Currently running"
+                    isLoading={activeSessions.isLoading}
+                    error={activeSessions.error}
+                    iconColor={themeColors.sessions}
+                    iconBgColor={`${themeColors.sessions}33`}
+                  />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard
+                    icon={<Database className="w-4 h-4" />}
+                    title={<span className="flex items-center"><FaBoxes className="mr-3 h-5 w-5" style={{ color: themeColors.resources }} />Inventory</span>}
+                    value={agenticStats.data?.totalResources || 0}
+                    subtext="Total resources configured"
+                    isLoading={resources.isLoading}
+                    error={resources.error}
+                    iconColor={themeColors.resources}
+                    iconBgColor={`${themeColors.resources}33`}
+                  />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard
+                    icon={<TrendingUp className="w-4 h-4" />}
+                    title={<span className="flex items-center"><FaChartPie className="mr-3 h-5 w-5" style={{ color: themeColors.categories }} />Categories</span>}
+                    value={agenticStats.data?.categoriesInUse || 0}
+                    subtext="Categories in use"
+                    isLoading={agenticStats.isLoading}
+                    error={agenticStats.error}
+                    iconColor={themeColors.categories}
+                    iconBgColor={`${themeColors.categories}33`}
+                  />
+                </GlassPanel>
+              </motion.div>
 
-          {/* Bottom row: Most Used Workflows and Unused Available Workflows */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mb-8 grid grid-cols-1 xl:grid-cols-2 gap-6"
-          >
-            {/* Most Used Workflows */}
-            <GlassPanel style={{ height: 340 }}>
-              <WorkflowList
-                title="Most Used Workflows"
-                workflows={mostUsedWorkflows}
-                isLoading={workflows.isLoading || activeSessions.isLoading || blueprintSessionCounts.isLoading}
-                onWorkflowClick={handleWorkflowClick}
-                emptyMessage="No workflows currently in use"
-                showUsageCount={true}
-              />
-            </GlassPanel>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="mb-8"
+              >
+                <GlassPanel style={{ height: 400 }}>
+                  <Card className="shadow-card border-gray-800 h-full flex flex-col bg-transparent border-0">
+                    <CardHeader className="py-4 px-6">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xl flex items-center gap-2">
+                          <FaChartPie className="text-primary" />
+                          Resource Distribution
+                        </CardTitle>
+                        <span className="text-sm text-gray-400">By Category</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-6 pb-6 flex-1 overflow-hidden flex flex-col min-h-0">
+                      <ResourceDistributionChart
+                        data={resourceDistribution}
+                        isLoading={agenticStats.isLoading}
+                        primaryColor={primaryHex || "#A60000"}
+                      />
+                    </CardContent>
+                  </Card>
+                </GlassPanel>
+              </motion.div>
 
-            {/* Unused Available Workflows */}
-            <GlassPanel style={{ height: 340 }}>
-              <WorkflowList
-                title="Unused Available Workflows"
-                workflows={unusedWorkflows}
-                isLoading={workflows.isLoading || activeSessions.isLoading || blueprintSessionCounts.isLoading}
-                onWorkflowClick={handleWorkflowClick}
-                emptyMessage={
-                  workflows.data.length === 0
-                    ? "No workflows available"
-                    : "All workflows are currently in use"
-                }
-                maxItems={8}
-                countBadge={unusedWorkflows.length}
-              />
-            </GlassPanel>
-          </motion.div>
-        </main>
-        <StatusBar />
-      </div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="mb-8 grid grid-cols-1 xl:grid-cols-2 gap-6"
+              >
+                <GlassPanel style={{ height: 340 }}>
+                  <WorkflowList
+                    title="Most Used Workflows"
+                    workflows={mostUsedWorkflows}
+                    isLoading={workflows.isLoading || activeSessions.isLoading || blueprintSessionCounts.isLoading}
+                    onWorkflowClick={handleWorkflowClick}
+                    emptyMessage="No workflows currently in use"
+                    showUsageCount={true}
+                  />
+                </GlassPanel>
+                <GlassPanel style={{ height: 340 }}>
+                  <WorkflowList
+                    title="Unused Available Workflows"
+                    workflows={unusedWorkflows}
+                    isLoading={workflows.isLoading || activeSessions.isLoading || blueprintSessionCounts.isLoading}
+                    onWorkflowClick={handleWorkflowClick}
+                    emptyMessage={
+                      workflows.data.length === 0
+                        ? "No workflows available"
+                        : "All workflows are currently in use"
+                    }
+                    maxItems={8}
+                    countBadge={unusedWorkflows.length}
+                  />
+                </GlassPanel>
+              </motion.div>
+            </main>
+            <StatusBar />
+          </>
+        )}
 
-      {/* Workflow View Modal */}
       <Dialog open={isWorkflowModalOpen} onOpenChange={handleCloseModal}>
         <DialogContent className="bg-background-card border-gray-800 max-w-6xl w-[90vw] h-[85vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-gray-800 flex-shrink-0">
@@ -266,7 +419,7 @@ export default function AgenticOverview() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import StatusBar from "@/components/layout/StatusBar";
@@ -13,6 +13,297 @@ import { FaUsers, FaKey, FaRobot, FaCog, FaLock, FaInfoCircle } from "react-icon
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { useView, TeamInfo } from "@/contexts/ViewContext";
+import { createTeam, updateTeam, deleteTeam } from "@/api/teams";
+import { Users, Plus, Pencil, Trash2, X, UserPlus, Crown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+function TeamManagementTab() {
+  const { user } = useAuth();
+  const { teams, refreshTeams } = useView();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<TeamInfo | null>(null);
+  const [deleteConfirmTeam, setDeleteConfirmTeam] = useState<TeamInfo | null>(null);
+  const [teamName, setTeamName] = useState("");
+  const [memberInput, setMemberInput] = useState("");
+  const [members, setMembers] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const resetForm = () => {
+    setTeamName("");
+    setMemberInput("");
+    setMembers([]);
+    setError("");
+    setEditingTeam(null);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    if (user?.username) {
+      setMembers([user.username]);
+    }
+    setDialogOpen(true);
+  };
+
+  const openEdit = (team: TeamInfo) => {
+    setEditingTeam(team);
+    setTeamName(team.name);
+    setMembers([...team.members]);
+    setMemberInput("");
+    setError("");
+    setDialogOpen(true);
+  };
+
+  const addMember = () => {
+    const username = memberInput.trim();
+    if (!username) return;
+    if (members.includes(username)) {
+      setError(`"${username}" is already a member`);
+      return;
+    }
+    setMembers([...members, username]);
+    setMemberInput("");
+    setError("");
+  };
+
+  const removeMember = (username: string) => {
+    if (editingTeam && username === editingTeam.created_by) return;
+    if (!editingTeam && username === user?.username) return;
+    setMembers(members.filter((m) => m !== username));
+  };
+
+  const handleSubmit = async () => {
+    if (!teamName.trim()) {
+      setError("Team name is required");
+      return;
+    }
+    if (members.length === 0) {
+      setError("At least one member is required");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      if (editingTeam) {
+        await updateTeam(editingTeam.id, { name: teamName.trim(), members });
+      } else {
+        await createTeam(teamName.trim(), user!.username, members);
+      }
+      await refreshTeams();
+      setDialogOpen(false);
+      resetForm();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Operation failed";
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirmTeam) return;
+    try {
+      await deleteTeam(deleteConfirmTeam.id);
+      await refreshTeams();
+    } catch (err: any) {
+      console.error("Failed to delete team:", err);
+    } finally {
+      setDeleteConfirmTeam(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-heading font-semibold">Your Teams</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Create and manage teams to collaborate on workflows and resources
+          </p>
+        </div>
+        <Button className="bg-primary" onClick={openCreate}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Team
+        </Button>
+      </div>
+
+      {teams.length === 0 ? (
+        <Card className="bg-background-card shadow-card border-gray-800">
+          <CardContent className="p-12 text-center">
+            <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <h4 className="text-lg font-medium text-gray-300 mb-2">No teams yet</h4>
+            <p className="text-sm text-gray-500 mb-6">
+              Create a team to start collaborating with others on shared workflows and resources.
+            </p>
+            <Button className="bg-primary" onClick={openCreate}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Your First Team
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {teams.map((team) => (
+            <Card key={team.id} className="bg-background-card shadow-card border-gray-800 hover:border-gray-700 transition-colors">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white">{team.name}</h4>
+                      <p className="text-xs text-gray-500">{team.members.length} member{team.members.length !== 1 ? "s" : ""}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEdit(team)}
+                      className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    {team.created_by === user?.username && (
+                      <button
+                        onClick={() => setDeleteConfirmTeam(team)}
+                        className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {team.members.map((member) => (
+                    <span
+                      key={member}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/5 text-gray-300"
+                    >
+                      {member === team.created_by && <Crown className="w-3 h-3 text-amber-400" />}
+                      {member}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) { setDialogOpen(false); resetForm(); } }}>
+        <DialogContent className="bg-background-card border-gray-800 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingTeam ? "Edit Team" : "Create New Team"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label htmlFor="team-name" className="text-sm">Team Name</Label>
+              <Input
+                id="team-name"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Platform Engineering"
+                className="mt-1 bg-background-dark"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm">Members</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={memberInput}
+                  onChange={(e) => setMemberInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMember(); } }}
+                  placeholder="Type a username and press Enter"
+                  className="bg-background-dark"
+                />
+                <Button type="button" variant="outline" onClick={addMember} className="shrink-0">
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {members.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {members.map((m) => {
+                    const isCreator = editingTeam
+                      ? m === editingTeam.created_by
+                      : m === user?.username;
+                    return (
+                      <span
+                        key={m}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-white/5 text-gray-300"
+                      >
+                        {isCreator && <Crown className="w-3 h-3 text-amber-400" />}
+                        {m}
+                        {!isCreator && (
+                          <button onClick={() => removeMember(m)} className="ml-0.5 hover:text-red-400">
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-400">{error}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                Cancel
+              </Button>
+              <Button className="bg-primary" onClick={handleSubmit} disabled={saving}>
+                {saving ? "Saving..." : editingTeam ? "Save Changes" : "Create Team"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirmTeam} onOpenChange={(open) => { if (!open) setDeleteConfirmTeam(null); }}>
+        <AlertDialogContent className="bg-background-card border-gray-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Team</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteConfirmTeam?.name}</strong>? This action cannot be undone.
+              Resources and workflows created under this team will remain but won't be accessible through the team view.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
 
 export default function Configuration() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,8 +321,12 @@ export default function Configuration() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Tabs defaultValue="settings" className="w-full">
+            <Tabs defaultValue="teams" className="w-full">
               <TabsList className="mb-6">
+                <TabsTrigger value="teams" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+                  <FaUsers className="mr-2" />
+                  Teams
+                </TabsTrigger>
                 <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-white">
                   <FaCog className="mr-2" />
                   Settings
@@ -45,6 +340,10 @@ export default function Configuration() {
                   Embedding Settings
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="teams">
+                <TeamManagementTab />
+              </TabsContent>
               
               <TabsContent value="settings">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
