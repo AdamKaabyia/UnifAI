@@ -7,18 +7,21 @@ from flask import Flask
 from flask_cors import CORS
 from config.app_config import AppConfig
 from core.app_container import AppContainer
-from api.flask.endpoints import register_all_endpoints
+from .endpoints import register_all_endpoints
 
 
-def create_app():
+def create_app(config: AppConfig = None) -> Flask:
+    config = config or AppConfig.get_instance()
     app = Flask(__name__)
+
     CORS(app, resources={r"/api/*": {
         "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
     }})
 
-    cfg = AppConfig()
-    container = AppContainer(cfg)
+    container = AppContainer(config)
     app.container = container
 
     register_all_endpoints(app)

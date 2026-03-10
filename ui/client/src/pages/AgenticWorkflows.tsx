@@ -84,10 +84,11 @@ export default function AgenticWorkflows() {
         "/sessions/user.session.create",
         selectedBlueprint,
       );
-      setSelectedGraphId(response.data);
+      const sessionId = response.data;
+      setSelectedGraphId(sessionId);
 
-      // Navigate to Agentic Chats page (client-side navigation preserves context/cache)
-      navigate("/agentic-chats");
+      // Navigate to Agentic Chats page, passing the new session ID so it auto-selects
+      navigate(`/agentic-chats?runId=${encodeURIComponent(sessionId)}`);
     } catch (error: any) {
       console.error("Error create new graph session:", error);
       toast({

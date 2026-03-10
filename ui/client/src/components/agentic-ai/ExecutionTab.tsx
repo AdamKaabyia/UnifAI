@@ -21,6 +21,7 @@ import { fetchResolvedBlueprint } from '@/api/blueprints'
 import { useStreamingData } from './StreamingDataContext'
 import { EnhancedStreamReader } from '@/components/shared/stream/StreamJsonParser'
 import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
 import WorkflowsPanel from "./WorkflowsPanel";
 import {
   Dialog,
@@ -108,6 +109,10 @@ export default function ExecutionTab({
 
   const { nodeListRef, forceUpdate } = useStreamingData();
   const { user } = useAuth();
+  const { viewMode, selectedTeam } = useView();
+  const contextUserId = viewMode === "team" && selectedTeam
+    ? selectedTeam.name
+    : (user?.username || "default");
 
   // Race-condition guard for session switching.
   //
@@ -266,19 +271,20 @@ export default function ExecutionTab({
       setIsLoading(true);
       setError(null);
 
-      const userId = user?.username || "default";
-      const response = await axios.get(`/sessions/session.user.chat.get?userId=${userId}`);
+      const response = await axios.get(`/sessions/session.user.chat.get?userId=${contextUserId}`);
       const transformedSessions = transformApiDataToSessions(response.data);
 
       // Sort chat sessions based on the latest date
       const sortedSessions = sortSessionsByTimestamp(transformedSessions);
       setChatSessions(sortedSessions);
 
-      // Auto-select the first session if available - use handleSessionSelect to trigger status checks
+      // Auto-select: prefer the session matching runId (from "Load Workflow"),
+      // otherwise fall back to the most recent session.
       if (sortedSessions.length > 0 && !selectedSession) {
-        const firstSession = sortedSessions[0];
-        // Use handleSessionSelect to ensure status checks and other logic run
-        await handleSessionSelect(firstSession);
+        const target = runId
+          ? sortedSessions.find(s => s.id === runId) ?? sortedSessions[0]
+          : sortedSessions[0];
+        await handleSessionSelect(target);
       }
     } catch (err) {
       console.error('Error fetching chat sessions:', err);
@@ -327,8 +333,7 @@ export default function ExecutionTab({
     } else if (session.blueprintId) {
       setIsLoadingBlueprintName(true);
       try {
-        const userId = user?.username || "default";
-        const resolvedBlueprint = await fetchResolvedBlueprint(session.blueprintId, userId);
+        const resolvedBlueprint = await fetchResolvedBlueprint(session.blueprintId, contextUserId);
 
         // Bail out if the user switched to a different session while we were fetching
         if (sessionSelectRequestId.current !== requestId) return;
@@ -406,7 +411,6 @@ export default function ExecutionTab({
 
     setIsDeleting(true);
     try {
-      const userId = user?.username || "default";
       await axios.delete(`/sessions/session.delete?sessionId=${chatToDelete.id}`);
 
       // Remove the deleted session from the list
@@ -451,7 +455,7 @@ export default function ExecutionTab({
 
       const selectedBlueprint = {
         blueprintId: graphId,
-        userId: user?.username || "default",
+        userId: contextUserId,
       };
 
       await axios.post(
@@ -460,8 +464,7 @@ export default function ExecutionTab({
       );
 
       // Fetch updated sessions
-      const userId = user?.username || "default";
-      const response = await axios.get(`/sessions/session.user.chat.get?userId=${userId}`);
+      const response = await axios.get(`/sessions/session.user.chat.get?userId=${contextUserId}`);
       const transformedSessions = transformApiDataToSessions(response.data);
       const sortedSessions = sortSessionsByTimestamp(transformedSessions);
       setChatSessions(sortedSessions);
@@ -486,10 +489,12 @@ export default function ExecutionTab({
     setSelectedFlowForModal(null);
   };
 
-  // Initialize component with API call
+  // Initialize component with API call, re-fetch when user/team context changes
   useEffect(() => {
+    setSelectedSession(null);
+    setCurrentSessionMessages([]);
     fetchChatSessions();
-  }, []);
+  }, [contextUserId]);
 
   // Cleanup effect when modal closes to prevent ReactFlow state interference
   useEffect(() => {

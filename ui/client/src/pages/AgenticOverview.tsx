@@ -26,9 +26,45 @@ import { useAgenticData } from "@/hooks/use-agentic-data";
 import { useWorkflowCalculations } from "@/hooks/use-workflow-calculations";
 import { useResourceDistribution } from "@/hooks/use-resource-distribution";
 
-// ─── Team Dashboard Mock Data ────────────────────────────────────────────────
+// ─── Shared member display helpers ───────────────────────────────────────────
 
-const DASHBOARD_MOCK_MEMBERS = [
+const MEMBER_COLORS = [
+  "from-blue-500 to-blue-600",
+  "from-emerald-500 to-emerald-600",
+  "from-pink-500 to-pink-600",
+  "from-orange-500 to-orange-600",
+  "from-violet-500 to-violet-600",
+  "from-cyan-500 to-cyan-600",
+  "from-amber-500 to-amber-600",
+  "from-rose-500 to-rose-600",
+];
+
+interface MemberDisplay {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+}
+
+function buildMemberDisplay(username: string, index: number): MemberDisplay {
+  const parts = username.split(/[._\-\s@]+/).filter(Boolean);
+  const initials =
+    parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : username.slice(0, 2).toUpperCase();
+  return {
+    id: username,
+    name: username,
+    initials,
+    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
+  };
+}
+
+// ─── Demo data (shown only for team "UnifAI") ───────────────────────────────
+
+const DEMO_TEAM_NAME = "UnifAI";
+
+const DEMO_MEMBERS: MemberDisplay[] = [
   { id: "1", name: "Sarah K.", initials: "SK", color: "from-blue-500 to-blue-600" },
   { id: "2", name: "David M.", initials: "DM", color: "from-emerald-500 to-emerald-600" },
   { id: "3", name: "Lisa R.", initials: "LR", color: "from-pink-500 to-pink-600" },
@@ -37,28 +73,30 @@ const DASHBOARD_MOCK_MEMBERS = [
   { id: "6", name: "Maria T.", initials: "MT", color: "from-cyan-500 to-cyan-600" },
 ];
 
-const MOCK_ACTIVITY = [
-  { user: DASHBOARD_MOCK_MEMBERS[0], action: "joined War Room", target: "Incident Triage", time: "Just now" },
-  { user: DASHBOARD_MOCK_MEMBERS[1], action: "published", target: "OpenShift Retrieval Tool", suffix: "to Team Registry", time: "2m ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[2], action: "forked", target: "SRE Auto-Medic", time: "8m ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[3], action: "started", target: "Compliance Audit", time: "15m ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[4], action: "deployed", target: "Jira Story Generator", suffix: "v2.1", time: "32m ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[5], action: "shared", target: "RHEL Diagnostics MCP", suffix: "with team", time: "1h ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[0], action: "ran", target: "SRE Auto-Medic", suffix: "(42nd run!)", time: "1h ago" },
-  { user: DASHBOARD_MOCK_MEMBERS[1], action: "added prompt", target: "Jira Summarizer", suffix: "to Team Registry", time: "2h ago" },
+const DEMO_ACTIVITY = [
+  { user: DEMO_MEMBERS[0], action: "joined War Room", target: "Incident Triage", time: "Just now" },
+  { user: DEMO_MEMBERS[1], action: "published", target: "OpenShift Retrieval Tool", suffix: "to Team Registry", time: "2m ago" },
+  { user: DEMO_MEMBERS[2], action: "forked", target: "SRE Auto-Medic", time: "8m ago" },
+  { user: DEMO_MEMBERS[3], action: "started", target: "Compliance Audit", time: "15m ago" },
+  { user: DEMO_MEMBERS[4], action: "deployed", target: "Jira Story Generator", suffix: "v2.1", time: "32m ago" },
+  { user: DEMO_MEMBERS[5], action: "shared", target: "RHEL Diagnostics MCP", suffix: "with team", time: "1h ago" },
+  { user: DEMO_MEMBERS[0], action: "ran", target: "SRE Auto-Medic", suffix: "(42nd run!)", time: "1h ago" },
+  { user: DEMO_MEMBERS[1], action: "added prompt", target: "Jira Summarizer", suffix: "to Team Registry", time: "2h ago" },
 ];
 
-const MOCK_LEADERBOARD = [
+const DEMO_LEADERBOARD = [
   { name: "SRE Auto-Medic", runs: 42, users: 6, forks: 3, saved: "~18 hrs", pct: 100 },
   { name: "Compliance Auditor", runs: 28, users: 4, forks: 1, saved: "~8 hrs", pct: 67 },
   { name: "Jira Story Generator", runs: 15, users: 5, forks: 2, saved: "~3 hrs", pct: 36 },
   { name: "OpenShift Retrieval Agent", runs: 8, users: 3, forks: 0, saved: "~2 hrs", pct: 19 },
 ];
 
-const MOCK_LIVE_SESSIONS = [
-  { name: "Incident Triage — PROD-4521", blueprint: "SRE Auto-Medic", duration: "12m", participants: [DASHBOARD_MOCK_MEMBERS[0], DASHBOARD_MOCK_MEMBERS[1], DASHBOARD_MOCK_MEMBERS[2]] },
-  { name: "Compliance Audit — Q1 Review", blueprint: "Compliance Auditor", duration: "4m", participants: [DASHBOARD_MOCK_MEMBERS[3]] },
+const DEMO_LIVE_SESSIONS = [
+  { name: "Incident Triage — PROD-4521", blueprint: "SRE Auto-Medic", duration: "12m", participants: [DEMO_MEMBERS[0], DEMO_MEMBERS[1], DEMO_MEMBERS[2]] },
+  { name: "Compliance Audit — Q1 Review", blueprint: "Compliance Auditor", duration: "4m", participants: [DEMO_MEMBERS[3]] },
 ];
+
+// ─── Rank visuals ────────────────────────────────────────────────────────────
 
 const RANK_STYLES = [
   "bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950",
@@ -67,7 +105,7 @@ const RANK_STYLES = [
 ];
 const RANK_ICONS = [Crown, Medal, Award];
 
-function TeamAvatar({ member, size = "sm" }: { member: (typeof DASHBOARD_MOCK_MEMBERS)[number]; size?: "xs" | "sm" }) {
+function TeamAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
   const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
   return (
     <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
@@ -75,6 +113,8 @@ function TeamAvatar({ member, size = "sm" }: { member: (typeof DASHBOARD_MOCK_ME
     </div>
   );
 }
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AgenticOverview() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -123,6 +163,39 @@ export default function AgenticOverview() {
   };
 
   const isTeam = viewMode === "team";
+  const isDemo = isTeam && selectedTeam?.name === DEMO_TEAM_NAME;
+
+  // ── Real-data computations (used when isTeam && !isDemo) ──
+
+  const teamMembers = useMemo<MemberDisplay[]>(() => {
+    if (!selectedTeam?.members) return [];
+    return selectedTeam.members.map((m, i) => buildMemberDisplay(m, i));
+  }, [selectedTeam?.members]);
+
+  const activeBlueprints = useMemo(() => {
+    if (!activeSessions.data?.length || !workflows.data?.length) return [];
+    const activeSet = new Set(activeSessions.data);
+    return workflows.data
+      .filter((w) => activeSet.has(w.blueprint_id))
+      .map((w) => ({
+        blueprint_id: w.blueprint_id,
+        name: w.spec_dict?.name || w.blueprint_id,
+      }));
+  }, [activeSessions.data, workflows.data]);
+
+  const leaderboard = useMemo(() => {
+    const counts = blueprintSessionCounts.data;
+    if (!counts || !workflows.data?.length) return [];
+    const entries = Object.entries(counts)
+      .map(([bid, runs]) => {
+        const wf = workflows.data.find((w) => w.blueprint_id === bid);
+        return { name: wf?.spec_dict?.name || bid, runs: runs as number };
+      })
+      .sort((a, b) => b.runs - a.runs)
+      .slice(0, 8);
+    const maxRuns = entries[0]?.runs || 1;
+    return entries.map((e) => ({ ...e, pct: Math.round((e.runs / maxRuns) * 100) }));
+  }, [blueprintSessionCounts.data, workflows.data]);
 
   return (
     <>
@@ -132,7 +205,8 @@ export default function AgenticOverview() {
       />
 
         {isTeam ? (
-          /* ═══════ TEAM DASHBOARD VIEW ═══════ */
+          isDemo ? (
+          /* ═══════ DEMO TEAM DASHBOARD (UnifAI) ═══════ */
           <div className="flex h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6">
               {/* ROI Banner */}
@@ -144,7 +218,7 @@ export default function AgenticOverview() {
                     </div>
                     <div className="flex-1">
                       <h3 className="font-bold text-white text-base">Team AI Impact This Week</h3>
-                      <p className="text-xs text-gray-400">Across 6 engineers running 58 sessions on 14 shared workflows</p>
+                      <p className="text-xs text-gray-400">Across {DEMO_MEMBERS.length} engineers running 58 sessions on 14 shared workflows</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-3xl font-extrabold text-emerald-400 tracking-tight">31 hrs</div>
@@ -160,10 +234,10 @@ export default function AgenticOverview() {
                   <StatCard icon={<Share2 className="w-4 h-4" />} title={<span className="flex items-center"><FaProjectDiagram className="text-primary mr-3 h-5 w-5" />Shared Workflows</span>} value={14} subtext="+3 this week" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
-                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={selectedTeam?.members.length ?? 0} subtext={`${selectedTeam?.members.length ?? 0} active today`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
+                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={DEMO_MEMBERS.length} subtext={`${DEMO_MEMBERS.length} active today`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
-                  <StatCard icon={<Radio className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={MOCK_LIVE_SESSIONS.length} subtext="War Rooms open" iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
+                  <StatCard icon={<Radio className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={DEMO_LIVE_SESSIONS.length} subtext="War Rooms open" iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
                   <StatCard icon={<TrendingUp className="w-4 h-4" />} title={<span className="flex items-center"><FaTrophy className="text-amber-400 mr-3 h-5 w-5" />Total Runs (7d)</span>} value={58} subtext="+22% vs last week" iconColor="#fbbf24" iconBgColor="rgba(251,191,36,.15)" />
@@ -181,7 +255,7 @@ export default function AgenticOverview() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {MOCK_LIVE_SESSIONS.map((session, i) => (
+                      {DEMO_LIVE_SESSIONS.map((session, i) => (
                         <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
                           <motion.div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
                           <div className="flex-1 min-w-0">
@@ -217,7 +291,7 @@ export default function AgenticOverview() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {MOCK_LEADERBOARD.map((item, i) => {
+                      {DEMO_LEADERBOARD.map((item, i) => {
                         const RankIcon = RANK_ICONS[i] ?? CircleDot;
                         return (
                           <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
@@ -254,7 +328,7 @@ export default function AgenticOverview() {
                 <span className="font-semibold text-sm text-white">Live Activity</span>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {MOCK_ACTIVITY.map((evt, i) => (
+                {DEMO_ACTIVITY.map((evt, i) => (
                   <div key={i} className="flex gap-2.5 px-4 py-2.5 border-b border-gray-800/40 hover:bg-white/[.02] transition-colors">
                     <TeamAvatar member={evt.user} size="xs" />
                     <div className="flex-1 min-w-0">
@@ -271,6 +345,141 @@ export default function AgenticOverview() {
               </div>
             </motion.div>
           </div>
+          ) : (
+          /* ═══════ REAL TEAM DASHBOARD ═══════ */
+          <div className="flex h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Summary Banner */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }}>
+                <Card className="mb-6 border-gray-800 bg-gradient-to-r from-primary/10 via-transparent to-pink-500/5 overflow-hidden">
+                  <CardContent className="p-5 flex items-center gap-5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-white text-base">{selectedTeam?.name ?? "Team"} Overview</h3>
+                      <p className="text-xs text-gray-400">
+                        {teamMembers.length} member{teamMembers.length !== 1 ? "s" : ""} · {agenticStats.data?.totalWorkflows ?? 0} workflows · {agenticStats.data?.totalResources ?? 0} resources
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-3xl font-extrabold text-emerald-400 tracking-tight">{agenticStats.data?.activeSessions ?? 0}</div>
+                      <div className="text-[11px] text-gray-500">active sessions</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Stat Cards */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Share2 className="w-4 h-4" />} title={<span className="flex items-center"><FaProjectDiagram className="text-primary mr-3 h-5 w-5" />Workflows</span>} value={agenticStats.data?.totalWorkflows ?? 0} subtext="Team workflows" isLoading={agenticStats.isLoading} error={agenticStats.error} />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={teamMembers.length} subtext={`In ${selectedTeam?.name ?? "team"}`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Zap className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={agenticStats.data?.activeSessions ?? 0} subtext="Currently running" isLoading={agenticStats.isLoading} error={agenticStats.error} iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
+                </GlassPanel>
+                <GlassPanel className="h-full">
+                  <StatCard icon={<Database className="w-4 h-4" />} title={<span className="flex items-center"><FaBoxes className="text-amber-400 mr-3 h-5 w-5" />Resources</span>} value={agenticStats.data?.totalResources ?? 0} subtext="Total configured" isLoading={agenticStats.isLoading} error={agenticStats.error} iconColor="#fbbf24" iconBgColor="rgba(251,191,36,.15)" />
+                </GlassPanel>
+              </motion.div>
+
+              {/* Active Sessions */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="mb-6">
+                <GlassPanel>
+                  <Card className="bg-transparent border-0 shadow-none">
+                    <CardHeader className="px-4 py-3 border-b border-gray-800/50">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <motion.div className="w-2 h-2 rounded-full bg-emerald-400" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+                        Active Workflow Sessions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {activeBlueprints.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500">No active sessions right now</div>
+                      ) : (
+                        activeBlueprints.map((bp) => (
+                          <div key={bp.blueprint_id} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
+                            <motion.div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-white truncate">{bp.name}</div>
+                              <div className="text-xs text-gray-500">Running</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </GlassPanel>
+              </motion.div>
+
+              {/* Workflow Usage */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+                <GlassPanel>
+                  <Card className="bg-transparent border-0 shadow-none">
+                    <CardHeader className="px-4 py-3 border-b border-gray-800/50">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <FaTrophy className="text-amber-400" />
+                          Top Workflows by Sessions
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {leaderboard.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500">No workflow session data yet</div>
+                      ) : (
+                        leaderboard.map((item, i) => {
+                          const RankIcon = RANK_ICONS[i] ?? CircleDot;
+                          return (
+                            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-800/30 last:border-0 hover:bg-white/[.02] transition-colors">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${i < 3 ? RANK_STYLES[i] : "bg-gray-800 text-gray-500"}`}>
+                                {i < 3 ? <RankIcon className="w-3.5 h-3.5" /> : <span className="text-xs font-bold">{i + 1}</span>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm text-white">{item.name}</div>
+                                <div className="text-xs text-gray-500">{item.runs} session{item.runs !== 1 ? "s" : ""}</div>
+                              </div>
+                              <div className="w-28 flex-shrink-0">
+                                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                  <motion.div className="h-full rounded-full bg-gradient-to-r from-primary to-pink-500" initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={{ duration: 0.8, delay: 0.3 + i * 0.1 }} />
+                                </div>
+                                <div className="text-[10px] text-gray-600 text-right mt-0.5">{item.runs} sessions</div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </CardContent>
+                  </Card>
+                </GlassPanel>
+              </motion.div>
+            </div>
+
+            {/* Team Members Panel */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="w-[280px] border-l border-gray-800 bg-background-card flex-col flex-shrink-0 hidden xl:flex">
+              <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
+                <Users className="w-4 h-4 text-gray-400" />
+                <span className="font-semibold text-sm text-white">Team Members ({teamMembers.length})</span>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="flex gap-2.5 px-4 py-2.5 border-b border-gray-800/40 hover:bg-white/[.02] transition-colors items-center">
+                    <TeamAvatar member={member} size="xs" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-200 truncate">{member.name}</p>
+                    </div>
+                  </div>
+                ))}
+                {teamMembers.length === 0 && (
+                  <div className="px-4 py-6 text-center text-xs text-gray-600">No members in this team</div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+          )
         ) : (
           /* ═══════ PRIVATE OVERVIEW VIEW ═══════ */
           <>
@@ -422,4 +631,3 @@ export default function AgenticOverview() {
     </>
   );
 }
-

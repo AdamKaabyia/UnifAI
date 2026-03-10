@@ -124,7 +124,7 @@ export default function Sidebar() {
                 }`}
               >
                 <UserIcon className="w-3 h-3" />
-                My Workspace
+                Personal
               </button>
               <button
                 onClick={() => { setViewMode('team'); }}

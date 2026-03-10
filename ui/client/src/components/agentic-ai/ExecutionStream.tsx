@@ -11,6 +11,7 @@ import { useStreamingData, NodeEntry } from "./StreamingDataContext"
 import axios from '../../http/axiosAgentConfig'
 import { GraphFlow } from './graphs/interfaces'
 import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
 import { fetchResolvedBlueprints } from "@/api/blueprints";
 
 interface LogEntry {
@@ -70,6 +71,10 @@ export default function ExecutionStream({
   const logsEndRef = useRef<HTMLDivElement>(null);
   const { nodeListRef } = useStreamingData();
   const { user } = useAuth();
+  const { viewMode, selectedTeam } = useView();
+  const contextUserId = viewMode === "team" && selectedTeam
+    ? selectedTeam.name
+    : (user?.username || "default");
 
   const extractNodeData = (graphFlow: GraphFlow): { id: string; name: string; description: string | null }[] => {
     if (!graphFlow || !graphFlow.plan) {
@@ -90,7 +95,7 @@ export default function ExecutionStream({
   // Create agent nodes from selected graph nodes on component mount
   useEffect(() => {
     const getGraphNodes = async () => {
-      const blueprintObjects = await fetchResolvedBlueprints(user?.username || "default");
+      const blueprintObjects = await fetchResolvedBlueprints(contextUserId);
       
       // Find the specific graph flow by blueprint_id
       const targetBlueprintObj = blueprintObjects.find((blueprintObj: any, index: number) => 

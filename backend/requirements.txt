@@ -1,0 +1,8 @@
+pydantic
+pydantic-settings
+gunicorn
+flask
+flask-cors
+pymongo
+python-dotenv
+webargs
