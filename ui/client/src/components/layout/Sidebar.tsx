@@ -2,18 +2,20 @@ import React from "react";
 import { Link, useLocation } from "wouter";
 import { useProject } from "@/contexts/ProjectContext";
 import { 
-  FaTachometerAlt, FaCogs, FaFileAlt, 
+  FaTachometerAlt, FaFileAlt, 
   FaChartLine, FaUserShield, FaCog,
   FaRobot, FaFile, FaChevronLeft, FaChevronRight,
   FaInfoCircle, FaBook, FaComment, FaPuzzlePiece,
+  FaCogs,
 } from "react-icons/fa";
 import { FaSlack, FaBars } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { useAuth, User } from '@/contexts/AuthContext';
-import { useView } from '@/contexts/ViewContext';
-import { Users, ChevronDown, User as UserIcon } from "lucide-react";
+import { useView, TeamInfo } from '@/contexts/ViewContext';
+import { Users, ChevronDown, User as UserIcon, Settings, Plus } from "lucide-react";
+import TeamSettingsModal from "@/components/teams/TeamSettingsModal";
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -28,6 +30,21 @@ export default function Sidebar() {
 
   const { user, logout } = useAuth();
   const { viewMode, setViewMode, selectedTeam, setSelectedTeam, teams } = useView();
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [teamModalTarget, setTeamModalTarget] = useState<TeamInfo | null>(null);
+
+  const openTeamSettings = (team: TeamInfo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTeamModalTarget(team);
+    setTeamModalOpen(true);
+    setTeamDropdownOpen(false);
+  };
+
+  const openCreateTeam = () => {
+    setTeamModalTarget(null);
+    setTeamModalOpen(true);
+    setTeamDropdownOpen(false);
+  };
 
   const getInitials = (name: string): string => {
     return name
@@ -170,20 +187,39 @@ export default function Sidebar() {
                         >
                           <div className="p-1.5">
                             {teams.map((team) => (
-                              <button
+                              <div
                                 key={team.id}
-                                onClick={() => { setSelectedTeam(team); setTeamDropdownOpen(false); }}
-                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                className={`flex items-center gap-1 rounded-lg transition-colors ${
                                   selectedTeam?.id === team.id ? 'bg-primary/10' : 'hover:bg-white/[.03]'
                                 }`}
                               >
-                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedTeam?.id === team.id ? 'bg-primary' : 'bg-gray-700'}`} />
-                                <div className="flex-1 min-w-0">
-                                  <div className={`text-xs font-semibold truncate ${selectedTeam?.id === team.id ? 'text-primary' : 'text-gray-300'}`}>{team.name}</div>
-                                  <div className="text-[10px] text-gray-600">{team.members.length} members</div>
-                                </div>
-                              </button>
+                                <button
+                                  onClick={() => { setSelectedTeam(team); setTeamDropdownOpen(false); }}
+                                  className="flex-1 flex items-center gap-2 px-2 py-1.5 text-left min-w-0"
+                                >
+                                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedTeam?.id === team.id ? 'bg-primary' : 'bg-gray-700'}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`text-xs font-semibold truncate ${selectedTeam?.id === team.id ? 'text-primary' : 'text-gray-300'}`}>{team.name}</div>
+                                    <div className="text-[10px] text-gray-600">{team.members.length} member{team.members.length !== 1 ? 's' : ''}</div>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={(e) => openTeamSettings(team, e)}
+                                  className="p-1 rounded-md text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors flex-shrink-0 mr-1"
+                                >
+                                  <Settings className="w-3 h-3" />
+                                </button>
+                              </div>
                             ))}
+                          </div>
+                          <div className="border-t border-gray-700/50">
+                            <button
+                              onClick={openCreateTeam}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-medium text-primary/80 hover:text-primary hover:bg-primary/5 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Create a new team
+                            </button>
                           </div>
                         </motion.div>
                       </>
@@ -328,6 +364,7 @@ export default function Sidebar() {
             isActive={location === '/configuration'}
             status={null}
             isCollapsed={isCollapsed}
+            disabled={true}
           />
           {user?.is_admin && (
           <NavItem 
@@ -392,6 +429,12 @@ export default function Sidebar() {
           )}
         </div>
       </div> */}
+
+      <TeamSettingsModal
+        open={teamModalOpen}
+        onOpenChange={setTeamModalOpen}
+        team={teamModalTarget}
+      />
     </div>
   );
 }
