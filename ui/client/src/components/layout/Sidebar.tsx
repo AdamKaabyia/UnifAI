@@ -242,7 +242,7 @@ export default function Sidebar() {
             className="px-3 mb-2"
           >
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {viewMode === 'team' ? (selectedTeam?.name ?? 'Team') : 'Agentic AI'}
+              Agentic AI
             </span>
           </motion.div>
         )}

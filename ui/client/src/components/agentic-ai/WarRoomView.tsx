@@ -18,7 +18,7 @@ import {
   DialogTitle,
   CustomDialogContent,
 } from "@/components/ui/dialog";
-import { Users, Trash2, Plus, MessageSquare, Clock, Activity } from "lucide-react";
+import { Users, Trash2, Plus, MessageSquare, Clock, Activity, Network, X } from "lucide-react";
 import ChatInterface from "./chat/ChatInterface";
 import GraphDisplay from "./graphs/GraphDisplay";
 import WorkflowsPanel from "./WorkflowsPanel";
@@ -84,6 +84,13 @@ interface WarRoomViewProps {
   teamName: string;
 }
 
+export interface QueuedMessage {
+  id: string;
+  message: string;
+  sender: string;
+  timestamp: Date;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomViewProps) {
@@ -107,6 +114,15 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [selectedFlowForModal, setSelectedFlowForModal] = useState<FlowObject | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+
+  // Workflow graph dialog
+  const [showGraphDialog, setShowGraphDialog] = useState(false);
+
+  // Message queue
+  const [messageQueue, setMessageQueue] = useState<QueuedMessage[]>([]);
+  const [processingQueuedMessage, setProcessingQueuedMessage] = useState<string | null>(null);
+  const messageQueueRef = useRef<QueuedMessage[]>([]);
+  messageQueueRef.current = messageQueue;
 
   const { nodeListRef } = useStreamingData();
   const { user } = useAuth();
@@ -173,6 +189,8 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
     let current = session;
     setSelectedSession(current);
     setIsSharingDisabled(false);
+    setMessageQueue([]);
+    setProcessingQueuedMessage(null);
 
     if (current.blueprintId) validateSelectedBlueprint(current.blueprintId);
 
@@ -406,11 +424,45 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
     [globalScope, user?.username, updateNodeList],
   );
 
+  // ─── Message queue ─────────────────────────────────────────────────────
+
+  const handleQueueMessage = useCallback((message: string) => {
+    setMessageQueue(prev => [...prev, {
+      id: `queue-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      message,
+      sender: user?.username || "default",
+      timestamp: new Date(),
+    }]);
+  }, [user?.username]);
+
+  const handleRemoveFromQueue = useCallback((id: string) => {
+    setMessageQueue(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  const handleQueuedMessageProcessed = useCallback(() => {
+    setProcessingQueuedMessage(null);
+  }, []);
+
+  // Auto-process queue when execution finishes
+  const prevIsLiveRequestRef = useRef(isLiveRequest);
+  useEffect(() => {
+    const wasLive = prevIsLiveRequestRef.current;
+    prevIsLiveRequestRef.current = isLiveRequest;
+
+    if (wasLive && !isLiveRequest && messageQueueRef.current.length > 0) {
+      const next = messageQueueRef.current[0];
+      setMessageQueue(prev => prev.slice(1));
+      setProcessingQueuedMessage(next.message);
+    }
+  }, [isLiveRequest]);
+
   // ─── Effects ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     setSelectedSession(null);
     setCurrentSessionMessages([]);
+    setMessageQueue([]);
+    setProcessingQueuedMessage(null);
     fetchChatSessions();
   }, [contextUserId]);
 
@@ -571,6 +623,9 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
                 isSharingDisabled={isSharingDisabled}
                 blueprintValid={isBlueprintValid}
                 isValidatingBlueprint={isValidatingBlueprint}
+                onQueueMessage={handleQueueMessage}
+                queuedMessageToProcess={processingQueuedMessage}
+                onQueuedMessageProcessed={handleQueuedMessageProcessed}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -615,31 +670,68 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
             </Button>
           </div>
 
-          {/* Workflow Graph */}
-          <div className="px-4 py-3 border-b border-gray-800 flex-1 min-h-0">
+          {/* Workflow Graph Toggle */}
+          <div className="px-4 py-3 border-b border-gray-800">
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Workflow Graph
             </div>
-            {selectedSession?.blueprintId ? (
-              <div className="bg-background-dark border border-gray-800 rounded-lg overflow-hidden" style={{ height: "180px" }}>
-                <GraphDisplay
-                  key={`warroom-graph-${selectedSession.id}`}
-                  blueprintId={selectedSession.blueprintId}
-                  specDict={blueprintSpecCache.get(selectedSession.blueprintId)}
-                  height="100%"
-                  showBackground={true}
-                  interactive={false}
-                  centerInView={true}
-                  animated={true}
-                  validationResults={blueprintValidationResults}
-                  isValidating={isValidatingBlueprint}
-                  isLiveRequest={isLiveRequest}
-                  isGraphVisible={true}
+            <Button
+              onClick={() => setShowGraphDialog(true)}
+              disabled={!selectedSession?.blueprintId}
+              variant="outline"
+              className="w-full h-9 bg-background-dark border-gray-700 hover:border-primary/50 hover:bg-primary/10 text-gray-300 text-xs justify-center gap-2"
+            >
+              <Network className="w-3.5 h-3.5" />
+              View Workflow
+              {isLiveRequest && (
+                <motion.div
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
                 />
+              )}
+            </Button>
+          </div>
+
+          {/* Message Queue */}
+          <div className="px-4 py-3 border-b border-gray-800 flex-1 min-h-0 flex flex-col">
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Message Queue {messageQueue.length > 0 && `(${messageQueue.length})`}
+            </div>
+            {messageQueue.length === 0 ? (
+              <div className="text-xs text-gray-600 text-center py-4">
+                No messages queued
               </div>
             ) : (
-              <div className="bg-background-dark border border-gray-800 rounded-lg h-[180px] flex items-center justify-center">
-                <span className="text-xs text-gray-600">No workflow selected</span>
+              <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
+                {messageQueue.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-background-dark border border-gray-800 rounded-lg p-2.5 group"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-primary/80 font-medium truncate">
+                        {item.sender}
+                      </span>
+                      {item.sender === (user?.username || "default") && (
+                        <button
+                          onClick={() => handleRemoveFromQueue(item.id)}
+                          className="p-0.5 rounded text-gray-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remove from queue"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-400 line-clamp-2">
+                      <span className="text-gray-500">asked: </span>
+                      &ldquo;{item.message}&rdquo;
+                    </p>
+                    <span className="text-[9px] text-gray-600 mt-1 block">
+                      {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -717,6 +809,50 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
               {isCreatingSession ? "Creating..." : "Start Session"}
             </Button>
           </DialogFooter>
+        </CustomDialogContent>
+      </Dialog>
+
+      {/* ── Workflow Graph Dialog ── */}
+      <Dialog open={showGraphDialog} onOpenChange={setShowGraphDialog}>
+        <CustomDialogContent className="bg-background-card border-gray-800 max-w-[90vw] w-[90vw] h-[80vh] max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0 pb-3">
+            <DialogTitle className="text-lg flex items-center gap-2">
+              <Network className="h-5 w-5 text-primary" />
+              Workflow Graph
+              {isLiveRequest && (
+                <motion.div
+                  className="w-2 h-2 rounded-full bg-emerald-400 ml-1"
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+              )}
+              {isLiveRequest && (
+                <span className="text-xs text-emerald-400 font-normal ml-1">Live</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-background-dark border border-gray-800 rounded-lg overflow-hidden">
+            {selectedSession?.blueprintId && showGraphDialog ? (
+              <GraphDisplay
+                key={`warroom-graph-dialog-${selectedSession.id}`}
+                blueprintId={selectedSession.blueprintId}
+                specDict={blueprintSpecCache.get(selectedSession.blueprintId)}
+                height="100%"
+                showBackground={true}
+                interactive={true}
+                centerInView={true}
+                animated={true}
+                validationResults={blueprintValidationResults}
+                isValidating={isValidatingBlueprint}
+                isLiveRequest={isLiveRequest}
+                isGraphVisible={showGraphDialog}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                No workflow loaded
+              </div>
+            )}
+          </div>
         </CustomDialogContent>
       </Dialog>
 

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2 } from "lucide-react";
+import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2, Clock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -36,13 +36,16 @@ interface ChatInterfaceProps {
   triggerExecution: (sessionPayload: SessionPayload) => Promise<string>;
   initialMessages?: BackendMessage[];
   blueprintExists?: boolean;
-  isSharingDisabled?: boolean; // If true, sharing is disabled for this blueprint
+  isSharingDisabled?: boolean;
   blueprintValid?: boolean;
   isValidatingBlueprint?: boolean;
   isBlueprintGraphHidden?: boolean;
-  isChatOnlyMode?: boolean; // If true, hide agent thinking and workflow details
-  onSetCarouselMode?: (mode: 'normal' | 'chat' | 'graph') => void; // Carousel mode setter
-  carouselMode?: 'normal' | 'chat' | 'graph'; // Current carousel mode
+  isChatOnlyMode?: boolean;
+  onSetCarouselMode?: (mode: 'normal' | 'chat' | 'graph') => void;
+  carouselMode?: 'normal' | 'chat' | 'graph';
+  onQueueMessage?: (message: string) => void;
+  queuedMessageToProcess?: string | null;
+  onQueuedMessageProcessed?: () => void;
 }
 
 export default function ChatInterface({
@@ -57,6 +60,9 @@ export default function ChatInterface({
   isChatOnlyMode = false,
   onSetCarouselMode,
   carouselMode = 'normal',
+  onQueueMessage,
+  queuedMessageToProcess,
+  onQueuedMessageProcessed,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -540,13 +546,23 @@ export default function ChatInterface({
     const messageContent = messageToSend || inputMessage;
     if (messageContent.trim() === "") return;
 
-    // Check if flow is loaded (runId should not be empty or null)
     if (!runId || runId.trim() === "") {
       toast({
         title: "No Flow Loaded",
         description: "You must load an existing flow before you can start chatting with the AI assistant.",
         variant: "destructive",
       });
+      return;
+    }
+
+    // If backend is busy and this is from user input (not from queue), queue it
+    if (isTyping && !messageToSend && onQueueMessage) {
+      onQueueMessage(messageContent);
+      setInputMessage("");
+      setTimeout(() => {
+        resetTextareaHeight();
+        textareaRef.current?.focus();
+      }, 0);
       return;
     }
 
@@ -672,6 +688,17 @@ export default function ChatInterface({
       stopStreamingLogs();
     };
   }, []);
+
+  // Process queued messages when backend becomes available
+  const handleSendMessageRef = useRef<((msg?: string) => Promise<void>) | null>(null);
+  handleSendMessageRef.current = handleSendMessage;
+
+  useEffect(() => {
+    if (queuedMessageToProcess && !isTyping) {
+      handleSendMessageRef.current?.(queuedMessageToProcess);
+      onQueuedMessageProcessed?.();
+    }
+  }, [queuedMessageToProcess, isTyping, onQueuedMessageProcessed]);
 
   // Memoized typing indicator
   const TypingIndicator = useMemo(
@@ -1100,10 +1127,15 @@ export default function ChatInterface({
             >
               <Button
                 onClick={() => handleSendMessage()}
-                disabled={inputMessage.trim() === "" || isTyping || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
+                disabled={inputMessage.trim() === "" || (isTyping && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
                 className="bg-primary hover:bg-[#7525c9] mb-0"
+                title={isTyping && onQueueMessage ? "Add to message queue" : "Send message"}
               >
-                <Send className="h-4 w-4" />
+                {isTyping && onQueueMessage ? (
+                  <Clock className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </UmamiTrack>
           </div>
