@@ -38,6 +38,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Load analytics after authentication
   loadAnalytics(isAuthenticated, user);
 
+  // Sync logout state across tabs via the storage event
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== 'unifai_logged_out') return;
+      const loggedOut = e.newValue === 'true';
+      setIsLoggedOut(loggedOut);
+      if (loggedOut) {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const checkAuthStatus = useCallback(async () => {
     try {
       const response = await api.get('/auth/user');
@@ -66,7 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('unifai_logged_out');
 
     const originalUrl = window.location.pathname + window.location.search;
-    const stateData = { originalUrl: originalUrl || '/' };
+    const stateData = { originalUrl: originalUrl || '/', forcePrompt };
     const encodedState = btoa(JSON.stringify(stateData));
 
     const promptParam = forcePrompt ? '&prompt=login' : '';
@@ -125,12 +140,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const decodedState = JSON.parse(atob(decodeURIComponent(stateParam)));
           const originalUrl = decodedState.originalUrl || '/';
+          const retryForcePrompt = decodedState.forcePrompt ?? false;
           console.log('Authentication failed, retrying with preserved URL:', originalUrl);
 
           // Re-encode state and retry login
-          const stateData = { originalUrl };
+          const stateData = { originalUrl, forcePrompt: retryForcePrompt };
           const encodedState = btoa(JSON.stringify(stateData));
-          window.location.href = `${api.defaults.baseURL}/auth/login?state=${encodeURIComponent(encodedState)}`;
+          const promptParam = retryForcePrompt ? '&prompt=login' : '';
+          window.location.href = `${api.defaults.baseURL}/auth/login?state=${encodeURIComponent(encodedState)}${promptParam}`;
           return; // Don't set loading to false yet, we're redirecting
         } catch (error) {
           console.error('Failed to decode state parameter on error:', error);
