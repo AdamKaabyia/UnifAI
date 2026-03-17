@@ -5,6 +5,7 @@ Handles user authentication, session management, and token validation
 from datetime import datetime, timedelta
 from functools import wraps
 import os
+import requests as http_requests
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
@@ -88,7 +89,12 @@ class AuthManager:
             
             # Pass the client-provided state through to Keycloak
             # Keycloak will echo it back in the callback
-            return self.keycloak_client.authorize_redirect(redirect_uri, state=client_state)
+            extra_params = {}
+            prompt = request.args.get('prompt')
+            if prompt:
+                extra_params['prompt'] = prompt
+
+            return self.keycloak_client.authorize_redirect(redirect_uri, state=client_state, **extra_params)
 
         @self.app.route('/api/auth/callback')
         def auth_callback():
@@ -119,6 +125,7 @@ class AuthManager:
                 }
                 session['access_token'] = token.get('access_token')
                 session['refresh_token'] = token.get('refresh_token')
+                session['id_token'] = token.get('id_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
                 
                 logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
@@ -139,8 +146,25 @@ class AuthManager:
         
         @self.app.route('/api/auth/logout', methods=['POST'])
         def logout():
-            """Logout user and clear session"""
+            """Logout user, revoke Keycloak tokens server-side, and clear Flask session"""
             username = session.get('user', {}).get('username', 'Unknown')
+            refresh_token_val = session.get('refresh_token')
+
+            # Revoke the session on Keycloak's side so the SSO cookie is invalidated
+            if refresh_token_val:
+                try:
+                    keycloak_base_url = config.keycloak_base_url
+                    realm = config.get('keycloak_realm', 'master')
+                    logout_url = f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/logout"
+                    http_requests.post(logout_url, data={
+                        'client_id': config.client_id,
+                        'client_secret': config.client_secret,
+                        'refresh_token': refresh_token_val,
+                    }, timeout=10)
+                    logger.info(f"Keycloak session revoked for user {username}")
+                except Exception as e:
+                    logger.warning(f"Failed to revoke Keycloak session for {username}: {e}")
+
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})
@@ -221,7 +245,7 @@ class AuthManager:
         return is_expired
     
     def _should_refresh_token(self):
-        """Check if access token should be refreshed (expires in next 5 minutes)"""
+        """Check if access token should be refreshed (expires within 1 minute)"""
         token_expires_at = session.get('token_expires_at', 0)
         if not token_expires_at:
             return True # No token expiration means we should try to refresh

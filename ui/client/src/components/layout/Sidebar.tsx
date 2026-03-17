@@ -11,7 +11,7 @@ import { FaSlack, FaBars } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
-import { useAuth, User } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -24,15 +24,7 @@ export default function Sidebar() {
     setIsCollapsed(!isCollapsed);
   };
 
-    const { user, logout } = useAuth();
-
-  const getInitials = (name: string): string => {
-    return name
-      .split(' ')                         // Split by spaces
-      .filter(Boolean)                    // Remove empty parts
-      .map(part => part[0].toUpperCase()) // Take first letter of each part and capitalize
-      .join('');                          // Join into a string
-  }
+    const { user } = useAuth();
 
   return (
     <div 
@@ -282,7 +274,7 @@ export default function Sidebar() {
               transition={{ duration: 0.2 }}
             >
               <SimpleTooltip content={<p>Sign out</p>}>
-                <button className="text-gray-400 hover:text-white">
+                <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
                   <FaSignOutAlt />
                 </button>
               </SimpleTooltip>

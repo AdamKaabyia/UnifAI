@@ -30,8 +30,9 @@ export const api = axios.create({
 
       if (error.response?.status === 401) {
         const isAuthEndpoint = error.config?.url?.includes('/auth');
-        
-        if (!isAuthEndpoint) {
+        const isLoggedOut = localStorage.getItem('unifai_logged_out') === 'true';
+
+        if (!isAuthEndpoint && !isLoggedOut) {
           // Capture the original URL to restore after authentication
           const originalUrl = window.location.pathname + window.location.search;
           const stateData = { originalUrl: originalUrl || '/' };

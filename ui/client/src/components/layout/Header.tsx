@@ -193,7 +193,7 @@ export default function Header({ title, onToggleSidebar }: HeaderProps) {
               transition={{ duration: 0.2 }}
             >
               <SimpleTooltip content={<p>Sign out</p>}>
-                <button className="mt-2 text-gray-400 hover:text-white">
+                <button onClick={logout} className="mt-2 text-gray-400 hover:text-white transition-colors">
                   <FaSignOutAlt />
                 </button>
               </SimpleTooltip>
