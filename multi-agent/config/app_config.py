@@ -13,4 +13,9 @@ class AppConfig(SharedConfig):
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
     # Engine
-    engine_name: str = "langgraph"
+    engine_name: str = "temporal"
+    temporal_task_queue: str = "graph-engine"
+    # Redis streaming tuning
+    redis_stream_ttl: int = 3600
+    redis_stream_block_ms: int = 5000
+    redis_stream_batch_size: int = 50

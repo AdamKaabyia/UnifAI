@@ -15,9 +15,9 @@ from dataclasses import dataclass
 import psutil
 import gc
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress
-from core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context,
     PacketFactory, IEMPerformanceMonitor

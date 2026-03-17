@@ -7,36 +7,53 @@ FinalizerPathInfo, and that this information is properly injected into nodes.
 
 import pytest
 from unittest.mock import Mock, MagicMock, call
-from graph.rt_graph_plan import RTGraphPlan
-from graph.graph_plan import GraphPlan
-from graph.models import Step, StepContext
-from graph.topology.models import StepTopology, FinalizerPathInfo
-from core.enums import ResourceCategory
-from session.session_registry import SessionRegistry
-from blueprints.models.blueprint import StepMeta
+from mas.graph.rt_graph_plan import RTGraphPlan
+from mas.graph.graph_plan import GraphPlan
+from mas.graph.models import Step, StepContext
+from mas.graph.topology.models import StepTopology, FinalizerPathInfo
+from mas.core.enums import ResourceCategory
+from mas.session.domain.session_registry import SessionRegistry
+from mas.catalog.element_registry import ElementRegistry
+from mas.blueprints.models.blueprint import StepMeta
 
 
 class TestRTGraphPlanTopologyIntegration:
     """Test integration of topology analysis into RTGraphPlan."""
     
     @pytest.fixture
+    def mock_element_registry(self):
+        """Mock element registry for card building."""
+        registry = Mock(spec=ElementRegistry)
+        mock_spec = Mock()
+        mock_spec.category = ResourceCategory.NODE
+        mock_spec.type_key = "test_type"
+        mock_spec.name = "Test"
+        mock_spec.description = "Test description"
+        mock_spec.capability_names = []
+        from mas.elements.common.card.default import DefaultCardBuilder
+        mock_spec.card_builder_cls = DefaultCardBuilder
+        registry.get_spec.return_value = mock_spec
+        return registry
+
+    @pytest.fixture
     def mock_session_registry(self):
         """Mock session registry for testing."""
         registry = Mock(spec=SessionRegistry)
+        
+        # Provide _store for SessionConfigCollector
+        registry._store = {cat: {} for cat in ResourceCategory}
         
         # Create mock node instances
         mock_nodes = {}
         for node_id in ["orchestrator", "agent", "processor", "finalizer"]:
             mock_node = Mock()
             mock_node.set_context = Mock()
-            # Ensure the mock has hasattr behavior for set_context
             mock_node.__dict__['set_context'] = mock_node.set_context
             mock_nodes[f"{node_id}_rid"] = mock_node
         
         def get_instance_side_effect(category, rid):
             if rid in mock_nodes:
                 return mock_nodes[rid]
-            # Create a new mock for unknown rids
             new_mock = Mock()
             new_mock.set_context = Mock()
             new_mock.__dict__['set_context'] = new_mock.set_context
@@ -44,19 +61,17 @@ class TestRTGraphPlanTopologyIntegration:
             return new_mock
         
         def get_runtime_element_side_effect(category, rid):
-            # Create a mock runtime element
             runtime_element = Mock()
             runtime_element.instance = mock_nodes.get(rid, Mock())
             runtime_element.config = Mock()
             
-            # Create mock spec with required attributes
             spec = Mock()
             spec.type_key = "test_type"
             spec.name = f"Test {rid}"
             spec.description = f"Test description for {rid}"
             spec.capability_surface = set()
-            spec.reads = []  # Empty list instead of Mock
-            spec.writes = []  # Empty list instead of Mock
+            spec.reads = []
+            spec.writes = []
             
             runtime_element.spec = spec
             return runtime_element
@@ -65,7 +80,7 @@ class TestRTGraphPlanTopologyIntegration:
         registry.get_runtime_element.side_effect = get_runtime_element_side_effect
         return registry, mock_nodes
     
-    def test_rtgraphplan_creates_topology_for_simple_chain(self, mock_session_registry):
+    def test_rtgraphplan_creates_topology_for_simple_chain(self, mock_session_registry, mock_element_registry):
         """Test RTGraphPlan creates topology for simple chain to finalizer."""
         registry, mock_nodes = mock_session_registry
         
@@ -105,7 +120,7 @@ class TestRTGraphPlanTopologyIntegration:
         logical_plan.add_step(finalizer)
         
         # Create runtime plan
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Verify orchestrator got topology information
         orchestrator_node = mock_nodes["orchestrator_rid"]
@@ -121,7 +136,7 @@ class TestRTGraphPlanTopologyIntegration:
         assert context.topology.get_distance_to_finalizer("agent") == 2  # agent -> finalizer + 1
         assert context.topology.get_nearest_finalizer_node() == "agent"
     
-    def test_rtgraphplan_creates_topology_for_multiple_paths(self, mock_session_registry):
+    def test_rtgraphplan_creates_topology_for_multiple_paths(self, mock_session_registry, mock_element_registry):
         """Test RTGraphPlan creates topology for multiple paths to finalizers."""
         registry, mock_nodes = mock_session_registry
         
@@ -173,7 +188,7 @@ class TestRTGraphPlanTopologyIntegration:
         for step in [orchestrator, agent1, agent2, processor]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check orchestrator's topology
         context = mock_nodes["orchestrator_rid"].set_context.call_args[0][0]
@@ -188,7 +203,7 @@ class TestRTGraphPlanTopologyIntegration:
         assert context.topology.get_shortest_finalizer_distance() == 1
         assert context.topology.get_nearest_finalizer_node() == "agent1"
     
-    def test_rtgraphplan_handles_no_finalizer_paths(self, mock_session_registry):
+    def test_rtgraphplan_handles_no_finalizer_paths(self, mock_session_registry, mock_element_registry):
         """Test RTGraphPlan handles nodes with no paths to finalizers."""
         registry, mock_nodes = mock_session_registry
         
@@ -221,7 +236,7 @@ class TestRTGraphPlanTopologyIntegration:
         logical_plan.add_step(node1)
         logical_plan.add_step(node2)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check node1's topology
         context = mock_nodes["node1_rid"].set_context.call_args[0][0]
@@ -229,7 +244,7 @@ class TestRTGraphPlanTopologyIntegration:
         assert not context.topology.has_finalizer_path()
         assert context.topology.finalizer_paths is None
     
-    def test_rtgraphplan_handles_cycles(self, mock_session_registry):
+    def test_rtgraphplan_handles_cycles(self, mock_session_registry, mock_element_registry):
         """Test RTGraphPlan handles cyclic graphs correctly."""
         registry, mock_nodes = mock_session_registry
         
@@ -281,7 +296,7 @@ class TestRTGraphPlanTopologyIntegration:
         for step in [node_a, node_b, node_c, finalizer]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check A's topology - should find path through C but handle B cycle
         context = mock_nodes["A_rid"].set_context.call_args[0][0]
@@ -294,7 +309,7 @@ class TestRTGraphPlanTopologyIntegration:
         # The key is that we have at least one valid path
         assert context.topology.get_shortest_finalizer_distance() >= 2
     
-    def test_rtgraphplan_handles_branching_conditions(self, mock_session_registry):
+    def test_rtgraphplan_handles_branching_conditions(self, mock_session_registry, mock_element_registry):
         """Test RTGraphPlan handles conditional branching in topology."""
         registry, mock_nodes = mock_session_registry
         
@@ -330,7 +345,7 @@ class TestRTGraphPlanTopologyIntegration:
         for step in [orchestrator, agent1, agent2]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check orchestrator's topology
         context = mock_nodes["orchestrator_rid"].set_context.call_args[0][0]
@@ -410,7 +425,7 @@ class TestRTGraphPlanStepContextInjection:
         registry.get_runtime_element.side_effect = get_runtime_element_side_effect
         return registry, mock_nodes
     
-    def test_all_nodes_receive_step_context(self, mock_session_registry):
+    def test_all_nodes_receive_step_context(self, mock_session_registry, mock_element_registry):
         """Test that all nodes receive StepContext with topology."""
         registry, mock_nodes = mock_session_registry
         
@@ -422,7 +437,7 @@ class TestRTGraphPlanStepContextInjection:
         for step in [node1, node2, finalizer]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # All nodes should have received set_context calls
         for rid, mock_node in mock_nodes.items():
@@ -432,7 +447,7 @@ class TestRTGraphPlanStepContextInjection:
             assert isinstance(context, StepContext)
             assert isinstance(context.topology, StepTopology)
     
-    def test_step_context_contains_correct_topology(self, mock_session_registry):
+    def test_step_context_contains_correct_topology(self, mock_session_registry, mock_element_registry):
         """Test that each node's StepContext contains correct topology for that node."""
         registry, mock_nodes = mock_session_registry
         
@@ -445,7 +460,7 @@ class TestRTGraphPlanStepContextInjection:
         for step in [node1, node2, finalizer]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check node1's context
         node1_context = mock_nodes["node1_rid"].set_context.call_args[0][0]
@@ -464,7 +479,7 @@ class TestRTGraphPlanStepContextInjection:
         assert finalizer_context.uid == "finalizer"
         assert not finalizer_context.topology.has_finalizer_path()  # No adjacent nodes
     
-    def test_step_context_includes_adjacent_nodes(self, mock_session_registry):
+    def test_step_context_includes_adjacent_nodes(self, mock_session_registry, mock_element_registry):
         """Test that StepContext includes both adjacent nodes and topology."""
         registry, mock_nodes = mock_session_registry
         
@@ -482,7 +497,7 @@ class TestRTGraphPlanStepContextInjection:
         for step in [orchestrator, agent1, agent2]:
             logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Check orchestrator's context
         context = mock_nodes["orchestrator_rid"].set_context.call_args[0][0]
@@ -498,7 +513,7 @@ class TestRTGraphPlanStepContextInjection:
         assert context.topology.get_distance_to_finalizer("agent2") == 1
         assert set(context.topology.get_finalizer_reachable_nodes()) == {"agent1", "agent2"}
     
-    def test_nodes_without_set_context_method(self, mock_session_registry):
+    def test_nodes_without_set_context_method(self, mock_session_registry, mock_element_registry):
         """Test that nodes without set_context method don't cause errors."""
         registry, mock_nodes = mock_session_registry
         
@@ -513,7 +528,7 @@ class TestRTGraphPlanStepContextInjection:
         logical_plan.add_step(node1)
         
         # Should not raise an error
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Verify the node was still retrieved
         registry.get_instance.assert_called_with(ResourceCategory.NODE, "node1_rid")
@@ -522,9 +537,25 @@ class TestRTGraphPlanStepContextInjection:
 class TestRTGraphPlanCoreFeatures:
     """Test that RTGraphPlan core features work with new topology system."""
     
-    def test_existing_functionality_with_topology(self):
+    @pytest.fixture
+    def mock_element_registry(self):
+        """Mock element registry for card building."""
+        registry = Mock(spec=ElementRegistry)
+        mock_spec = Mock()
+        mock_spec.category = ResourceCategory.NODE
+        mock_spec.type_key = "test_type"
+        mock_spec.name = "Test"
+        mock_spec.description = "Test description"
+        mock_spec.capability_names = []
+        from mas.elements.common.card.default import DefaultCardBuilder
+        mock_spec.card_builder_cls = DefaultCardBuilder
+        registry.get_spec.return_value = mock_spec
+        return registry
+
+    def test_existing_functionality_with_topology(self, mock_element_registry):
         """Test that existing RTGraphPlan functionality works with new topology."""
         registry = Mock(spec=SessionRegistry)
+        registry._store = {cat: {} for cat in ResourceCategory}
         mock_node = Mock()
         registry.get_instance.return_value = mock_node
         
@@ -539,7 +570,7 @@ class TestRTGraphPlanCoreFeatures:
         logical_plan = GraphPlan()
         logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Existing methods should still work
         assert len(rt_plan.steps) == 1
@@ -554,9 +585,10 @@ class TestRTGraphPlanCoreFeatures:
         # Should have length
         assert len(rt_plan) == 1
     
-    def test_step_context_with_new_topology(self):
+    def test_step_context_with_new_topology(self, mock_element_registry):
         """Test that StepContext works correctly with new topology composition."""
         registry = Mock(spec=SessionRegistry)
+        registry._store = {cat: {} for cat in ResourceCategory}
         mock_node = Mock()
         mock_node.set_context = Mock()
         registry.get_instance.return_value = mock_node
@@ -572,7 +604,7 @@ class TestRTGraphPlanCoreFeatures:
         logical_plan = GraphPlan()
         logical_plan.add_step(step)
         
-        rt_plan = RTGraphPlan(logical_plan, registry)
+        rt_plan = RTGraphPlan(logical_plan, registry, mock_element_registry)
         
         # Get the context that was passed to the node
         context = mock_node.set_context.call_args[0][0]

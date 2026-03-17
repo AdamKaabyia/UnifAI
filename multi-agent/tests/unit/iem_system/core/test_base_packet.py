@@ -10,8 +10,8 @@ import uuid
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from core.iem.packets import BaseIEMPacket, TaskPacket
-from core.iem.models import ElementAddress, PacketType
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.core.iem.models import ElementAddress, PacketType
 from tests.fixtures.iem_testing_tools import PacketFactory
 
 

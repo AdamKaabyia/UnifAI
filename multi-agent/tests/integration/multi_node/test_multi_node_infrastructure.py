@@ -28,7 +28,7 @@ from tests.base import (
     assert_work_plan_status,
     get_workspace_from_node,
 )
-from elements.nodes.common.workload import WorkItemStatus, Task
+from mas.elements.nodes.common.workload import WorkItemStatus, Task
 
 
 @pytest.mark.integration

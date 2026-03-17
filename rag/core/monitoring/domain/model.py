@@ -1,6 +1,6 @@
 """Monitoring domain models."""
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 
@@ -14,7 +14,7 @@ class MetricsEntry:
     pipeline_id: str
     source_type: str
     metrics: Dict[str, Any]
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MetricsEntry":
@@ -23,7 +23,7 @@ class MetricsEntry:
             pipeline_id=data.get("pipeline_id", ""),
             source_type=data.get("source_type", ""),
             metrics=data.get("metrics", {}),
-            timestamp=data.get("timestamp", datetime.utcnow()),
+            timestamp=data.get("timestamp", lambda: datetime.now(timezone.utc)()),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -40,7 +40,7 @@ class ErrorEntry:
     source_type: str
     error_message: str
     error_details: Dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ErrorEntry":
@@ -50,7 +50,7 @@ class ErrorEntry:
             source_type=data.get("source_type", ""),
             error_message=data.get("error_message", ""),
             error_details=data.get("error_details", {}),
-            timestamp=data.get("timestamp", datetime.utcnow()),
+            timestamp=data.get("timestamp", lambda: datetime.now(timezone.utc)()),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -78,7 +78,7 @@ class LogEntry:
             message=data.get("message", ""),
             level=data.get("level", ""),
             module=data.get("module", ""),
-            timestamp=data.get("timestamp", datetime.utcnow()),
+            timestamp=data.get("timestamp", lambda: datetime.now(timezone.utc)()),
             pipeline_id=data.get("pipeline_id"),
         )
 

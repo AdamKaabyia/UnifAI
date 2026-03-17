@@ -19,7 +19,7 @@ Test Strategy:
 """
 
 import pytest
-from elements.nodes.common.workload import Task
+from mas.elements.nodes.common.workload import Task
 from tests.base import (
     # Node creation
     create_orchestrator_node,

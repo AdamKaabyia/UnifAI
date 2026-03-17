@@ -13,15 +13,15 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
-from elements.conditions.router_direct.router import RouterDirectCondition
-from elements.conditions.router_direct.config import RouterDirectConditionConfig
-from elements.conditions.router_direct.router_condition_factory import RouterDirectConditionFactory
-from elements.conditions.common.models import BranchType, DirectBranchDef
-from graph.state.state_view import StateView
-from graph.state.graph_state import GraphState, Channel
-from graph.models import StepContext
-from core.iem.packets import TaskPacket, SystemPacket
-from core.iem.models import ElementAddress
+from mas.elements.conditions.router_direct.router import RouterDirectCondition
+from mas.elements.conditions.router_direct.config import RouterDirectConditionConfig
+from mas.elements.conditions.router_direct.router_condition_factory import RouterDirectConditionFactory
+from mas.elements.conditions.common.models import BranchType, DirectBranchDef
+from mas.graph.state.state_view import StateView
+from mas.graph.state.graph_state import GraphState, Channel
+from mas.graph.models import StepContext
+from mas.core.iem.packets import TaskPacket, SystemPacket
+from mas.core.iem.models import ElementAddress
 from tests.fixtures.iem_testing_tools import PacketFactory, create_test_step_context, create_test_state_view
 
 

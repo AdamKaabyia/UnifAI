@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { GraphFlow, FlowObject } from '@/components/agentic-ai/graphs/interfaces';
+import { FlowObject } from '@/components/agentic-ai/graphs/interfaces';
 import {
   Activity,
   Database,
@@ -14,6 +14,14 @@ import {
   MessageSquare,
   BookOpen,
 } from 'lucide-react';
+
+/**
+ * Minimal flow metadata required to create a FlowObject
+ */
+export interface FlowMetadata {
+  name?: string;
+  description?: string;
+}
 
 /**
  * Icon options for flows
@@ -30,18 +38,19 @@ export const FLOW_ICON_OPTIONS: React.FC<{ className?: string }>[] = [
 ];
 
 /**
- * Convert GraphFlow to FlowObject
+ * Convert flow metadata to FlowObject.
+ * Accepts any object with name/description (GraphFlow, BlueprintSummary, etc.)
  */
 export const convertGraphFlowToFlowObject = (
-  graphFlow: GraphFlow,
+  flowData: FlowMetadata,
   index: number,
   blueprintId?: string
 ): FlowObject | null => {
-  if (!graphFlow) return null;
+  if (!flowData) return null;
 
   // Extract metadata
-  const name = graphFlow.name || `Flow ${index + 1}`;
-  const description = graphFlow.description || 'No description available';
+  const name = flowData.name || `Flow ${index + 1}`;
+  const description = flowData.description || 'No description available';
 
   // Generate a random icon for the flow
   const IconComponent = FLOW_ICON_OPTIONS[index % FLOW_ICON_OPTIONS.length];

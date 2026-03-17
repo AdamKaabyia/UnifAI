@@ -11,13 +11,13 @@ Tests end-to-end ReAct agent execution including:
 
 import pytest
 from unittest.mock import Mock, patch
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.strategies.react import ReActStrategy
-from elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
-from elements.nodes.common.agent.execution.executor import AgentActionExecutor
-from elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
-from elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.strategies.react import ReActStrategy
+from mas.elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
+from mas.elements.nodes.common.agent.execution.executor import AgentActionExecutor
+from mas.elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 # Note: Using professional mock tools from fixtures instead of ad-hoc tools
@@ -239,7 +239,7 @@ class TestReActCompleteFlow:
 
         # Mock SystemError.from_parse_error to avoid constants import issue
         with patch('elements.nodes.common.agent.primitives.SystemError.from_parse_error') as mock_system_error:
-            from elements.nodes.common.agent.primitives import SystemError
+            from mas.elements.nodes.common.agent.primitives import SystemError
             mock_system_error.return_value = SystemError(
                 message="Parse error occurred",
                 error_type="parse_error",

@@ -1,5 +1,5 @@
 """MongoDB adapter for PipelineRepository port."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 from pymongo.collection import Collection
@@ -34,7 +34,7 @@ class MongoPipelineRepository(PipelineRepository):
 
     def update_status(self, pipeline_id: str, status: PipelineStatus) -> bool:
         """Update pipeline status. Returns True if updated."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         update_fields: Dict[str, Any] = {
             "status": status.value,
             "last_updated": now,
@@ -85,7 +85,7 @@ class MongoPipelineRepository(PipelineRepository):
             return True
 
         inc_fields = {f"stats.{k}": v for k, v in stats_updates.items()}
-        inc_fields["last_updated"] = datetime.utcnow()
+        inc_fields["last_updated"] = datetime.now(timezone.utc)
 
         result = self._col.update_one(
             {"pipeline_id": pipeline_id},

@@ -8,9 +8,9 @@ ALL functions here are GENERIC and work for ANY node type.
 """
 
 from typing import Set
-from graph.state.graph_state import GraphState, Channel
-from graph.state.state_view import StateView
-from graph.models import StepContext
+from mas.graph.state.graph_state import GraphState, Channel
+from mas.graph.state.state_view import StateView
+from mas.graph.models import StepContext
 
 
 def setup_node_with_state(node, channels: Set[str] = None):
@@ -94,7 +94,7 @@ def create_test_element_card(uid: str, name: str = None, description: str = None
         uid: Unique identifier
         name: Display name (defaults to uid)
         description: Description (defaults to "Test node {uid}")
-        capabilities: Set of capabilities (defaults to empty)
+        capabilities: Set of capability names (defaults to empty)
         type_key: Element type (defaults to "test_node")
         
     Returns:
@@ -103,21 +103,21 @@ def create_test_element_card(uid: str, name: str = None, description: str = None
     Example:
         card = create_test_element_card("agent1", capabilities={"analysis", "reporting"})
     """
-    from core.models import ElementCard
-    from core.enums import ResourceCategory
+    from mas.elements.common.card import ElementCard
+    from mas.elements.common.card.models.card import Capability
+    from mas.core.enums import ResourceCategory
+    
+    cap_list = [Capability(name=c) for c in (capabilities or set())]
     
     return ElementCard(
         uid=uid,
-        category=ResourceCategory.NODE,  # Default to NODE for testing
+        category=ResourceCategory.NODE,
         type_key=type_key,
         name=name or uid,
         description=description or f"Test node {uid}",
-        capabilities=capabilities or set(),
-        reads=set(),
-        writes=set(),
-        instance=None,  # Not needed for most tests
-        config=None,    # Not needed for most tests
-        skills={},      # Empty skills for testing
+        capabilities=cap_list,
+        skills=[],
+        configuration={},
         metadata=None
     )
 
@@ -148,7 +148,7 @@ def create_test_adjacent_nodes(node_uids: list = None, node_cards: dict = None):
         }
         adj = create_test_adjacent_nodes(node_cards=cards)
     """
-    from graph.models.adjacency import AdjacentNodes
+    from mas.graph.models.adjacency import AdjacentNodes
     
     if node_cards:
         # Use provided cards
@@ -176,7 +176,7 @@ def create_test_step_context(uid: str, adjacent_node_uids: list = None):
     Returns:
         StepContext instance properly configured for testing
     """
-    from graph.models import StepContext
+    from mas.graph.models import StepContext
     from unittest.mock import Mock
     
     # Create mock metadata (lightweight, doesn't need real implementation)
@@ -212,7 +212,7 @@ def assert_workplan_created(state_view: StateView, thread_id: str, owner_uid: st
         # After orchestrator runs
         assert_workplan_created(state_view, "thread_1", "orch1")
     """
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     
     storage = StateBoundStorage(state_view)
     service = UnifiedWorkloadService(storage)
@@ -237,7 +237,7 @@ def assert_thread_created(state_view: StateView, thread_title: str) -> str:
     Example:
         thread_id = assert_thread_created(state_view, "My Task")
     """
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     
     storage = StateBoundStorage(state_view)
     service = UnifiedWorkloadService(storage)
@@ -412,7 +412,7 @@ def create_work_plan_with_items(
         plan = create_work_plan_with_items("thread1", "orch1", num_local=2, num_remote=3, 
                                           remote_workers=["worker1", "worker2"])
     """
-    from elements.nodes.common.workload import WorkPlan, WorkItem, WorkItemKind, WorkItemStatus
+    from mas.elements.nodes.common.workload import WorkPlan, WorkItem, WorkItemKind, WorkItemStatus
     
     plan = WorkPlan(
         summary="Test work plan",
@@ -564,7 +564,7 @@ def simulate_worker_response(
         thread_id = simulate_worker_response(orch, "thread1", "corr_123", 
                                             success=True, from_uid="worker1")
     """
-    from elements.nodes.common.workload import Task
+    from mas.elements.nodes.common.workload import Task
     
     response = Task(
         content=content,
@@ -810,7 +810,7 @@ def create_custom_agent_node(uid: str, llm, tools=None, system_message=""):
         agent = create_custom_agent_node("agent1", mock_llm, tools=[search_tool])
         state_view, context = setup_node_with_context(agent, "agent1", [])
     """
-    from elements.nodes.custom_agent.custom_agent import CustomAgentNode
+    from mas.elements.nodes.custom_agent.custom_agent import CustomAgentNode
     
     agent = CustomAgentNode(
         llm=llm,
@@ -841,7 +841,7 @@ def create_orchestrator_node(uid: str, llm, tools=None, system_message=""):
         parent_orch = create_orchestrator_node("orch1", mock_llm)
         child_orch = create_orchestrator_node("orch2", mock_llm)
     """
-    from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+    from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
     
     orch = OrchestratorNode(
         llm=llm,
@@ -901,9 +901,9 @@ def send_task_between_nodes(sender, receiver, task_content: str, thread_id: str 
     Example:
         task = send_task_between_nodes(orch, agent, "Process this data", "thread1")
     """
-    from elements.nodes.common.workload import Task
-    from core.iem.packets import TaskPacket
-    from core.iem.models import ElementAddress
+    from mas.elements.nodes.common.workload import Task
+    from mas.core.iem.packets import TaskPacket
+    from mas.core.iem.models import ElementAddress
     
     # Get sender and receiver UIDs
     sender_uid = sender._ctx.uid if hasattr(sender, '_ctx') and sender._ctx else "sender"
@@ -1109,8 +1109,8 @@ def setup_node_for_execution(node, uid: str, adjacent_node_uids: list = None, sh
         
         # Now orch and agent1 share the same GraphState and can see each other's packets!
     """
-    from graph.state.graph_state import GraphState, Channel
-    from graph.state.state_view import StateView
+    from mas.graph.state.graph_state import GraphState, Channel
+    from mas.graph.state.state_view import StateView
     
     # Use shared state if provided, otherwise create new
     if shared_state_view is not None:
@@ -1153,8 +1153,8 @@ def create_task_packet(from_uid: str, to_uid: str, task):
         task = Task(content="Process this", thread_id="thread1")
         packet = create_task_packet("orch1", "agent1", task)
     """
-    from core.iem.packets import TaskPacket
-    from core.iem.models import ElementAddress
+    from mas.core.iem.packets import TaskPacket
+    from mas.core.iem.models import ElementAddress
     
     return TaskPacket.create(
         src=ElementAddress(uid=from_uid),
@@ -1185,7 +1185,7 @@ def add_packet_to_inbox(state, node_uid: str, packet):
         packet = create_task_packet("user1", "orch1", task)  # dst.uid = "orch1"
         add_packet_to_inbox(state_view, "orch1", packet)  # StateView must have INTER_PACKETS write!
     """
-    from graph.state.graph_state import Channel
+    from mas.graph.state.graph_state import Channel
     
     # ✅ Use StateView's PUBLIC API - works for both GraphState and StateView
     inter_packets = state.get(Channel.INTER_PACKETS, [])
@@ -1241,7 +1241,7 @@ def get_packets_from_outbox(state, node_uid: str):
         packets = get_packets_from_outbox(state_view, "orch1")
         assert len(packets) > 0
     """
-    from graph.state.graph_state import Channel
+    from mas.graph.state.graph_state import Channel
     
     # ✅ Use StateView's PUBLIC API - works for both GraphState and StateView
     inter_packets = state.get(Channel.INTER_PACKETS, [])
@@ -1276,7 +1276,7 @@ def find_packet_to_node(state, from_uid: str, to_uid: str):
         packet = find_packet_to_node(state_view, "orch1", "agent1")
         assert packet is not None
     """
-    from graph.state.graph_state import Channel
+    from mas.graph.state.graph_state import Channel
     
     # ✅ Use StateView's PUBLIC API - works for both GraphState and StateView
     inter_packets = state.get(Channel.INTER_PACKETS, [])
@@ -1316,7 +1316,7 @@ def create_response_task(original_task, response_content: str, from_uid: str, su
             success=True
         )
     """
-    from elements.nodes.common.workload import Task
+    from mas.elements.nodes.common.workload import Task
     
     response = Task(
         content=response_content,
@@ -1355,7 +1355,7 @@ def manually_add_to_outbox(state, node_uid: str, packets: list):
         manually_add_to_outbox(state_view, "orch1", [packet])
         found = find_packet_to_node(state_view, "orch1", "agent1")
     """
-    from graph.state.graph_state import Channel
+    from mas.graph.state.graph_state import Channel
     
     # ✅ Use StateView's PUBLIC API - works for both GraphState and StateView
     inter_packets = state.get(Channel.INTER_PACKETS, [])

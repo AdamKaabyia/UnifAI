@@ -5,7 +5,7 @@ Tests the focused model that handles finalizer path distance information.
 """
 
 import pytest
-from graph.topology.models import FinalizerPathInfo
+from mas.graph.topology.models import FinalizerPathInfo
 
 
 class TestFinalizerPathInfoCreation:

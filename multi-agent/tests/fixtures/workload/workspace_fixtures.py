@@ -77,7 +77,7 @@ def workspace_service(state_view):
     Returns:
         WorkspaceService instance (provides work plan operations)
     """
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     storage = StateBoundStorage(state_view)
     service = UnifiedWorkloadService(storage)
     return service.get_workspace_service()
@@ -91,7 +91,7 @@ def workspace_service_with_data(state_view, sample_work_plan):
     Returns:
         WorkspaceService with sample workplan loaded
     """
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     storage = StateBoundStorage(state_view)
     service = UnifiedWorkloadService(storage)
     workspace_service = service.get_workspace_service()
@@ -109,6 +109,6 @@ def orchestrator_workspace_service(state_view):
     Returns:
         UnifiedWorkloadService bound to state
     """
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     storage = StateBoundStorage(state_view)
     return UnifiedWorkloadService(storage)

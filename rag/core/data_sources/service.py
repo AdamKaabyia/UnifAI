@@ -1,6 +1,6 @@
 """DataSource application service - CRUD and business logic."""
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Callable
 
 from core.data_sources.domain.model import DataSource
@@ -202,7 +202,7 @@ class DataSourceService:
             summary: Optional dict to merge into type_data (e.g. stats, error info)
         """
         existing = self._source_repo.find_by_pipeline_id(pipeline_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if existing:
             # Update existing source

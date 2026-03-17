@@ -16,7 +16,7 @@ def sample_work_item():
     Returns:
         WorkItem instance
     """
-    from elements.nodes.common.workload import WorkItemStatus, WorkItemKind, ToolArguments
+    from mas.elements.nodes.common.workload import WorkItemStatus, WorkItemKind, ToolArguments
     
     return WorkPlanFactory.create_work_item(
         id="test_item_1",
@@ -87,7 +87,7 @@ def empty_work_plan():
     Returns:
         WorkPlan with no items
     """
-    from elements.nodes.common.workload import WorkPlan
+    from mas.elements.nodes.common.workload import WorkPlan
     
     return WorkPlan(
         summary="Empty Work Plan",

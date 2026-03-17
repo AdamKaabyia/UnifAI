@@ -19,6 +19,23 @@ export interface WorkflowBlueprint {
   };
 }
 
+/**
+ * Lightweight blueprint summary without spec_dict or rid_refs.
+ * Used for listing blueprints without loading the full spec data.
+ */
+export interface BlueprintSummary {
+  blueprint_id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  metadata: {
+    usageScope?: "public" | "private";
+    [key: string]: any;
+  };
+}
+
 export interface BlueprintInfoResponse {
   blueprint_id: string;
   user_id: string;
@@ -55,6 +72,18 @@ export interface SaveBlueprintResponse {
 export async function fetchBlueprints(userId?: string): Promise<WorkflowBlueprint[]> {
   const userIdParam = userId || 'default';
   const response = await axios.get(`/blueprints/available.blueprints.get?userId=${userIdParam}`);
+  return response.data || [];
+}
+
+/**
+ * Fetch lightweight blueprint summaries (name, description, metadata only - no spec_dict).
+ * Use this for listing blueprints when the full spec is not needed.
+ */
+export async function fetchBlueprintSummaries(userId?: string): Promise<BlueprintSummary[]> {
+  const userIdParam = userId || 'default';
+  const response = await axios.get<BlueprintSummary[]>(
+    `/blueprints/available.blueprints.summary.get?userId=${userIdParam}`
+  );
   return response.data || [];
 }
 

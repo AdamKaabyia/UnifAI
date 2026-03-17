@@ -13,11 +13,11 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Set
 
-from core.iem.utils import get_outgoing_targets
-from core.iem.packets import TaskPacket, SystemPacket, DebugPacket
-from core.iem.models import ElementAddress
-from graph.state.state_view import StateView
-from graph.models import StepContext
+from mas.core.iem.utils import get_outgoing_targets
+from mas.core.iem.packets import TaskPacket, SystemPacket, DebugPacket
+from mas.core.iem.models import ElementAddress
+from mas.graph.state.state_view import StateView
+from mas.graph.models import StepContext
 from tests.fixtures.iem_testing_tools import (
     PacketFactory, create_test_step_context, create_test_state_view
 )
@@ -520,7 +520,7 @@ class TestGetOutgoingTargetsIntegrationWithCondition:
 
     def test_integration_single_target_scenario(self):
         """Test integration scenario returning single target."""
-        from elements.conditions.router_direct.router import RouterDirectCondition
+        from mas.elements.conditions.router_direct.router import RouterDirectCondition
         
         # Set up condition
         condition = RouterDirectCondition()
@@ -548,7 +548,7 @@ class TestGetOutgoingTargetsIntegrationWithCondition:
 
     def test_integration_multiple_targets_scenario(self):
         """Test integration scenario returning multiple targets."""
-        from elements.conditions.router_direct.router import RouterDirectCondition
+        from mas.elements.conditions.router_direct.router import RouterDirectCondition
         
         # Set up condition
         condition = RouterDirectCondition()
@@ -583,7 +583,7 @@ class TestGetOutgoingTargetsIntegrationWithCondition:
 
     def test_integration_no_targets_scenario(self):
         """Test integration scenario with no targets."""
-        from elements.conditions.router_direct.router import RouterDirectCondition
+        from mas.elements.conditions.router_direct.router import RouterDirectCondition
         
         # Set up condition
         condition = RouterDirectCondition()

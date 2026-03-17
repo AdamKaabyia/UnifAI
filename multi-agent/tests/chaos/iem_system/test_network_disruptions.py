@@ -15,10 +15,10 @@ from enum import Enum
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress
-from core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket
-from core.iem.exceptions import IEMException, IEMValidationException, IEMAdjacencyException
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket
+from mas.core.iem.exceptions import IEMException, IEMValidationException, IEMAdjacencyException
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context,
     PacketFactory, IEMPerformanceMonitor, ChaosInjector

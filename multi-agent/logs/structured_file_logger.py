@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from logs.logger_interface import LoggerInterface
 
 class StructuredFileLogger(LoggerInterface):
@@ -9,7 +9,7 @@ class StructuredFileLogger(LoggerInterface):
             pass  # Clear file
 
     def _log(self, data):
-        data["timestamp"] = str(datetime.utcnow())
+        data["timestamp"] = str(datetime.now(timezone.utc))
         with open(self.file_path, "a") as f:
             f.write(json.dumps(data) + "\n")
 

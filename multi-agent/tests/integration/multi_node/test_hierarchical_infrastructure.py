@@ -30,7 +30,7 @@ from tests.base import (
     assert_response_routes_to_root,
     get_hierarchy_depth,
 )
-from elements.nodes.common.workload import WorkItemStatus, Task
+from mas.elements.nodes.common.workload import WorkItemStatus, Task
 
 
 @pytest.mark.integration

@@ -19,7 +19,6 @@ import GraphDisplay from "./graphs/GraphDisplay";
 import axios from '../../http/axiosAgentConfig'
 import { fetchResolvedBlueprint } from '@/api/blueprints'
 import { useStreamingData } from './StreamingDataContext'
-import { EnhancedStreamReader } from '@/components/shared/stream/StreamJsonParser'
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
 import WorkflowsPanel from "./WorkflowsPanel";
@@ -39,14 +38,17 @@ import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
 import { ChatSession, ChatMessage, ChatSessionData, SessionStateData } from "@/types/session";
 import {transformSessionData, sortSessionsByTimestamp} from "@/utils/sessionHelpers";
 import { useSessionManagement } from "@/hooks/use-session-management";
+import { useSessionStream } from "@/hooks/use-session-stream";
 
 
+/**
+ * Session execution payload (fire-and-forget submit + stream subscribe pattern)
+ */
 export type SessionPayload = {
   sessionId: string;
-  inputs: {"user_prompt": string},
-  stream: boolean,
-  scope: 'public' | 'private';
-  loggedInUser: string;
+  inputs: { user_prompt: string };
+  scope?: 'public' | 'private';
+  loggedInUser?: string;
 };
 
 type ExecutionTabProps = {
@@ -107,12 +109,15 @@ export default function ExecutionTab({
   const [blueprintSpecCache, setBlueprintSpecCache] = useState<Map<string, any>>(new Map());
   const [carouselMode, setCarouselMode] = useState<'normal' | 'chat' | 'graph'>('normal');
 
-  const { nodeListRef, forceUpdate } = useStreamingData();
+  const { nodeListRef, forceUpdate, clearStream } = useStreamingData();
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const contextUserId = viewMode === "team" && selectedTeam
     ? selectedTeam.name
     : (user?.username || "default");
+  
+  // Ref to hold the updateNodeList callback for use in stream subscription
+  const updateNodeListRef = useRef<((chunkData: any) => void) | null>(null);
 
   // Race-condition guard for session switching.
   //
@@ -303,6 +308,15 @@ export default function ExecutionTab({
     let currentSession = session;
     setSelectedSession(currentSession);
 
+    // Cancel any existing stream subscription before switching sessions
+    // This ensures the UI stops receiving events from the previous session
+    sessionStream.cancelStream();
+
+    // Reset streaming state when switching sessions
+    // This clears any existing node data from the previous session
+    clearStream();
+    setIsLiveRequest(false);
+
     // Reset sharing-disabled state immediately so a previously disabled session
     // doesn't bleed into the newly selected (possibly valid) session.
     setIsSharingDisabled(false);
@@ -397,6 +411,16 @@ export default function ExecutionTab({
     } else {
       setCurrentSessionMessages([]);
     }
+
+    // Check if this session has an active Redis stream and reconnect if so
+    // This enables persistent streaming - when user navigates away and returns,
+    // they can reconnect to the live stream and continue seeing updates
+    // Note: This runs in the background - we don't block session selection on it
+    sessionStream.checkAndReconnect(session.id).then(hasActiveStream => {
+      if (hasActiveStream) {
+        setIsLiveRequest(true);
+      }
+    });
   };
 
   // Handle delete chat
@@ -623,59 +647,82 @@ export default function ExecutionTab({
     // forceUpdate(); // Uncomment if needed to trigger a re-render
   };
 
-  // Reads the stream, decodes it, parses chunks, and updates state cleanly.
-  const triggerExecution = async (sessionPayload: SessionPayload) => {
-    let streamReader: EnhancedStreamReader | null = null;
+  // Keep ref updated with latest updateNodeList function
+  updateNodeListRef.current = updateNodeList;
 
+  // Ref to track stream completion promise resolver
+  const streamCompleteResolverRef = useRef<(() => void) | null>(null);
+
+  // Redis stream subscription for persistent streaming across page navigation
+  // Uses fire-and-forget submit + subscribe pattern
+  const sessionStream = useSessionStream({
+    onChunk: useCallback((chunkData: any) => {
+      updateNodeListRef.current?.(chunkData);
+    }, []),
+    onStreamEnd: useCallback(() => {
+      setIsLiveRequest(false);
+      // Resolve any pending completion promise
+      if (streamCompleteResolverRef.current) {
+        streamCompleteResolverRef.current();
+        streamCompleteResolverRef.current = null;
+      }
+    }, []),
+    onError: useCallback((error: string) => {
+      console.error('Stream error:', error);
+      setIsLiveRequest(false);
+      // Resolve any pending completion promise (with error state)
+      if (streamCompleteResolverRef.current) {
+        streamCompleteResolverRef.current();
+        streamCompleteResolverRef.current = null;
+      }
+    }, []),
+  });
+
+  /**
+   * Submit a session for execution and stream results.
+   * 
+   * Uses fire-and-forget pattern:
+   * 1. POST /user.session.submit  ← fire & forget (returns 202 immediately)
+   * 2. GET /session.stream.subscribe ← real-time events (NDJSON stream)
+   * 
+   * The streaming is handled by useSessionStream hook, which:
+   * - Processes events via onChunk → updateNodeList → nodeListRef
+   * - Signals completion via onStreamEnd → setIsLiveRequest(false)
+   * 
+   * Multiple sessions can run in parallel - we only switch which stream we're listening to.
+   */
+  const triggerExecution = async (sessionPayload: SessionPayload): Promise<string> => {
     try {
       setIsLiveRequest(true);
-      const payloadWithScope = {
-        ...sessionPayload,
-        scope: globalScope,
-        loggedInUser: user?.username || "default",
-      };
-
-      const response = await fetch(`/api2/sessions/user.session.execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payloadWithScope),
+      
+      // Create a promise that resolves when streaming completes
+      const streamCompletePromise = new Promise<void>((resolve) => {
+        streamCompleteResolverRef.current = resolve;
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      if (!response.body) throw new Error('ReadableStream not supported!');
-
-      // Create stream reader with chunk processing callback
-      streamReader = new EnhancedStreamReader((chunkData: any) => {
-        updateNodeList(chunkData);
-        // console.log(JSON.stringify(Array.from(nodeListRef.current.entries()), null, 2));
+      // Submit session and subscribe to stream (fire & forget + immediate subscription)
+      await sessionStream.submitAndSubscribe({
+        sessionId: sessionPayload.sessionId,
+        inputs: sessionPayload.inputs,
+        scope: sessionPayload.scope || globalScope,
+        loggedInUser: sessionPayload.loggedInUser || user?.username || "default",
       });
 
-      // Read the entire stream
-      await streamReader.readStream(response);
+      // Wait for streaming to complete (resolved by onStreamEnd callback)
+      await streamCompletePromise;
 
       console.log('Streaming completed.');
       console.log('Final Node List:', nodeListRef.current);
+
+      // Fetch the final session state
+      const session_response = await axios.get(
+        `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`
+      );
+      return session_response.data.output;
     } catch (error) {
-      console.error('Error communicating with chat API', error);
-
-      // Cancel stream reading if there was an error
-      if (streamReader) {
-        await streamReader.cancel();
-      }
-    } finally {
+      console.error('Error in session execution:', error);
       setIsLiveRequest(false);
-
-      try {
-        const session_response = await axios.get(
-          `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`
-        );
-        return session_response.data.output;
-      } catch (error) {
-        console.error('Error fetching session state:', error);
-        throw error;
-      }
+      throw error;
     }
   };
 
@@ -869,6 +916,7 @@ export default function ExecutionTab({
         >
           <div className="flex-grow">
             <ChatInterface
+              key={selectedSession?.id || 'no-session'}
               runId={selectedSession?.id || ''}
               triggerExecution={triggerExecution}
               initialMessages={currentSessionMessages}
@@ -880,6 +928,7 @@ export default function ExecutionTab({
               isChatOnlyMode={isChatOnlyMode}
               onSetCarouselMode={handleSetCarouselMode}
               carouselMode={carouselMode}
+              isLiveRequest={isLiveRequest}
             />
           </div>
           

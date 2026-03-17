@@ -1,6 +1,7 @@
 pydantic
 pydantic-core
 pyyaml
+typer
 langchain
 langchain-core
 langchain-openai
@@ -8,8 +9,8 @@ langchain-google-genai
 openai
 langgraph
 gunicorn
+flask
 flask-cors
-PyYAML
 pymongo
 python-dotenv
 httptools

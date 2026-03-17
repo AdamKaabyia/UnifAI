@@ -1,33 +1,40 @@
 #!/bin/sh
 
-set -e  # Exit on any error
+set -e
 
 echo ""
 echo "------------------------------------------"
-echo "🚀 Starting container with ROLE=\"$ROLE\""
+echo "  Starting container with ROLE=\"$ROLE\""
 echo "------------------------------------------"
 
 case "$ROLE" in
-  flask)
-    echo "🟢 Starting Flask API (Server)..."
-    . ~/venv/bin/activate
-    exec gunicorn -w $GUNICORN_WORKERS --threads $GUNICORN_THREADS -b 0.0.0.0:$PORT --timeout $GUNICORN_TIMEOUT --access-logfile - --error-logfile - --chdir ~/app run.wsgi:application
+  serve)
+    echo "Starting production API server (Gunicorn)..."
+    exec mas api serve \
+      --port "${PORT:-8002}" \
+      --workers "${GUNICORN_WORKERS:-4}" \
+      --threads "${GUNICORN_THREADS:-1}" \
+      --timeout "${GUNICORN_TIMEOUT:-120}"
     ;;
-    
-  # celery)
-  #   echo "🔧 Starting Slack Celery worker with tasks concurrently : $CELERY_WORKER"
-  #   . ~/venv/bin/activate
-  #   exec celery -A celery_app.init worker -c $CELERY_WORKER --pool=solo --loglevel=info -Q $CELERY_QUEUES -n multiagent
-  #   ;;
+
+  serve-dev)
+    echo "Starting development API server (Flask)..."
+    exec mas api dev --port "${PORT:-8002}"
+    ;;
+
+  temporal-worker)
+    echo "Starting Temporal worker..."
+    exec mas temporal-worker --threads "${WORKER_THREADS:-10}"
+    ;;
 
   debug)
-    echo "🐞 Debug mode activated — container will stay alive."
+    echo "Debug mode — container will stay alive."
     tail -f /dev/null
     ;;
 
   *)
-    echo "❌ ERROR: Unknown ROLE \"$ROLE\""
-    echo "Valid roles are: flask, celery, debug"
+    echo "ERROR: Unknown ROLE \"$ROLE\""
+    echo "Valid roles: serve, serve-dev, temporal-worker, debug"
     exit 1
     ;;
 esac

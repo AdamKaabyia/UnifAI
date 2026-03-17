@@ -7,7 +7,7 @@ functionality without complex failure modes or edge cases.
 
 from typing import Any, Optional, Dict, List
 from pydantic import BaseModel, Field
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 # =============================================================================

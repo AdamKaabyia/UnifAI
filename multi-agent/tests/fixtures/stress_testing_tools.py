@@ -10,7 +10,7 @@ import threading
 import random
 from typing import Optional, Any
 from pydantic import BaseModel, Field
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 # =============================================================================

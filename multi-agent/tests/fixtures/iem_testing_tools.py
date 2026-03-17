@@ -19,15 +19,15 @@ import pytest
 from pydantic import BaseModel, Field
 
 # IEM system imports
-from core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket, DebugPacket
-from core.iem.models import ElementAddress, PacketType, ErrorCode, IEMError
-from core.iem.interfaces import InterMessenger, MessengerMiddleware
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.factory import create_messenger, messenger_from_ctx
-from elements.nodes.common.workload import Task, AgentResult
-from graph.state.state_view import StateView
-from graph.state.graph_state import GraphState, Channel
-from graph.models import StepContext
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket, DebugPacket
+from mas.core.iem.models import ElementAddress, PacketType, ErrorCode, IEMError
+from mas.core.iem.interfaces import InterMessenger, MessengerMiddleware
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.factory import create_messenger, messenger_from_ctx
+from mas.elements.nodes.common.workload import Task, AgentResult
+from mas.graph.state.state_view import StateView
+from mas.graph.state.graph_state import GraphState, Channel
+from mas.graph.models import StepContext
 
 
 # =============================================================================
@@ -695,7 +695,7 @@ class MockMiddleware(MessengerMiddleware):
         self.before_send_calls.append(packet)
         
         if self.reject_packets:
-            from core.iem.exceptions import IEMValidationException
+            from mas.core.iem.exceptions import IEMValidationException
             raise IEMValidationException("Mock rejection")
         
         if self.modify_before_send:
@@ -711,7 +711,7 @@ class MockMiddleware(MessengerMiddleware):
         self.after_receive_calls.append(packet)
         
         if self.reject_packets:
-            from core.iem.exceptions import IEMValidationException
+            from mas.core.iem.exceptions import IEMValidationException
             raise IEMValidationException("Mock rejection")
         
         return packet

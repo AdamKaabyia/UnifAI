@@ -49,7 +49,7 @@ class BaseUnitTest:
         Returns:
             Mock LLM with chat method
         """
-        from elements.llms.common.chat.message import ChatMessage, Role
+        from mas.elements.llms.common.chat.message import ChatMessage, Role
         
         mock_llm = Mock()
         mock_llm.chat.return_value = ChatMessage(

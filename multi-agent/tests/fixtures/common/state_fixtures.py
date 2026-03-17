@@ -5,8 +5,8 @@ Provides fixtures for creating and configuring state objects for testing.
 """
 
 import pytest
-from graph.state.graph_state import GraphState, Channel
-from graph.state.state_view import StateView
+from mas.graph.state.graph_state import GraphState, Channel
+from mas.graph.state.state_view import StateView
 
 
 @pytest.fixture

@@ -8,12 +8,12 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, MagicMock
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.interfaces import MessengerMiddleware
-from core.iem.models import ElementAddress
-from core.iem.packets import BaseIEMPacket, TaskPacket
-from core.iem.exceptions import IEMValidationException, IEMException
-from graph.state.graph_state import Channel
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.interfaces import MessengerMiddleware
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.core.iem.exceptions import IEMValidationException, IEMException
+from mas.graph.state.graph_state import Channel
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, PacketFactory, MockMiddleware
 )

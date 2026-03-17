@@ -25,7 +25,7 @@ Same as test_real_orchestrator_agent_flows.py - use setup_multi_node_env()
 
 import pytest
 from unittest.mock import Mock
-from elements.nodes.common.workload import Task, AgentResult, WorkItemStatus, WorkItemKind
+from mas.elements.nodes.common.workload import Task, AgentResult, WorkItemStatus, WorkItemKind
 from tests.base import (
     # Node creation
     create_orchestrator_node,
@@ -898,8 +898,8 @@ class TestOrchestratorExecutionPhase:
         Tests: Normal EXECUTION phase flow with local work.
         """
         from unittest.mock import Mock
-        from elements.llms.common.chat.message import ChatMessage, Role
-        from elements.tools.common.base_tool import BaseTool
+        from mas.elements.llms.common.chat.message import ChatMessage, Role
+        from mas.elements.tools.common.base_tool import BaseTool
         from pydantic import BaseModel, Field
         
         # ===== Create Domain Tool for Local Execution =====
@@ -995,7 +995,7 @@ class TestOrchestratorExecutionPhase:
         
         Tests: Proper transition from EXECUTION to MONITORING phase.
         """
-        from elements.tools.common.base_tool import BaseTool
+        from mas.elements.tools.common.base_tool import BaseTool
         from pydantic import BaseModel, Field
         
         # ===== Create Domain Tool =====
@@ -1106,7 +1106,7 @@ class TestOrchestratorExecutionPhase:
         Tests: Dynamic phase transition from MONITORING back to EXECUTION
         when LLM identifies new local work after processing a response.
         """
-        from elements.tools.common.base_tool import BaseTool
+        from mas.elements.tools.common.base_tool import BaseTool
         from pydantic import BaseModel, Field
         
         # ===== Create Domain Tool =====
@@ -1224,7 +1224,7 @@ class TestOrchestratorExecutionPhase:
         
         Tests: ExecutionValidator provides guidance when local work is stuck.
         """
-        from elements.tools.common.base_tool import BaseTool
+        from mas.elements.tools.common.base_tool import BaseTool
         from pydantic import BaseModel, Field
         
         # ===== Create Domain Tool =====
@@ -1882,7 +1882,7 @@ class TestOrchestratorComplexCascades:
 
         Tests: Complex cascade through multiple phases, including backward cascade from SYNTHESIS.
         """
-        from elements.tools.common.base_tool import BaseTool
+        from mas.elements.tools.common.base_tool import BaseTool
         from pydantic import BaseModel, Field
         
         # ===== Create Domain Tool =====

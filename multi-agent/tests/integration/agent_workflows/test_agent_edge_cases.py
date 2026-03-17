@@ -20,18 +20,18 @@ import time
 import asyncio
 from unittest.mock import Mock, patch, MagicMock
 from concurrent.futures import ThreadPoolExecutor
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.strategies.react import ReActStrategy
-from elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
-from elements.nodes.common.agent.execution.executor import AgentActionExecutor
-from elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
-from elements.nodes.common.agent.parsers.base import ParseError, ParseErrorType
-from elements.nodes.common.agent.primitives import (
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.strategies.react import ReActStrategy
+from mas.elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
+from mas.elements.nodes.common.agent.execution.executor import AgentActionExecutor
+from mas.elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
+from mas.elements.nodes.common.agent.parsers.base import ParseError, ParseErrorType
+from mas.elements.nodes.common.agent.primitives import (
     AgentAction, AgentObservation, AgentFinish, AgentStep, StepType, ActionStatus
 )
-from elements.tools.common.base_tool import BaseTool
-from elements.tools.common.execution import ToolExecutorManager, ExecutorConfig
-from elements.tools.common.execution.models import ExecutionMode as ToolExecutionMode
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.execution import ToolExecutorManager, ExecutorConfig
+from mas.elements.tools.common.execution.models import ExecutionMode as ToolExecutionMode
 
 
 class FlakySLowTool(BaseTool):
@@ -265,7 +265,7 @@ class TestAgentEdgeCases:
         
         # Mock SystemError.from_parse_error to avoid constants import
         with patch('elements.nodes.common.agent.primitives.SystemError.from_parse_error') as mock_system_error:
-            from elements.nodes.common.agent.primitives import SystemError
+            from mas.elements.nodes.common.agent.primitives import SystemError
             mock_system_error.return_value = SystemError(
                 message="Parse error occurred",
                 error_type="parse_error",

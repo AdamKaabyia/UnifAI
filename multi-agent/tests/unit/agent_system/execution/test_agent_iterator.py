@@ -11,9 +11,9 @@ Tests the agent execution iterator including:
 
 import pytest
 from unittest.mock import Mock, patch
-from elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
-from elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish, AgentStep, StepType, ActionStatus
-from elements.llms.common.chat.message import ChatMessage, Role
+from mas.elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish, AgentStep, StepType, ActionStatus
+from mas.elements.llms.common.chat.message import ChatMessage, Role
 
 
 @pytest.mark.unit

@@ -58,10 +58,10 @@ from tests.fixtures.nodes.base_node_fixtures import (
 )
 
 # Import core types
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.tools.common.base_tool import BaseTool
-from elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish
-from elements.nodes.common.agent.parsers import ToolCallParser
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish
+from mas.elements.nodes.common.agent.parsers import ToolCallParser
 
 # Import professional testing tools
 from tests.fixtures.testing_tools import (
@@ -537,8 +537,8 @@ def create_step_context(uid: str, adjacent_nodes: list = None):
 @pytest.fixture
 def element_card():
     """Create a basic ElementCard for testing."""
-    from core.models import ElementCard
-    from core.enums import ResourceCategory
+    from mas.elements.common.card import ElementCard
+    from mas.core.enums import ResourceCategory
     
     return ElementCard(
         uid="test_element",
@@ -546,12 +546,9 @@ def element_card():
         type_key="test_type",
         name="Test Element",
         description="A test element for testing",
-        capabilities=set(),
-        reads=set(),
-        writes=set(),
-        instance=None,
-        config={},
-        skills={}
+        capabilities=[],
+        skills=[],
+        configuration={},
     )
 
 
@@ -674,14 +671,14 @@ def orchestrator_integration_state(state_view):
 @pytest.fixture
 def orchestrator_workspace_service(orchestrator_integration_state):
     """Provide a workspace service bound to the integration state."""
-    from elements.nodes.common.workload.state_bound_service import StateBoundWorkloadService
+    from mas.elements.nodes.common.workload.state_bound_service import StateBoundWorkloadService
     return StateBoundWorkloadService(orchestrator_integration_state)
 
 
 @pytest.fixture
 def integration_orchestrator(predictable_llm, orchestrator_integration_state):
     """Provide a fully configured orchestrator for integration testing."""
-    from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+    from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
     
     orchestrator = OrchestratorNode(llm=predictable_llm)
     
@@ -700,7 +697,7 @@ def integration_orchestrator(predictable_llm, orchestrator_integration_state):
 def integration_task_factory():
     """Provide a factory for creating tasks for integration testing."""
     import uuid
-    from elements.nodes.common.workload import Task
+    from mas.elements.nodes.common.workload import Task
     
     def create_task(content: str, thread_id: str = None, **kwargs) -> Task:
         """Create a task for integration testing."""

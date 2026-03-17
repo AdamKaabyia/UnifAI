@@ -7,12 +7,12 @@ and handles various graph scenarios including cycles, multiple paths, and edge c
 
 import pytest
 from unittest.mock import Mock
-from graph.topology.finalizer_analyzer import FinalizerAnalyzer
-from graph.topology.models import StepTopology, FinalizerPathInfo
-from graph.models import Step
-from graph.graph_plan import GraphPlan
-from core.enums import ResourceCategory
-from blueprints.models.blueprint import StepMeta
+from mas.graph.topology.finalizer_analyzer import FinalizerAnalyzer
+from mas.graph.topology.models import StepTopology, FinalizerPathInfo
+from mas.graph.models import Step
+from mas.graph.graph_plan import GraphPlan
+from mas.core.enums import ResourceCategory
+from mas.blueprints.models.blueprint import StepMeta
 
 
 class TestFinalizerAnalyzerBasicFunctionality:

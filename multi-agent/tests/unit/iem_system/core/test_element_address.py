@@ -6,7 +6,7 @@ Covers edge cases with UIDs and address comparison logic.
 """
 
 import pytest
-from core.iem.models import ElementAddress
+from mas.core.iem.models import ElementAddress
 
 
 class TestElementAddress:

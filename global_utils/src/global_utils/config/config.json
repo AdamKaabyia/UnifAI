@@ -2,5 +2,10 @@
   "rabbitmq_port": "${RABBITMQ_PORT}",
   "rabbitmq_ip": "${RABBITMQ_IP}",
   "mongodb_port": "${MONGODB_PORT}",
-  "mongodb_ip": "${MONGODB_IP}"
+  "mongodb_ip": "${MONGODB_IP}",
+  "temporal_ip": "${TEMPORAL_IP}",
+  "temporal_port": "${TEMPORAL_PORT}",
+  "temporal_namespace": "${TEMPORAL_NAMESPACE}",
+  "redis_ip": "${REDIS_IP}",
+  "redis_port": "${REDIS_PORT}"
 }

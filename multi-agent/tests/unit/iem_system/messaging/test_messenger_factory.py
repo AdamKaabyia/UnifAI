@@ -9,12 +9,12 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import List
 
-from core.iem.factory import (
+from mas.core.iem.factory import (
     create_messenger, messenger_from_ctx, messenger_for_testing
 )
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.interfaces import MessengerMiddleware
-from core.iem.models import ElementAddress
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.interfaces import MessengerMiddleware
+from mas.core.iem.models import ElementAddress
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context, MockMiddleware
 )
@@ -180,7 +180,7 @@ class TestMessengerFactory:
         
         # Create a mock context without adjacent_nodes
         from unittest.mock import Mock
-        from graph.models import AdjacentNodes
+        from mas.graph.models import AdjacentNodes
         mock_context = Mock()
         mock_context.uid = "test_node"
         mock_context.adjacent_nodes = AdjacentNodes.empty()  # Empty adjacent nodes
@@ -369,20 +369,17 @@ class TestMessengerFactory:
         assert messenger1._is_adjacent("new_node") is False
         
         # Create new context with additional node (immutable approach)
-        from core.models import ElementCard
-        from core.enums import ResourceCategory
+        from mas.elements.common.card import ElementCard
+        from mas.core.enums import ResourceCategory
         new_card = ElementCard(
             uid="new_node",
             category=ResourceCategory.NODE,
             type_key="test",
             name="New Node",
             description="Test node",
-            capabilities=set(),
-            reads=set(),
-            writes=set(),
-            instance=None,
-            config={},
-            skills={}
+            capabilities=[],
+            skills=[],
+            configuration={},
         )
         
         # Create new context with the additional node

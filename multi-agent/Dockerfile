@@ -57,5 +57,6 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN /bin/bash -c "pip install -r ./app/requirements.txt "
 
 RUN /bin/bash -c "pip install -e ./global_utils/"
+RUN /bin/bash -c "pip install ./app/"
 
 ENTRYPOINT ["./app/entrypoint.sh"]
