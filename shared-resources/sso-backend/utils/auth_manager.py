@@ -125,7 +125,6 @@ class AuthManager:
                 }
                 session['access_token'] = token.get('access_token')
                 session['refresh_token'] = token.get('refresh_token')
-                session['id_token'] = token.get('id_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
                 
                 logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
