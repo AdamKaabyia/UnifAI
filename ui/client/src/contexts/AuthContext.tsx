@@ -166,7 +166,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Periodically refresh access token before it expires
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user || isLoggedOut) return;
 
     const checkTokenExpiration = () => {
       const timeUntilExpiry = user.token_expires_at - Date.now() / 1000;
@@ -184,7 +184,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkTokenExpiration();
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, user, checkAuthStatus, login]);
+  }, [isAuthenticated, user, isLoggedOut, checkAuthStatus, login]);
 
   const value: AuthContextType = {
     user,
