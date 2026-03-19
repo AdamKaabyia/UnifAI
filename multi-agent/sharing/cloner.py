@@ -65,7 +65,7 @@ class ShareCloner:
         closure_data = self._compute_closure({root_rid}, sender_user_id)
 
         # Clone using pre-computed data
-        result = self._clone_resource_set(closure_data, recipient_user_id)
+        result = self._clone_resource_set(closure_data, recipient_user_id, sender_user_id)
 
         if not result.success:
             raise ValueError(f"Resource cloning failed: {result.errors}")
@@ -125,7 +125,7 @@ class ShareCloner:
             return {}, {}, 0
 
         logger.debug(f"Total closure to clone: {set(closure_data.keys())}")
-        clone_result = self._clone_resource_set(closure_data, recipient_user_id)
+        clone_result = self._clone_resource_set(closure_data, recipient_user_id, sender_user_id)
 
         if not clone_result.success:
             raise ValueError(f"Failed to clone resources: {clone_result.errors}")
@@ -134,7 +134,7 @@ class ShareCloner:
         return clone_result.rid_mapping, clone_result.name_conflicts, clone_result.resources_cloned
 
     def _clone_resource_set(self, closure_data: Dict[str, ResourceCacheData],
-                            recipient_user_id: str) -> CloneResult:
+                            recipient_user_id: str, sender_user_id: str) -> CloneResult:
         """Clone a set of resources using pre-computed closure data."""
         try:
             logger.debug(f"Cloning {len(closure_data)} resources using cached data")
@@ -147,7 +147,7 @@ class ShareCloner:
             new_docs = []
             for old_rid, cache_data in closure_data.items():
                 try:
-                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient_user_id)
+                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient_user_id, sender_user_id)
 
                     # Track name conflicts
                     if new_doc.name != cache_data.doc.name:
@@ -225,15 +225,16 @@ class ShareCloner:
         return closure_cache
 
     def _clone_single_resource(self, cache_data: ResourceCacheData, rid_mapping: Dict[str, str],
-                               recipient_user_id: str) -> Resource:
+                               recipient_user_id: str, sender_user_id: str) -> Resource:
         """Clone a single resource using pre-computed data."""
         original_doc = cache_data.doc
         new_rid = rid_mapping[original_doc.rid]
 
-        # Resolve name conflicts
+        # Resolve name with "(from sender)" suffix, consistent with blueprint naming
         new_name = self._resolve_name_conflict(
             recipient_user_id, original_doc.category,
-            original_doc.type, original_doc.name
+            original_doc.type, original_doc.name,
+            sender_user_id=sender_user_id
         )
 
         # Use typed model for clean remapping (Ref objects), then dump to dict
@@ -263,17 +264,18 @@ class ShareCloner:
             self.resources.create(doc)
 
     def _resolve_name_conflict(self, user_id: str, category: str,
-                               type_: str, preferred_name: str) -> str:
-        """Resolve name conflicts by adding copy suffix."""
-        base_name = preferred_name
+                               type_: str, preferred_name: str,
+                               sender_user_id: str) -> str:
+        """Resolve name conflicts by adding '(from sender)' suffix."""
+        base_name = f"{preferred_name} (from {sender_user_id})"
         current_name = base_name
 
-        for counter in range(1, 101):  # Limit to 100 attempts
+        for counter in range(2, 101):
             existing = self.resources._repo.find_by_name(user_id, category, type_, current_name)
             if not existing:
                 return current_name
 
-            current_name = f"{base_name} (copy {counter})" if counter > 1 else f"{base_name} (copy)"
+            current_name = f"{base_name} ({counter})"
 
         # Fallback to UUID if too many conflicts
         return f"{base_name} ({uuid4().hex[:8]})"
