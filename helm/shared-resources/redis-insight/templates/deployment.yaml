@@ -1,0 +1,56 @@
+# Redis Insight deployment with name 'redisinsight'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "redis-insight.fullname" . }} #deployment name
+  labels:
+    app: {{ .Chart.Name }} #deployment label
+spec:
+  replicas: 1 #a single replica pod
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }} #which pods is the deployment managing, as defined by the pod template
+  template: #pod template
+    metadata:
+      labels:
+        app: {{ .Chart.Name }} #label for pod/s
+    spec:
+      volumes:
+        - name: redis-insight
+          persistentVolumeClaim:
+            claimName: {{ include "redis-insight.fullname" . }}-pvc
+        - name: log-storage
+          emptyDir: {}
+      # initContainers:
+      #   - name: init
+      #     image: busybox
+      #     command:
+      #       - /bin/sh
+      #       - '-c'
+      #       - |
+      #         chown -R 1000 /data
+      #     resources: {}
+      #     volumeMounts:
+      #       - name: redis-insight
+      #         mountPath: /data
+      #     terminationMessagePath: /dev/termination-log
+      #     terminationMessagePolicy: File
+      containers:
+        - name:  {{ include "redis-insight.fullname" . }} #Container name (DNS_LABEL, unique)
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}"  #:{{ .Values.image.tag }}" - need to think over the latest tag
+          imagePullPolicy: {{ .Values.image.pullPolicy }} #Always pull image
+          volumeMounts:
+          - name: redis-insight #Pod volumes to mount into the container's filesystem. Cannot be updated.
+            mountPath: /data
+          - name: log-storage
+            mountPath: /data/redis-insight/logs
+          env:
+          {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: "{{ $value }}"
+          {{- end }}
+          ports:
+          - containerPort: {{ .Values.service.port }} #exposed container port and protocol
+            protocol: TCP

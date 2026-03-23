@@ -11,11 +11,11 @@ Tests the core ReAct strategy logic including:
 
 import pytest
 from unittest.mock import Mock, patch
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.strategies.react import ReActStrategy
-from elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish, StepType
-from elements.nodes.common.agent.parsers import ParseError, ParseErrorType
-from elements.nodes.common.agent.constants import StrategyType
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.strategies.react import ReActStrategy
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentObservation, AgentFinish, StepType
+from mas.elements.nodes.common.agent.parsers import ParseError, ParseErrorType
+from mas.elements.nodes.common.agent.constants import StrategyType
 
 
 @pytest.mark.unit
@@ -138,7 +138,7 @@ class TestReActStrategy:
              patch.object(react_strategy.parser, 'parse', side_effect=parse_error), \
              patch('elements.nodes.common.agent.primitives.SystemError.from_parse_error') as mock_system_error:
             
-            from elements.nodes.common.agent.primitives import SystemError
+            from mas.elements.nodes.common.agent.primitives import SystemError
             mock_system_error.return_value = SystemError(
                 message="Parse error occurred",
                 error_type="parse_error",
@@ -166,7 +166,7 @@ class TestReActStrategy:
              patch.object(react_strategy.parser, 'parse') as mock_parse, \
              patch('elements.nodes.common.agent.primitives.SystemError.from_parse_error') as mock_system_error:
             
-            from elements.nodes.common.agent.primitives import SystemError
+            from mas.elements.nodes.common.agent.primitives import SystemError
             mock_system_error.return_value = SystemError(
                 message="Reasoning too short",
                 error_type="validation_error",
@@ -209,7 +209,7 @@ class TestReActStrategy:
     
     def test_should_continue_terminal_step(self, react_strategy):
         """Test should_continue returns False for terminal steps."""
-        from elements.nodes.common.agent.primitives import AgentStep
+        from mas.elements.nodes.common.agent.primitives import AgentStep
         
         # Create a FINISH step (which is inherently terminal)
         terminal_step = AgentStep(
@@ -251,7 +251,7 @@ class TestReActStrategy:
     ])
     def test_consecutive_error_handling(self, react_strategy, consecutive_errors, should_continue):
         """Test that strategy stops after any error (ERROR steps are terminal)."""
-        from elements.nodes.common.agent.primitives import AgentStep
+        from mas.elements.nodes.common.agent.primitives import AgentStep
         
         # Create history with consecutive errors
         history = []
@@ -280,7 +280,7 @@ class TestReActStrategy:
              patch.object(react_strategy.parser, 'parse', side_effect=parse_error), \
              patch('elements.nodes.common.agent.primitives.SystemError.from_parse_error') as mock_system_error:
             
-            from elements.nodes.common.agent.primitives import SystemError
+            from mas.elements.nodes.common.agent.primitives import SystemError
             mock_system_error.return_value = SystemError(
                 message="Parse error occurred",
                 error_type="parse_error",

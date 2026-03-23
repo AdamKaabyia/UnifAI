@@ -1,5 +1,5 @@
 """MongoDB adapter for MonitoringRepository port."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 
 from pymongo.database import Database
@@ -53,7 +53,7 @@ class MongoMonitoringRepository(MonitoringRepository):
     def save_error(self, entry: ErrorEntry) -> None:
         """Save an error record."""
         doc = entry.to_dict()
-        doc["timestamp"] = datetime.utcnow()
+        doc["timestamp"] = datetime.now(timezone.utc)
         self._errors.insert_one(doc)
 
     def get_errors(self, pipeline_id: str, limit: int = 100) -> List[ErrorEntry]:

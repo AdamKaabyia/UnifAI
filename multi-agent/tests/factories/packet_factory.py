@@ -7,9 +7,9 @@ with correct addressing and payload structure.
 
 from typing import Optional
 
-from core.iem.packets import TaskPacket
-from core.iem.models import ElementAddress
-from elements.nodes.common.workload import Task
+from mas.core.iem.packets import TaskPacket
+from mas.core.iem.models import ElementAddress
+from mas.elements.nodes.common.workload import Task
 
 
 class PacketFactory:

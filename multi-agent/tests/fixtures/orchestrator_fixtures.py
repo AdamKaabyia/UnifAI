@@ -19,20 +19,20 @@ from typing import Dict, Any, List, Optional, Callable
 from unittest.mock import Mock, MagicMock, patch
 
 # Core imports
-from elements.tools.common.base_tool import BaseTool
-from elements.llms.common.chat.message import ChatMessage, Role
-from elements.nodes.common.agent.primitives import AgentObservation, AgentAction
-from elements.nodes.common.workload import (
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.llms.common.chat.message import ChatMessage, Role
+from mas.elements.nodes.common.agent.primitives import AgentObservation, AgentAction
+from mas.elements.nodes.common.workload import (
     WorkPlan, WorkItem, WorkItemStatus, WorkItemKind,
     WorkItemResult, ToolArguments, WorkPlanStatus, Task,
     UnifiedWorkloadService, InMemoryStorage
 )
-from elements.nodes.orchestrator.orchestrator_phase_provider import (
+from mas.elements.nodes.orchestrator.orchestrator_phase_provider import (
     OrchestratorPhaseProvider, OrchestratorPhase
 )
-from elements.nodes.common.agent.phases.phase_definition import PhaseDefinition, PhaseSystem
+from mas.elements.nodes.common.agent.phases.phase_definition import PhaseDefinition, PhaseSystem
 from tests.conftest import create_step_context
-from elements.nodes.common.agent.phases.phase_protocols import PhaseState, create_phase_state
+from mas.elements.nodes.common.agent.phases.phase_protocols import PhaseState, create_phase_state
 
 
 # =============================================================================
@@ -242,7 +242,7 @@ def work_plan_service(mock_workload_service):
     DEPRECATED: Use workspace_service_real instead.
     Create a WorkPlanService instance (for backward compatibility).
     """
-    from elements.nodes.common.workload.workplan import WorkPlanService as LegacyWorkPlanService
+    from mas.elements.nodes.common.workload.workplan import WorkPlanService as LegacyWorkPlanService
     # WorkPlanService now requires workspace_service and thread_service
     # This is a simplified mock version
     return Mock()
@@ -323,7 +323,7 @@ def mock_tool_dependencies():
     workload_service.update_workspace = Mock()
     
     # Create mock thread for delegation testing
-    from elements.nodes.common.workload import Thread
+    from mas.elements.nodes.common.workload import Thread
     mock_thread = Thread(
         title="Test Thread",
         objective="Test objective",
@@ -697,7 +697,7 @@ def orchestrator_step_context_isolated():
 @pytest.fixture
 def orchestrator_node_with_state(mock_llm, orchestrator_step_context, state_view):
     """Create an OrchestratorNode with both context and state properly set up."""
-    from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+    from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
     
     node = OrchestratorNode(llm=mock_llm)
     node.set_context(orchestrator_step_context)  # Set up context for uid access

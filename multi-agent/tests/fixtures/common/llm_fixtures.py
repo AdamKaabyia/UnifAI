@@ -8,8 +8,8 @@ import pytest
 from typing import List
 from unittest.mock import Mock
 
-from elements.llms.common.chat.message import ChatMessage, Role
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.llms.common.chat.message import ChatMessage, Role
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 def create_mock_llm(response_content: str = "Mock LLM response") -> Mock:
@@ -54,7 +54,7 @@ def mock_llm_chat():
     """
     def _mock_chat(messages: List[ChatMessage], tools: List[BaseTool] = None) -> ChatMessage:
         # Default response with tool call
-        from elements.llms.common.chat.message import ToolCall
+        from mas.elements.llms.common.chat.message import ToolCall
         return ChatMessage(
             role=Role.ASSISTANT,
             content="I'll search for information.",

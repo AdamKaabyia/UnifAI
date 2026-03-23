@@ -7,12 +7,12 @@ works correctly and provides clean, extensible architecture.
 
 import pytest
 from unittest.mock import Mock
-from graph.topology.models import StepTopology, FinalizerPathInfo
-from graph.models.step_context import StepContext
-from graph.topology.finalizer_analyzer import FinalizerAnalyzer
-from graph.models import Step
-from graph.graph_plan import GraphPlan
-from core.enums import ResourceCategory
+from mas.graph.topology.models import StepTopology, FinalizerPathInfo
+from mas.graph.models.step_context import StepContext
+from mas.graph.topology.finalizer_analyzer import FinalizerAnalyzer
+from mas.graph.models import Step
+from mas.graph.graph_plan import GraphPlan
+from mas.core.enums import ResourceCategory
 
 
 class TestNewCompositionDesign:

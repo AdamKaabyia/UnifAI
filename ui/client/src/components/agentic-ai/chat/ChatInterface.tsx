@@ -43,6 +43,7 @@ interface ChatInterfaceProps {
   isChatOnlyMode?: boolean; // If true, hide agent thinking and workflow details
   onSetCarouselMode?: (mode: 'normal' | 'chat' | 'graph') => void; // Carousel mode setter
   carouselMode?: 'normal' | 'chat' | 'graph'; // Current carousel mode
+  isLiveRequest?: boolean; // True when session is actively streaming (including reconnection)
 }
 
 export default function ChatInterface({
@@ -57,6 +58,7 @@ export default function ChatInterface({
   isChatOnlyMode = false,
   onSetCarouselMode,
   carouselMode = 'normal',
+  isLiveRequest = false,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -471,6 +473,94 @@ export default function ChatInterface({
     }
   };
 
+  // Ref to track if current streaming was initiated by reconnection (not handleSendMessage)
+  const isReconnectionStreamRef = useRef(false);
+
+  // Handle reconnection to active stream (when user navigates back to a running session)
+  // With the key prop on ChatInterface, each session gets a fresh component instance.
+  // 
+  // This effect watches BOTH isLiveRequest AND messages because:
+  // 1. isLiveRequest might become true AFTER mount (via checkAndReconnect)
+  // 2. messages are set AFTER mount (via initialMessages useEffect)
+  // Both conditions must be met to start polling.
+  //
+  // This recreates the same behavior as triggerExecution:
+  // - triggerExecution: handleSendMessage starts polling, then triggerExecution fills nodeListRef
+  // - Reconnection: checkAndReconnect fills nodeListRef via Redis, this effect starts polling
+  useEffect(() => {
+    // Skip if already streaming (user-initiated via handleSendMessage)
+    if (currentStreamingMessageId) return;
+    // Skip if user is typing (middle of handleSendMessage)
+    if (isTyping) return;
+    
+    // Start polling when session is live and messages are loaded
+    if (isLiveRequest && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      
+      // If the last message is from the user, the AI response is still being generated
+      // We need to create a placeholder AI message to attach the stream to
+      // (This mirrors what handleSendMessage does when user sends a message)
+      // During a live stream, the last message is always USER because:
+      // - User Q is saved immediately when sent
+      // - AI response is saved only when stream completes (with finalAnswer)
+      // If last message is AI, stream has already completed - no reconnection needed
+      if (lastMessage.sender === 'user') {
+        const reconnectMessageId = `reconnect-${Date.now()}`;
+        const placeholderAiMessage: Message = {
+          id: reconnectMessageId,
+          content: "",
+          sender: "ai",
+        };
+        
+        // Add placeholder AI message
+        setMessages((prev) => [...prev, placeholderAiMessage]);
+        
+        // Mark this as a reconnection stream (not user-initiated)
+        isReconnectionStreamRef.current = true;
+        setCurrentStreamingMessageId(reconnectMessageId);
+        startStreamingLogs(reconnectMessageId);
+        startStreamingWorkPlans(reconnectMessageId);
+      }
+    }
+  }, [isLiveRequest, messages]);
+
+  // Handle stream end from parent (when isLiveRequest becomes false)
+  // For reconnection streams, fetch the final answer since handleSendMessage isn't running
+  useEffect(() => {
+    if (!isLiveRequest && currentStreamingMessageId) {
+      const messageId = currentStreamingMessageId;
+      const wasReconnection = isReconnectionStreamRef.current;
+      
+      // Stop polling
+      stopStreamingLogs(messageId);
+      setCurrentStreamingMessageId(null);
+      isReconnectionStreamRef.current = false;
+      
+      // For reconnection streams, fetch the final answer
+      if (wasReconnection && runId) {
+        (async () => {
+          try {
+            const response = await axios.get(`/sessions/session.chat.get?sessionId=${runId}`);
+            const finalAnswer = response.data?.output;
+            
+            if (finalAnswer) {
+              setMessages((prev) =>
+                prev.map((msg) => {
+                  if (msg.id === messageId) {
+                    return { ...msg, finalAnswer };
+                  }
+                  return msg;
+                })
+              );
+            }
+          } catch (error) {
+            console.error('Error fetching final state after reconnection:', error);
+          }
+        })();
+      }
+    }
+  }, [isLiveRequest, runId]);
+
   // Toggle expansion of a specific node log in separate state
   const toggleNodeExpansion = useCallback((messageId: string, nodeId: string) => {
     const currentLogs = streamLogDataRef.current[messageId] || [];
@@ -511,24 +601,6 @@ export default function ChatInterface({
     }));
   }, []);
 
-  const getSessionState = async (sid: string) => {
-    try {
-      // Make API call to get the session state
-      const response = await axios.get(
-        `/session.state.get?sessionId=${sid}`,
-      );
-      const data = response.data;
-
-      if (data && data.response) {
-        return data.response;
-      }
-
-      return "I'm sorry, I couldn't retrieve a response for your query.";
-    } catch (error) {
-      console.error("Failed to get session state:", error);
-      return "I'm sorry, I couldn't retrieve a response for your query.";
-    }
-  };
 
   // User sends message → Creates an AI message with empty streamLogs
   // Streaming starts → Interval polls for node updates and updates the message
@@ -595,7 +667,6 @@ export default function ChatInterface({
       const sessionPayload: SessionPayload = {
         sessionId: runId || "",
         inputs: { user_prompt: messageContent },
-        stream: true,
         scope: "public",
         loggedInUser: "default",
       };
@@ -1031,7 +1102,11 @@ export default function ChatInterface({
                 </div>
               </motion.div>
             ))}
-            {isTyping && (isChatOnlyMode ? ChatOnlyLoader : TypingIndicator)}
+            {/* Show loading indicator when:
+                1. isTyping - user just sent a message
+                2. isLiveRequest && currentStreamingMessageId && !isTyping - reconnection to active stream */}
+            {(isTyping || (isLiveRequest && currentStreamingMessageId && !isTyping)) && 
+              (isChatOnlyMode ? ChatOnlyLoader : TypingIndicator)}
           </AnimatePresence>
           <div ref={messagesEndRef} />
         </div>

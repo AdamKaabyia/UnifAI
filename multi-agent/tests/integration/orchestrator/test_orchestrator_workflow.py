@@ -14,11 +14,11 @@ import pytest
 from unittest.mock import Mock, patch
 from typing import List
 
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.common.workload import Task, UnifiedWorkloadService, InMemoryStorage, WorkItem, WorkItemStatus
-from graph.state.graph_state import GraphState
-from core.iem.packets import TaskPacket
-from core.iem.models import ElementAddress
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.common.workload import Task, UnifiedWorkloadService, InMemoryStorage, WorkItem, WorkItemStatus
+from mas.graph.state.graph_state import GraphState
+from mas.core.iem.packets import TaskPacket
+from mas.core.iem.models import ElementAddress
 from tests.base.base_integration_test import BaseIntegrationTest
 
 # ✅ GENERIC: Import helpers that work for ALL integration tests
@@ -70,7 +70,7 @@ class TestOrchestratorBasicWorkflow(BaseIntegrationTest):
         workspace_service = service.get_workspace_service()
         plan = workspace_service.create_work_plan(thread.thread_id, "orch1")
         
-        from elements.nodes.common.workload import WorkItemKind
+        from mas.elements.nodes.common.workload import WorkItemKind
         item = WorkItem(
             id="item_1",
             kind=WorkItemKind.REMOTE,
@@ -161,7 +161,7 @@ class TestOrchestratorDelegation(BaseIntegrationTest):
         workspace_service = service.get_workspace_service()
         plan = workspace_service.create_work_plan(thread.thread_id, "orch1")
         
-        from elements.nodes.common.workload import WorkItemKind
+        from mas.elements.nodes.common.workload import WorkItemKind
         item = WorkItem(
             id="item_1",
             kind=WorkItemKind.REMOTE,
@@ -207,7 +207,7 @@ class TestOrchestratorStateManagement(BaseIntegrationTest):
         workspace_service = service.get_workspace_service()
         plan = workspace_service.create_work_plan(thread.thread_id, "orch1", "Test Plan")
         
-        from elements.nodes.common.workload import WorkItem, WorkItemKind
+        from mas.elements.nodes.common.workload import WorkItem, WorkItemKind
         item = WorkItem(
             id="item_1",
             kind=WorkItemKind.LOCAL,
@@ -221,8 +221,8 @@ class TestOrchestratorStateManagement(BaseIntegrationTest):
         # Second visit: load work plan (simulating re-entrant execution)
         node2 = OrchestratorNode(llm=mock_llm)
         # ✅ GENERIC: Reuse same state for second visit
-        from graph.state.state_view import StateView
-        from graph.state.graph_state import Channel
+        from mas.graph.state.state_view import StateView
+        from mas.graph.state.graph_state import Channel
         node2._state = StateView(
             state,
             reads={Channel.THREADS, Channel.WORKSPACES, Channel.TASK_THREADS},

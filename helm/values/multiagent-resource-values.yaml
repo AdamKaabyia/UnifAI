@@ -1,5 +1,5 @@
 multiagent_server:
-  replicaCount: 2
+  replicaCount: 1
   resources: 
     limits:
       cpu: '4'
@@ -15,8 +15,29 @@ multiagent_server:
     port: "8003"
   env:
     BACKEND_ENV: "production" #options - production development
-    ROLE: "flask" # options are flask celery debug
+    ROLE: "serve" # options are flask celery debug
     GUNICORN_WORKERS: "9"
     GUNICORN_THREADS: "8"
     GUNICORN_TIMEOUT: "600"
+    VERSION: ""
+
+multiagent_temporal_worker:
+  replicaCount: 1
+  resources: 
+    limits:
+      cpu: '4'
+      memory: '32Gi'
+    requests:
+      cpu: '4'
+      memory: '16Gi'
+  image: 
+    repository: images.paas.redhat.com/unifai/multiagent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: "8003"
+  env:
+    BACKEND_ENV: "production" #options - production development
+    ROLE: "temporal-worker" # options are flask celery debug
+    WORKER_THREADS: "100"
     VERSION: ""

@@ -13,7 +13,7 @@ import os
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 # Shared Resources for Testing

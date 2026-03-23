@@ -1,5 +1,5 @@
 """Pipeline application service - CRUD and business logic."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Union
 
 from core.pipeline.domain.model import PipelineRecord, PipelineStatus, PipelineStats
@@ -26,7 +26,7 @@ class PipelineService:
         """Create new pipeline record if doesn't exist, otherwise update timestamp."""
         existing = self._repo.find_by_id(pipeline_id)
         if existing:
-            existing.last_updated = datetime.utcnow()
+            existing.last_updated = datetime.now(timezone.utc)
             self._repo.save(existing)
             return existing
 
@@ -34,8 +34,8 @@ class PipelineService:
             pipeline_id=pipeline_id,
             source_type=source_type,
             status=PipelineStatus.PENDING,
-            created_at=datetime.utcnow(),
-            last_updated=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            last_updated=datetime.now(timezone.utc),
             stats=PipelineStats(),
         )
         self._repo.save(record)
@@ -62,12 +62,15 @@ class PipelineService:
             return False
 
         record.status = status
-        record.last_updated = datetime.utcnow()
+        record.last_updated = datetime.now(timezone.utc)
 
         # Calculate processing time when done
         if status == PipelineStatus.DONE:
+            created_at = record.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
             record.stats.processing_time = (
-                record.last_updated - record.created_at
+                record.last_updated - created_at
             ).total_seconds()
 
         self._repo.save(record)

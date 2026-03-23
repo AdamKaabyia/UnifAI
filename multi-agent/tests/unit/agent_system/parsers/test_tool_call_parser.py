@@ -10,10 +10,10 @@ Tests the tool call parsing functionality including:
 """
 
 import pytest
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
-from elements.nodes.common.agent.primitives import AgentAction, AgentFinish
-from elements.nodes.common.agent.parsers import ParseError, ParseErrorType
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentFinish
+from mas.elements.nodes.common.agent.parsers import ParseError, ParseErrorType
 
 
 @pytest.mark.unit

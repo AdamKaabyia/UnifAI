@@ -50,7 +50,7 @@ from tests.base import (
     setup_node_for_execution,
     create_test_step_context,
 )
-from elements.nodes.common.workload import Task, WorkItemStatus
+from mas.elements.nodes.common.workload import Task, WorkItemStatus
 
 
 @pytest.mark.integration
@@ -748,7 +748,7 @@ class TestNewArchitectureFeatures(BaseIntegrationTest):
     
     def test_agent_returns_agent_result_with_full_metadata(self):
         """✅ NEW: Test agent returning AgentResult with full structured data."""
-        from elements.nodes.common.workload import AgentResult
+        from mas.elements.nodes.common.workload import AgentResult
         
         planning_llm = create_planning_and_delegating_llm([
             {"title": "Analysis task", "kind": "remote", "assigned_uid": "agent1"}

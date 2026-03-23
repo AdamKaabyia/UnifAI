@@ -1,6 +1,6 @@
 """Slack statistics aggregation service."""
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
 from core.data_sources.service import DataSourceService
@@ -78,7 +78,7 @@ class SlackStatsService:
             api_calls_count=counts["api_calls_count"],
             last_sync_at=last_sync,
             total_embeddings=len(sources),
-            updated_at=datetime.utcnow().isoformat() + "Z",
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
     
     def _aggregate_counts(self, sources: List[Dict[str, Any]]) -> Dict[str, int]:

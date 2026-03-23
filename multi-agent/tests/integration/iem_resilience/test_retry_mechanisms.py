@@ -13,10 +13,10 @@ from typing import Dict, List, Optional, Callable, Any
 from unittest.mock import Mock, patch
 from enum import Enum
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress
-from core.iem.packets import BaseIEMPacket, TaskPacket
-from core.iem.exceptions import IEMException, IEMValidationException
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.core.iem.exceptions import IEMException, IEMValidationException
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context,
     PacketFactory, IEMPerformanceMonitor

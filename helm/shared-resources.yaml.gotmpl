@@ -30,6 +30,24 @@ releases:
     values:
       - {{- toYaml .Values.rabbitmq | nindent 8 }}
 
+  - name: unifai-redis
+    chart: ./shared-resources/redis
+    wait: true
+    values:
+      - {{- toYaml .Values.redis | nindent 8 }}
+
+  - name: unifai-redis-insight
+    chart: ./shared-resources/redis-insight
+    wait: true
+    values:
+     - {{- toYaml (index .Values "redis-insight") | nindent 8 }}
+
+  - name: unifai-temporal
+    chart: ./shared-resources/temporal
+    wait: true
+    values:
+     - {{- toYaml .Values.temporal | nindent 8 }}
+
   - name: unifai-shared-config
     chart: ./shared-resources/shared-config
     wait: true
@@ -37,6 +55,9 @@ releases:
       - unifai-mongodb
       - unifai-qdrant
       - unifai-rabbitmq
+      - unifai-redis
+      - unifai-redis-insight
+      - unifai-temporal
     hooks:
       - events: ["postsync"]
         showlogs: true

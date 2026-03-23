@@ -8,7 +8,7 @@ like FinalizerPathInfo, and its extensibility for future topology information.
 import pytest
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from graph.topology.models import StepTopology, FinalizerPathInfo
+from mas.graph.topology.models import StepTopology, FinalizerPathInfo
 
 
 # Mock future topology models for extensibility testing

@@ -13,10 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
-import { GraphFlow, FlowObject } from "./graphs/interfaces";
+import { FlowObject } from "./graphs/interfaces";
 import GraphDisplay from "./graphs/GraphDisplay";
 import { fetchActiveSessions } from "@/api/agentic";
-import { fetchResolvedBlueprints, deleteBlueprint, fetchResolvedBlueprint } from "@/api/blueprints";
+import { fetchBlueprintSummaries, deleteBlueprint, fetchResolvedBlueprint } from "@/api/blueprints";
 import { convertGraphFlowToFlowObject } from "@/utils/blueprintHelpers";
 import ShareWorkflow from "./ShareWorkflow";
 import { BlueprintValidationResult } from "@/types/validation";
@@ -83,18 +83,22 @@ export default function WorkflowsPanel({
     showToastOnFailure: true,
   });
 
-  // Fetch available blueprints from API (resolved – references replaced with actual data)
+  // Fetch available blueprints from API using lightweight summary endpoint
   const fetchAvailableFlows = async (): Promise<void> => {
     try {
       const userId = user?.username || "default";
-      // Resolved endpoint so spec_dict contains actual resource names (not $ref: pointers).
-      // Per-flow resolved data is still fetched on selection for the graph + sharing status.
-      const blueprints = await fetchResolvedBlueprints(userId);
+      // Use summary endpoint - returns name, description, metadata without heavy spec_dict.
+      // Full resolved data is fetched on selection for the graph + sharing status.
+      const summaries = await fetchBlueprintSummaries(userId);
 
-      // Convert the blueprints to the format expected by the component
-      const processedFlows = blueprints
-        .map((blueprint) =>
-          convertGraphFlowToFlowObject(blueprint.spec_dict, 0, blueprint.blueprint_id),
+      // Convert summaries to FlowObject format
+      const processedFlows = summaries
+        .map((summary, index) =>
+          convertGraphFlowToFlowObject(
+            { name: summary.name, description: summary.description },
+            index,
+            summary.blueprint_id
+          ),
         )
         .filter((flow): flow is FlowObject => flow !== null);
       

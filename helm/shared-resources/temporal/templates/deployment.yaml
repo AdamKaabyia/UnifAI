@@ -1,0 +1,54 @@
+# Redis Insight deployment with name 'redisinsight'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal #deployment name
+  labels:
+    app: {{ .Chart.Name }} #deployment label
+spec:
+  replicas: 1 #a single replica pod
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }} #which pods is the deployment managing, as defined by the pod template
+  template: #pod template
+    metadata:
+      labels:
+        app: {{ .Chart.Name }} #label for pod/s
+    spec:
+      volumes:
+        - name: temporal
+          persistentVolumeClaim:
+            claimName: {{ include "temporal.fullname" . }}-pvc
+      # initContainers:
+      #   - name: init
+      #     image: busybox
+      #     command:
+      #       - /bin/sh
+      #       - '-c'
+      #       - |
+      #         chown -R 1000 /data
+      #     resources: {}
+      #     volumeMounts:
+      #       - name: redis-insight
+      #         mountPath: /data
+      #     terminationMessagePath: /dev/termination-log
+      #     terminationMessagePolicy: File
+      containers:
+        - name:  temporal #Container name (DNS_LABEL, unique)
+          image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          tty: true
+          stdin: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          command: ["/bin/sh", "-c", "temporal server start-dev --ip 0.0.0.0"]
+          volumeMounts:
+          - name: temporal #Pod volumes to mount into the container's filesystem. Cannot be updated.
+            mountPath: /tmp/temporal
+          ports:
+          - containerPort: {{ .Values.service.port }}
+            protocol: TCP
+          - containerPort: {{ .Values.service.port_ui }}
+            protocol: TCP

@@ -12,10 +12,10 @@ Tests extreme and malformed inputs to validate parser robustness:
 
 import pytest
 import json
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
-from elements.nodes.common.agent.parsers.base import ParseError, ParseErrorType
-from elements.nodes.common.agent.primitives import AgentAction, AgentFinish
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.parsers.tool_call_parser import ToolCallParser
+from mas.elements.nodes.common.agent.parsers.base import ParseError, ParseErrorType
+from mas.elements.nodes.common.agent.primitives import AgentAction, AgentFinish
 
 
 @pytest.mark.unit

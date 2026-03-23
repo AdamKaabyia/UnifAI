@@ -1,6 +1,6 @@
 """TermsApproval domain model."""
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 
@@ -16,7 +16,7 @@ class TermsApproval:
         """Create a TermsApproval instance from a dictionary."""
         return cls(
             username=data.get("username", ""),
-            approved_at=data.get("approved_at", datetime.utcnow()),
+            approved_at=data.get("approved_at", datetime.now(timezone.utc)),
             created_at=data.get("created_at"),
         )
 

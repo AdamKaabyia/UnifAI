@@ -1,7 +1,7 @@
 """Slack event task dispatcher port (interface)."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 
 
@@ -16,7 +16,7 @@ class SlackEventTaskResult:
 
     def __post_init__(self):
         if self.dispatched_at is None:
-            self.dispatched_at = datetime.utcnow()
+            self.dispatched_at = datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {

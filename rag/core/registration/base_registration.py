@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from typing import Any, Dict, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.registration.domain.port import RegistrationPort
 from core.registration.domain.model import BaseSourceData
@@ -57,7 +57,7 @@ class BaseRegistration(RegistrationPort):
 
     def _persist(self, type_data: Dict[str, Any]) -> None:
         """Persist the source using the repository port."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         source = DataSource(
             source_id=self.source_data.source_id,
             source_name=self.source_data.source_name,

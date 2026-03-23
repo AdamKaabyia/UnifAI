@@ -49,7 +49,7 @@ def sample_ambiguous_response_task():
     Returns:
         Task with ambiguous response content
     """
-    from elements.nodes.common.workload import Task
+    from mas.elements.nodes.common.workload import Task
     
     return Task(
         content="I found the data but it's in XML format. Should I convert it?",

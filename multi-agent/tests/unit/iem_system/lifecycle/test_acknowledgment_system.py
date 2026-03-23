@@ -9,10 +9,10 @@ import pytest
 from datetime import datetime, timedelta
 from typing import List, Set
 
-from core.iem.packets import TaskPacket
-from core.iem.models import ElementAddress
-from core.iem.messenger import DefaultInterMessenger
-from graph.state.graph_state import Channel
+from mas.core.iem.packets import TaskPacket
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.graph.state.graph_state import Channel
 from tests.fixtures.iem_testing_tools import (
     PacketFactory, create_test_state_view, MockIEMNode
 )

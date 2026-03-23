@@ -32,7 +32,7 @@ def mock_agent_action_executor():
     Returns:
         Mock executor with execute methods
     """
-    from elements.nodes.common.agent.primitives import AgentObservation
+    from mas.elements.nodes.common.agent.primitives import AgentObservation
     
     executor = Mock()
     executor.execute.return_value = AgentObservation(

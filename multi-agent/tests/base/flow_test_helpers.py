@@ -14,7 +14,7 @@ These helpers enable complete end-to-end flow testing with:
 
 from typing import List, Dict, Any, Optional
 from unittest.mock import Mock
-from elements.llms.common.chat.message import ChatMessage
+from mas.elements.llms.common.chat.message import ChatMessage
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -44,7 +44,7 @@ def create_mock_llm_with_tools(tool_call_sequences: List[List[Dict]]):
             [{"name": "workplan.summarize", "args": {...}}]
         ])
     """
-    from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+    from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
     
     call_index = [0]  # Mutable to track calls
     
@@ -259,7 +259,7 @@ def execute_orchestrator_cycle(orchestrator, state_view, initial_task=None):
         result_state, thread_id = execute_orchestrator_cycle(orch, state_view, initial_task=task)
     """
     from tests.base import add_packet_to_inbox, create_task_packet
-    from graph.state.graph_state import Channel
+    from mas.graph.state.graph_state import Channel
     
     # Add initial task if provided
     if initial_task:
@@ -431,7 +431,7 @@ def get_delegation_packets(state, from_uid: str):
         assert len(delegations) == 2
     """
     from tests.base import get_packets_from_outbox
-    from core.iem.models import PacketType
+    from mas.core.iem.models import PacketType
     
     packets = get_packets_from_outbox(state, from_uid)
     # Filter for task packets (delegations)
@@ -556,7 +556,7 @@ def create_simple_agent_llm(response_content: str):
         # Use in real flow test
         state = execute_agent_work(agent, state, task)
     """
-    from elements.llms.common.chat.message import ChatMessage, Role
+    from mas.elements.llms.common.chat.message import ChatMessage, Role
     
     llm = Mock()
     llm.chat = Mock(return_value=ChatMessage(
@@ -597,7 +597,7 @@ def create_stateful_agent_llm(responses: List[str]):
         state = execute_agent_work(agent, state, task2)  # Returns response[1]
         state = execute_agent_work(agent, state, task3)  # Returns response[2]
     """
-    from elements.llms.common.chat.message import ChatMessage, Role
+    from mas.elements.llms.common.chat.message import ChatMessage, Role
     
     llm = Mock()
     call_count = [0]  # Mutable counter
@@ -649,7 +649,7 @@ def create_multi_round_planning_llm(rounds: List[Dict]):
             {"action": "finish"}
         ])
     """
-    from elements.llms.common.chat.message import ChatMessage, Role
+    from mas.elements.llms.common.chat.message import ChatMessage, Role
     
     sequences = []
     
@@ -860,7 +860,7 @@ def get_work_plan_status_counts(plan):
     if not plan:
         return {}
     
-    from elements.nodes.common.workload import WorkItemStatus, WorkItemKind
+    from mas.elements.nodes.common.workload import WorkItemStatus, WorkItemKind
     
     status_counts = plan.get_status_counts()
     

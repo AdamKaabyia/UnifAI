@@ -38,8 +38,8 @@ class BaseIntegrationTest(BaseNodeTest):
         Returns:
             Dict containing all created nodes and configuration
         """
-        from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-        from elements.nodes.custom_agent.custom_agent import CustomAgentNode
+        from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+        from mas.elements.nodes.custom_agent.custom_agent import CustomAgentNode
         
         orchestrator_config = orchestrator_config or {}
         agent_configs = agent_configs or []
@@ -96,9 +96,9 @@ class BaseIntegrationTest(BaseNodeTest):
         Returns:
             Workflow execution result
         """
-        from elements.nodes.common.workload import Task
-        from core.iem.packets import TaskPacket
-        from core.iem.models import ElementAddress
+        from mas.elements.nodes.common.workload import Task
+        from mas.core.iem.packets import TaskPacket
+        from mas.core.iem.models import ElementAddress
         
         # Create initial task
         task = Task(
@@ -171,9 +171,9 @@ class BaseIntegrationTest(BaseNodeTest):
             agent_uid: UID of the responding agent
             success: Whether the response indicates success
         """
-        from elements.nodes.common.workload import Task
-        from core.iem.packets import TaskPacket
-        from core.iem.models import ElementAddress
+        from mas.elements.nodes.common.workload import Task
+        from mas.core.iem.packets import TaskPacket
+        from mas.core.iem.models import ElementAddress
         
         # Create response task
         response_task = Task(
@@ -209,7 +209,7 @@ class BaseIntegrationTest(BaseNodeTest):
             thread_id: Thread ID
             expected_completed_items: Expected number of completed work items
         """
-        from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+        from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
         
         storage = StateBoundStorage(self.state)
         service = UnifiedWorkloadService(storage)
@@ -219,7 +219,7 @@ class BaseIntegrationTest(BaseNodeTest):
         assert work_plan is not None, "WorkPlan should exist"
         
         if expected_completed_items is not None:
-            from elements.nodes.common.workload import WorkItemStatus
+            from mas.elements.nodes.common.workload import WorkItemStatus
             completed_items = [
                 item for item in work_plan.items.values()
                 if item.status == WorkItemStatus.DONE

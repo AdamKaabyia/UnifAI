@@ -15,8 +15,8 @@ Tests thread management:
 
 import pytest
 from unittest.mock import Mock
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.common.workload import Thread, WorkItemStatus, Task
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.common.workload import Thread, WorkItemStatus, Task
 from tests.base import (
     BaseUnitTest,
     setup_node_with_state,

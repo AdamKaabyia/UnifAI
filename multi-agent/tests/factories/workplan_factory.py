@@ -8,7 +8,7 @@ for testing orchestration scenarios.
 from typing import List, Dict, Any, Optional
 import uuid
 
-from elements.nodes.common.workload import (
+from mas.elements.nodes.common.workload import (
     WorkPlan, WorkItem, WorkItemStatus, WorkItemKind,
     WorkItemResult, ToolArguments
 )
