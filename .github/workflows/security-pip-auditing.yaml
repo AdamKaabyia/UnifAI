@@ -1,0 +1,178 @@
+name: PIP Audit Dependency Security Scan
+
+permissions:
+  contents: read
+
+on: 
+    #currently we'll run this only upon request and not automatically.
+    # push:
+    #     branches:
+    #         - GENIE-1354-dependency_scanning
+    pull_request:
+    workflow_dispatch:
+      inputs:
+        branch:
+          description: 'Branch to scan'
+          required: true
+          default: 'main'
+
+jobs:
+
+    # scan_backend:
+    #     runs-on: ubuntu-latest
+    #     steps:
+
+    #     - name: Checkout code
+    #       uses: actions/checkout@v4
+    #       with:
+    #         ref: ${{ inputs.branch }}
+          
+    #     - name: Set up Python
+    #       uses: actions/setup-python@v5
+    #       with:
+    #         python-version: '3.11'
+    #         cache: 'pip'
+
+    #     - name: setup virtual environment (backend)
+    #       run: python3 -m venv venv
+    
+    #     - name: Install python requirements (backend)
+    #       run: | 
+    #         ./venv/bin/pip install --upgrade pip "setuptools>=70.0.0"
+    #         ./venv/bin/pip install -r rag/requirements.txt
+
+    #     - name: Install python requirements (backend)
+    #       run: pip install -r backend/requirements.txt
+
+    #     - name: Scan dependencies (backend)
+    #       uses: pypa/gh-action-pip-audit@v1.1.0
+    #       with:
+    #         local: true
+    #         virtual-environment: venv/
+    #         summary: true
+
+    scan_rag:
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+        
+      - name: setup virtual environment (rag)
+        run: python3 -m venv venv
+
+      - name: Install python requirements (rag)
+        run: | 
+          ./venv/bin/pip install --upgrade pip "setuptools>=70.0.0"
+          ./venv/bin/pip install -r rag/requirements.txt
+          ./venv/bin/pip install -e ./global_utils/ 
+
+      - name: Scan dependencies (rag)
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          local: true
+          virtual-environment: venv/
+          summary: true
+
+    scan_multi-agent:
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+        
+      - name: setup virtual environment (multi-agent)
+        run: python3 -m venv venv
+
+      - name: Install python requirements (multi-agent)
+        run: | 
+          ./venv/bin/pip install --upgrade pip "setuptools>=70.0.0"
+          ./venv/bin/pip install -r multi-agent/requirements.txt
+          ./venv/bin/pip install -e ./global_utils/ 
+
+      - name: Scan dependencies (multi-agent)
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          local: true
+          virtual-environment: venv/
+          summary: true
+
+    scan_sso:
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+        
+      - name: setup virtual environment (sso)
+        run: python3 -m venv venv
+
+      - name: Install python requirements (sso)
+        run: | 
+          ./venv/bin/pip install --upgrade pip "setuptools>=70.0.0"
+          ./venv/bin/pip install -r shared-resources/sso-backend/requirements.txt
+
+      - name: Scan dependencies (sso)
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          local: true
+          virtual-environment: venv/
+          summary: true
+
+    analyze:
+        needs: [scan_rag, scan_multi-agent, scan_sso]
+        #change to the line below after new BE is pushed
+        #needs: [scan_backend, scan_rag, scan_multiagent, scan_sso]
+        if: always() && contains(needs.*.result, 'failure')
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+        steps:
+
+        - name: Generate Token
+          id: generate_token
+          #uses: tibdex/github-app-token@v2
+          uses: actions/create-github-app-token@v2
+          with:
+            app-id: ${{ secrets.LOG_ANALYZER_APP_ID }}
+            private-key: ${{ secrets.LOG_ANALYZER_PRIVATE_KEY }}
+
+        - name: GitHub Actions Failure Analysis
+          uses: calebevans/gha-failure-analysis@v0.1.9
+          with:
+            llm-provider: gemini
+            llm-model: gemini-3.1-pro-preview
+            llm-api-key: ${{ secrets.GEMINI_API_KEY }}
+            github-token: ${{ steps.generate_token.outputs.token }}
+            post-pr-comment: false

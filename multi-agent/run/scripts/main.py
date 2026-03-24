@@ -100,7 +100,7 @@ def main_new_session():
         metadata={"experiment": "test-v1"}
     )
 
-    run_id = session.run_context.run_id
+    run_id = session
     print(f"Started run: {run_id}")
 
     # manager, executor = setup_components()

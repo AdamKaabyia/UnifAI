@@ -48,7 +48,7 @@ mas = "bootstrap.cli:app"
 # ---------------------------------------------------------------------------
 [tool.setuptools.packages.find]
 where = ["lib", "adapters", "."]
-include = ["mas*", "inbound*", "outbound*", "temporal*", "bootstrap*", "config*"]
+include = ["mas*", "inbound*", "outbound*", "temporal*", "bootstrap*", "config*", "run*"]
 
 # ---------------------------------------------------------------------------
 # Pytest

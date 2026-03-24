@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from mas.engine.domain.models import GraphDefinition
 from mas.graph.models.step_context import StepContext
 from mas.graph.state.graph_state import GraphState
+from mas.core.execution_context import ExecutionContext
 
 
 # ── Workflow params ──────────────────────────────────────────────────
@@ -25,6 +26,7 @@ class GraphExecutionParams(BaseModel):
     state: GraphState = Field(default_factory=GraphState)
     graph_definition: GraphDefinition = Field(default_factory=GraphDefinition)
     session_id: str = ""
+    execution_context: ExecutionContext = Field(default_factory=ExecutionContext)
 
 
 class SessionWorkflowParams(BaseModel):
@@ -39,8 +41,7 @@ class SessionWorkflowParams(BaseModel):
     workflow starts — no raw inputs are passed here.
     """
     run_id: str
-    scope: str = "public"
-    logged_in_user: str = ""
+    execution_context: ExecutionContext = Field(default_factory=ExecutionContext)
     graph_execution_params: GraphExecutionParams = Field(default_factory=GraphExecutionParams)
 
 
@@ -53,6 +54,7 @@ class ExecuteNodeParams(BaseModel):
     step_context: Optional[StepContext] = None
     state: GraphState = Field(default_factory=GraphState)
     session_id: str = ""
+    execution_context: ExecutionContext = Field(default_factory=ExecutionContext)
 
 
 class EvaluateConditionParams(BaseModel):
@@ -69,8 +71,7 @@ class BeginSessionParams(BaseModel):
     Inputs are already staged — this only transitions QUEUED → RUNNING.
     """
     run_id: str
-    scope: str = "public"
-    logged_in_user: str = ""
+    execution_context: ExecutionContext = Field(default_factory=ExecutionContext)
 
 
 class CompleteSessionParams(BaseModel):

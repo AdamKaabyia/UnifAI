@@ -43,12 +43,14 @@ class GraphTraversalWorkflow:
         self._state: Dict[str, Any] = {}
         self._current_nodes: List[str] = []
         self._session_id: str = ""
+        self._execution_context = None
 
     @workflow.run
     async def run(self, params: GraphExecutionParams) -> GraphState:
         graph = params.graph_definition
         state = params.state
         self._session_id = params.session_id
+        self._execution_context = params.execution_context
 
         traversal = GraphTraversal(graph, GraphState)
 
@@ -88,6 +90,7 @@ class GraphTraversalWorkflow:
             step_context=node_def.step_context,
             state=state,
             session_id=self._session_id,
+            execution_context=self._execution_context,
         )
         return await workflow.execute_activity(
             "execute_graph_node",

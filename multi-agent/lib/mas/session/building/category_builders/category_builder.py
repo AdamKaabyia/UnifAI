@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Iterable
+from typing import Any, ClassVar, Iterable, Optional
 from mas.elements.common.exceptions import PluginConfigurationError
 from pydantic import ValidationError
 from mas.core.enums import ResourceCategory
 from mas.core.contracts import SessionRegistry
+from mas.core.element_deps import ElementDeps
 from mas.blueprints.models.blueprint import BlueprintSpec, ResourceSpec
 
 
@@ -17,15 +18,15 @@ class CategoryBuilder(ABC):
     def __init__(self, registry_elements) -> None:
         self._registry_elements = registry_elements
 
-    def build(self, blueprint: BlueprintSpec, registry: SessionRegistry) -> None:
+    def build(
+        self,
+        blueprint: BlueprintSpec,
+        registry: SessionRegistry,
+        deps: Optional[ElementDeps] = None,
+    ) -> None:
         for resource in self._iter_specs(blueprint):
-            # Get spec once
             spec = self._registry_elements.get_spec(self.category, resource.type)
-            
-            # Create instance
-            inst = self._create_instance(resource, registry)
-            
-            # Store complete runtime element (instance + spec + resource_spec)
+            inst = self._create_instance(resource, registry, deps=deps)
             self._register(registry, resource.rid.ref, inst, spec, resource)
 
     # -------- protected helpers ----------------------------------------
@@ -38,7 +39,12 @@ class CategoryBuilder(ABC):
         registry.register(self.category, name, inst, spec, resource_spec)
 
     # ––– shared factory construction with error handling ––––––––––––––
-    def _create_instance(self, resource_spec: ResourceSpec, session_registry: SessionRegistry) -> Any:
+    def _create_instance(
+        self,
+        resource_spec: ResourceSpec,
+        session_registry: SessionRegistry,
+        deps: Optional[ElementDeps] = None,
+    ) -> Any:
         """Lookup factory, validate schema, create instance with extras."""
         try:
             factory_cls = self._registry_elements.get_factory_class(self.category, resource_spec.type)
@@ -48,7 +54,6 @@ class CategoryBuilder(ABC):
                 f"No plugin for {self.category!r} type={resource_spec.type!r}", resource_spec.config.dict()
             ) from e
 
-        # schema validation / merge
         raw = resource_spec.config.dict(exclude_unset=True)
         try:
             validated = schema_cls(**raw) if schema_cls else raw
@@ -64,7 +69,8 @@ class CategoryBuilder(ABC):
             )
 
         try:
-            return factory.create(validated, **self._extra_kwargs(resource_spec.config, session_registry))
+            extra = self._extra_kwargs(resource_spec.config, session_registry)
+            return factory.create(validated, deps=deps, **extra)
         except Exception as e:
             raise PluginConfigurationError(
                 f"{factory_cls.__name__}.create() failed: {e}", validated

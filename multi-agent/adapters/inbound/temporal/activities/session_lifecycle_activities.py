@@ -23,7 +23,7 @@ class SessionLifecycleActivities:
     @activity.defn(name="begin_session")
     def begin_session(self, params: BeginSessionParams) -> GraphState:
         return self._handler.begin(
-            params.run_id, params.scope, params.logged_in_user,
+            params.run_id, params.execution_context,
         )
 
     @activity.defn(name="complete_session")

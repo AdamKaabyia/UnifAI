@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional
 from mas.blueprints.models.blueprint import BlueprintSpec
 from mas.core.channels import SessionChannel
 from mas.core.enums import ResourceCategory
+from mas.core.execution_context import ExecutionContext, ExecutionContextHolder
 from mas.graph.models.step_context import StepContext
 from mas.graph.state.graph_state import GraphState
 from mas.session.building.workflow_session_factory import WorkflowSessionFactory
@@ -40,6 +41,7 @@ class NodeExecutor:
         step_context: Optional[StepContext],
         state: GraphState,
         channel: Optional[SessionChannel] = None,
+        execution_context: Optional[ExecutionContext] = None,
     ) -> GraphState:
         """
         Build ONE node from its mini-blueprint, inject context, run it.
@@ -48,7 +50,13 @@ class NodeExecutor:
         streaming-capable nodes can emit events during execution.
         """
         mini_bp = BlueprintSpec.model_validate(node_blueprint)
-        rt_plan = self._factory.build_runtime_plan(mini_bp)
+
+        ctx_holder = ExecutionContextHolder()
+        rt_plan = self._factory.build_runtime_plan(mini_bp, ctx_holder=ctx_holder)
+
+        if execution_context:
+            ctx_holder.context = execution_context
+
         step = rt_plan.get_step(node_uid)
 
         if step_context:

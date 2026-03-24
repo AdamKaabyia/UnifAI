@@ -61,8 +61,7 @@ class SessionWorkflow:
             "begin_session",
             BeginSessionParams(
                 run_id=self._params.run_id,
-                scope=self._params.scope,
-                logged_in_user=self._params.logged_in_user,
+                execution_context=self._params.execution_context,
             ),
             start_to_close_timeout=_LIFECYCLE_TIMEOUT,
             retry_policy=_LIFECYCLE_RETRY,
@@ -75,6 +74,7 @@ class SessionWorkflow:
             state=seeded_state,
             graph_definition=self._params.graph_execution_params.graph_definition,
             session_id=self._params.run_id,
+            execution_context=self._params.execution_context,
         )
         return await workflow.execute_child_workflow(
             GraphTraversalWorkflow.run,

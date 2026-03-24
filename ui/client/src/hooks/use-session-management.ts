@@ -8,14 +8,27 @@ import { ChatSession, SessionStateData, ChatMessage } from '@/types/session';
 import { getPreviewText } from '@/utils/sessionHelpers';
 
 /**
- * Fetch session state (messages) for a specific session
+ * Fetch session chat data (messages and output) for a specific session
  */
 export const fetchSessionState = async (sessionId: string): Promise<SessionStateData | null> => {
   try {
-    const response = await axios.get(`/sessions/session.state.get?sessionId=${sessionId}`);
+    const response = await axios.get(`/sessions/session.chat.get?sessionId=${sessionId}`);
     return response.data;
   } catch (err) {
     console.error('Error fetching session state:', err);
+    return null;
+  }
+};
+
+/**
+ * Fetch only session messages for a specific session (lightweight)
+ */
+export const fetchSessionMessages = async (sessionId: string): Promise<ChatMessage[] | null> => {
+  try {
+    const response = await axios.get(`/sessions/session.chat.get?sessionId=${sessionId}`);
+    return response.data?.messages ?? null;
+  } catch (err) {
+    console.error('Error fetching session messages:', err);
     return null;
   }
 };
@@ -29,15 +42,15 @@ export const useSessionManagement = () => {
   const loadSessionMessages = useCallback(
     async (session: ChatSession): Promise<ChatSession | null> => {
       // Always fetch fresh messages from the backend to ensure we have the latest data
-      const stateData = await fetchSessionState(session.id);
-      if (stateData && stateData.messages) {
-        setCurrentMessages(stateData.messages);
+      const messages = await fetchSessionMessages(session.id);
+      if (messages && messages.length > 0) {
+        setCurrentMessages(messages);
 
         // Update the session with loaded messages and preview
         const updatedSession: ChatSession = {
           ...session,
-          messages: stateData.messages,
-          preview: getPreviewText(stateData.messages),
+          messages: messages,
+          preview: getPreviewText(messages),
         };
 
         return updatedSession;

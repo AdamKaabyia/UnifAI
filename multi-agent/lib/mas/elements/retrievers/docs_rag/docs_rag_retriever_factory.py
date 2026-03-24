@@ -1,6 +1,7 @@
 from typing import Any
 from mas.elements.common.base_factory import BaseFactory
 from mas.elements.common.exceptions import PluginConfigurationError
+from mas.core.element_deps import ElementDeps
 from .config import DocsRagRetrieverConfig
 from .docs_rag_retriever import DocsRagRetriever
 from .identifiers import Identifier
@@ -15,6 +16,7 @@ class DocsRagRetrieverFactory(BaseFactory[DocsRagRetrieverConfig, DocsRagRetriev
         return element_type == Identifier.TYPE
 
     def create(self, cfg: DocsRagRetrieverConfig, **kwargs: Any) -> DocsRagRetriever:
+        deps: ElementDeps | None = kwargs.get("deps")
         try:
             return DocsRagRetriever(
                 top_k_results=cfg.top_k_results,
@@ -22,10 +24,10 @@ class DocsRagRetrieverFactory(BaseFactory[DocsRagRetrieverConfig, DocsRagRetriev
                 timeout=cfg.timeout,
                 docs=cfg.docs,
                 tags=cfg.tags,
+                identity=deps.execution_ctx if deps else None,
             )
         except Exception as e:
             raise PluginConfigurationError(
                 f"DocsRagRetrieverFactory.create() failed: {e}",
                 cfg.model_dump()
             ) from e
-

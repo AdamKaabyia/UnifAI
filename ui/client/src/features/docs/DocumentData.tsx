@@ -50,8 +50,8 @@ export const DocumentData: React.FC<LibraryTabProps> = ({ doc, details, isLoadin
           <div className="lg:flex gap-6 h-[500px]">
 
             {/* Left side: document content */}
-            <div className="flex-1 flex flex-col">
-              <div className="bg-background-dark rounded-lg border border-gray-800 overflow-hidden flex flex-col flex-1">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="bg-background-dark rounded-lg border border-gray-800 overflow-hidden flex flex-col flex-1 min-h-0">
                 <div className="p-4 bg-background-surface border-b border-gray-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">

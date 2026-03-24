@@ -1,0 +1,35 @@
+permissions:
+  contents: read
+name: enforce_staging_to_main_alignment.yaml
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+jobs:
+  check-staging-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # we need full history
+
+      - name: Fetch all branches
+        run: git fetch origin +refs/heads/*:refs/remotes/origin/*
+
+      - name: Ensure branch was merged into staging
+        run: |
+          BRANCH="${GITHUB_HEAD_REF}"
+          echo "Checking if origin/$BRANCH is already in origin/staging..."
+
+          git fetch origin +refs/heads/*:refs/remotes/origin/*
+
+          if git merge-base --is-ancestor origin/$BRANCH origin/staging; then
+            echo "✅ Branch already merged into staging."
+          else
+            echo "❌ Branch not merged into staging. Merge it into staging first"
+            exit 1
+          fi

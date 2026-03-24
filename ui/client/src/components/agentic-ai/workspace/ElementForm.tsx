@@ -693,7 +693,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {editingElement ? "Edit" : "Create"} {elementType.name}

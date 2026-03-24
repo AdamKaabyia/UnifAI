@@ -1,13 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
@@ -85,6 +78,30 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
     total: null
   });
 
+  // Radix Dialog's react-remove-scroll blocks wheel events on portaled content
+  // (like our Popover) because it lives outside the dialog's DOM tree. This
+  // native listener calls stopPropagation before the document-level handler
+  // can call preventDefault, restoring normal scroll on the CommandList.
+  // We store the node in state so the useEffect properly cleans up the
+  // previous listener whenever the DOM node changes or unmounts.
+  const [listNode, setListNode] = useState<HTMLDivElement | null>(null);
+  const listScrollRef = useCallback((node: HTMLDivElement | null) => {
+    setListNode(node);
+  }, []);
+
+  useEffect(() => {
+    if (!listNode) return;
+    const handler = (e: WheelEvent) => {
+      if (listNode.scrollHeight > listNode.clientHeight) {
+        e.stopPropagation();
+      }
+    };
+    listNode.addEventListener('wheel', handler, { passive: true });
+    return () => {
+      listNode.removeEventListener('wheel', handler);
+    };
+  }, [listNode]);
+
   const isSelectAll = (value: string) => value === SELECT_ALL_VALUE;
 
   // Extract hint flags with defaults for backwards compatibility
@@ -109,7 +126,7 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
     return null;
   }
 
-  // Helper to extract value (ID) from an item - handles both string and object formats
+  // Extract value (ID) from an item - handles both string and object formats
   const extractValue = (item: any): string => {
     if (typeof item == 'string') return item;
     if (typeof item == 'object' && item !== null) {
@@ -121,10 +138,20 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
 
   // Helper to get display label for a value
   const getDisplayLabel = (value: string): string => {
-    // First check populated options
     const option = populatedOptions.find(opt => opt.value === value);
     if (option) return option.label;
-    
+
+    // Fallback: look up the original object in formData (covers items not yet
+    // loaded into populatedOptions, e.g. paginated items on later pages).
+    const currentValue = formData[fieldName];
+    if (Array.isArray(currentValue)) {
+      const item = currentValue.find((i: any) => extractValue(i) === value);
+      if (item && typeof item === 'object') {
+        if (displayField && item[displayField] != null) return String(item[displayField]);
+        return String(item.name ?? item.label ?? item.title ?? value);
+      }
+    }
+
     return value;
   };
 
@@ -367,7 +394,14 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
         return;
       }
       
-      const normalizedResults = normalizeOptions(rawResults, displayField, valueField);
+      // Normalize labels via displayField, then override each option's value
+      // with extractValue so it matches selectedValues (which are also built
+      // with extractValue). Without this, extractId's JSON.stringify fallback
+      // produces different strings than extractValue's id/value/name fallback.
+      const normalizedResults = normalizeOptions(rawResults, displayField, valueField).map(opt => ({
+        ...opt,
+        value: extractValue(opt.originalObject),
+      }));
       const newOptionValues = new Set(normalizedResults.map(opt => opt.value));
       
       if (populateHint.selection_type == 'manual' || populateHint.multi_select) {
@@ -380,26 +414,33 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
           if (normalizedResults.length > 0) {
             setHasLoadedOnce(true);
           }
-          
-          // Validate existing selections - remove any that no longer exist in new results
-          // (keeps original selection or empty if there wasn't one - matches main behavior)
-          setSelectedValues(prevSelected => {
-            if (prevSelected.length === 0) return prevSelected;
-            const validatedSelections = prevSelected.filter(val => newOptionValues.has(val));
-            
-            // If selections changed (some were removed), notify parent
-            if (validatedSelections.length !== prevSelected.length) {
-              // Use setTimeout to avoid state update during render
-              setTimeout(() => {
-                onPopulateResult(fieldName, getSelectedObjects(validatedSelections), populateHint.multi_select || false);
-              }, 0);
-            }
-            
-            return validatedSelections;
-          });
+
+          // For non-paginated fields (e.g. MCP tools), prune selections that
+          // no longer exist in the new result set. Paginated fields (e.g. docs)
+          // skip this because selected items may live on a later page.
+          if (!supportsPagination) {
+            setSelectedValues(prevSelected => {
+              if (prevSelected.length === 0) return prevSelected;
+              const validatedSelections = prevSelected.filter(val => newOptionValues.has(val));
+
+              if (validatedSelections.length !== prevSelected.length) {
+                setTimeout(() => {
+                  onPopulateResult(fieldName, getSelectedObjects(validatedSelections), populateHint.multi_select || false);
+                }, 0);
+              }
+
+              return validatedSelections;
+            });
+          }
         } else {
-          // Search: update with results (even if empty - will show "No results found")
-          setPopulatedOptions(normalizedResults);
+          // Search: merge new results into existing options so that items
+          // already visible via client-side filtering aren't discarded when
+          // the backend returns a narrower (e.g. prefix-only) result set.
+          setPopulatedOptions(prev => {
+            const existing = new Set(prev.map(opt => opt.value));
+            const additions = normalizedResults.filter(opt => !existing.has(opt.value));
+            return additions.length > 0 ? [...prev, ...additions] : prev;
+          });
         }
       }
 
@@ -433,16 +474,25 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
     }
   };
 
-  const remainingCount = pagination.total ? pagination.total - populatedOptions.length : null;
+  const remainingCount = pagination.total != null && pagination.total > populatedOptions.length
+    ? pagination.total - populatedOptions.length
+    : null;
 
   // Check if all options are selected (for showing Select All vs Clear All)
   const allOptionsSelected = populatedOptions.length > 0 && 
     selectedValues.length === populatedOptions.length;
 
-  // For multi-select, filter out already selected options from dropdown
-  const availableOptions = !populateHint.multi_select
+  // Sort alphabetically for non-paginated fields. Paginated fields keep the
+  // backend's order (e.g. upload time) so "load more" appends naturally.
+  const availableOptions = supportsPagination
     ? populatedOptions
-    : populatedOptions.filter(opt => !selectedValues.includes(opt.value));
+    : [...populatedOptions].sort((a, b) => a.label.localeCompare(b.label));
+
+  // Client-side substring filter on labels (supplements backend search for
+  // searchable fields, and is the only filter for non-searchable ones).
+  const displayedOptions = searchTerm
+    ? availableOptions.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+    : availableOptions;
 
   // Hide UI when auto-triggering (keep logic running in background)
   if (hideUI) {
@@ -454,7 +504,7 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
     return `Select ${populateHint.field_mapping || 'option'}...`;
   };
 
-  const renderSearchableDropdown = () => (
+  const renderDropdown = () => (
     <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={isDropdownOpen} className="w-full justify-between bg-background-dark">
@@ -467,7 +517,6 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
-          // Prevent closing when interacting with elements inside the popover
           const target = e.target as HTMLElement;
           if (target.closest('[data-radix-popper-content-wrapper]')) {
             e.preventDefault();
@@ -477,9 +526,9 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
         <Command shouldFilter={false} loop>
           <div className="[&_input]:!text-white">
             <CommandInput 
-            placeholder={`Search ${populateHint.field_mapping || 'options'}...`} 
-            value={searchTerm} 
-            onValueChange={setSearchTerm} 
+              placeholder={`Search ${populateHint.field_mapping || 'options'}...`} 
+              value={searchTerm} 
+              onValueChange={setSearchTerm} 
             />
           </div>
           {isSearching && (
@@ -488,12 +537,11 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
               <span className="ml-2 text-sm text-gray-400">Searching...</span>
             </div>
           )}
-          <CommandList>
+          <CommandList ref={listScrollRef}>
             <CommandEmpty>
-              {isLoading ? 'Loading...' : isSearching ? 'Searching...' : searchTerm ? 'No matching results found.' : 'No options found.'}
+              {isLoading ? 'Loading...' : isSearching ? 'Searching...' : searchTerm ? `No results matching "${searchTerm}".` : 'No options found.'}
             </CommandEmpty>
             <CommandGroup>
-              {/* Select All / Clear All option for multi-select */}
               {populateHint.multi_select && populatedOptions.length > 0 && !searchTerm && (
                 <CommandItem
                   value={SELECT_ALL_VALUE}
@@ -514,43 +562,47 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
                 </CommandItem>
               )}
 
-              {availableOptions.map((option: OptionItem) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  onSelect={() => {
-                    handleItemSelect(option.value);
-                    if (!populateHint.multi_select) {
-                      setIsDropdownOpen(false);
-                    }
-                  }}
-                >
-                  <Check 
-                    className={`mr-2 h-4 w-4 ${
-                      selectedValues.includes(option.value) ? "opacity-100" : "opacity-0"
-                    }`} 
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
+              {displayedOptions.map((option: OptionItem) => {
+                const isSelected = selectedValues.includes(option.value);
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    disabled={populateHint.multi_select && isSelected}
+                    onSelect={() => {
+                      if (populateHint.multi_select && isSelected) return;
+                      handleItemSelect(option.value);
+                      if (!populateHint.multi_select) {
+                        setIsDropdownOpen(false);
+                      }
+                    }}
+                    className={populateHint.multi_select && isSelected ? "opacity-50 cursor-default" : ""}
+                  >
+                    <Check 
+                      className={`mr-2 h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`} 
+                    />
+                    {option.label}
+                  </CommandItem>
+                );
+              })}
 
-              {/* Load More option for pagination */}
               {supportsPagination && pagination.hasMore && (
                 <CommandItem 
-                value="__load_more__" 
-                onSelect={handleLoadMore} 
-                className="text-blue-400 font-medium justify-center cursor-pointer"
+                  value="__load_more__" 
+                  onSelect={handleLoadMore} 
+                  className="text-blue-400 font-medium justify-center cursor-pointer"
                 >
-                  {isLoadingMore ? <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading more...
-                  </>
-                   : 
-                   <>
-                   <ChevronDown className="mr-2 h-4 w-4" />
-                   Load more{remainingCount !== null ? ` (${remainingCount} remaining)` : '...'}
-                   </>
-                  }
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading more...
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                      Load more{remainingCount !== null ? ` (${remainingCount} remaining)` : '...'}
+                    </>
+                  )}
                 </CommandItem>
               )}
             </CommandGroup>
@@ -558,81 +610,6 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
         </Command>
       </PopoverContent>
     </Popover>
-  );
-
-  // Render standard dropdown (for backwards compatibility - no search)
-  const renderStandardDropdown = () => (
-    <Select
-      value=""
-      open={isDropdownOpen}
-      onOpenChange={setIsDropdownOpen}
-      onValueChange={(value) => {
-        if (value == "__load_more__") { 
-          handleLoadMore(); 
-          return; 
-        }
-        if (populateHint.multi_select) handleItemSelect(value);
-        else { handleSelectChange(value); setIsDropdownOpen(false); }
-      }}
-    >
-      <SelectTrigger className="bg-background-dark">
-        <SelectValue placeholder={getDropdownLabel()} />
-      </SelectTrigger>
-      <SelectContent
-        onCloseAutoFocus={(e) => { 
-          if (populateHint.multi_select) {
-            e.preventDefault(); 
-            }
-          }}
-        onPointerDownOutside={() => setIsDropdownOpen(false)}
-        onEscapeKeyDown={() => setIsDropdownOpen(false)}
-      >
-        {/* Select All / Clear All option for multi-select */}
-        {populateHint.multi_select && populatedOptions.length > 0 && (
-          <SelectItem 
-            value={SELECT_ALL_VALUE}
-            className="font-medium border-b border-gray-700"
-          >
-            {allOptionsSelected ? (
-              <span className="flex items-center gap-2 text-red-400">
-                <X className="h-3 w-3" />
-                Clear All
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 text-green-400">
-                <CheckCheck className="h-3 w-3" />
-                Select All ({populatedOptions.length})
-              </span>
-            )}
-          </SelectItem>
-        )}
-
-        {availableOptions.map((option: OptionItem, index: number) => (
-          <SelectItem 
-          key={`${option.value}-${index}`} 
-          value={option.value}
-          >
-            {option.label}
-            </SelectItem>
-        ))}
-
-        {supportsPagination && pagination.hasMore && (
-          <SelectItem 
-          value="__load_more__" 
-          className="text-blue-400 font-medium cursor-pointer"
-          >
-            {isLoadingMore 
-              ? <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" />Loading...</span>
-              : <span className="flex items-center gap-2"><ChevronDown className="h-3 w-3" />Load more{remainingCount !== null ? ` (${remainingCount} remaining)` : '...'}</span>}
-          </SelectItem>
-        )}
-        {availableOptions.length === 0 && (
-          <SelectItem value="__no_options_disabled__" disabled>
-            {populatedOptions.length > 0 && populateHint.multi_select ? 'All options selected' : 'No options available'}
-          </SelectItem>
-        )}
-      </SelectContent>
-    </Select>
   );
 
   return (
@@ -677,8 +654,7 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
       {/* Selection Dropdown (show if we have ever loaded options - keeps visible during search) */}
       {(hasLoadedOnce || populatedOptions.length > 0) && (
         <div className="space-y-2">
-          {/* Use searchable dropdown if search is supported, otherwise use standard dropdown */}
-          {supportsSearch ? renderSearchableDropdown() : renderStandardDropdown()}
+          {renderDropdown()}
 
           {/* Show selected items (for multi-select or single select) */}
           {selectedValues.length > 0 && (

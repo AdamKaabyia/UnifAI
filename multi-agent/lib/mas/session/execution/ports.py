@@ -5,10 +5,10 @@ Ports are defined by the use-case owner (session layer) and implemented
 by infrastructure adapters (Temporal, Celery, etc.).
 """
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, Dict
+from dataclasses import dataclass, field
 
 from mas.session.domain.workflow_session import WorkflowSession
+from mas.core.execution_context import ExecutionContext
 
 
 @dataclass(frozen=True)
@@ -16,10 +16,9 @@ class SubmitSessionRequest:
     """Immutable value object carrying execution context for a background worker.
 
     Inputs are already staged into the SessionRecord before submission,
-    so this only carries the execution context (scope, user).
+    so this only carries the execution context (scope, user, etc.).
     """
-    scope: str
-    logged_in_user: str = ""
+    execution_context: ExecutionContext = field(default_factory=ExecutionContext)
 
 
 class BackgroundSessionSubmitter(ABC):

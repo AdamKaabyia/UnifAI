@@ -6,8 +6,8 @@ from mas.session.execution.input_projector import SessionInputProjector
 from mas.session.execution.ports import BackgroundSessionSubmitter, SubmitSessionRequest
 from mas.session.domain.workflow_session import WorkflowSession
 from mas.session.domain.session_record import SessionRecord
-from mas.session.domain.dto import ChatHistoryItem
-from mas.session.domain.models import SessionMeta, TimeSeriesPoint, SystemAnalyticsData
+from mas.session.domain.dto import SessionListItem
+from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint, SystemAnalyticsData
 from mas.session.domain.exceptions import BlueprintNotFoundError
 from mas.core.dto import GroupedCount
 
@@ -50,7 +50,6 @@ class SessionService:
         session_id: str,
         inputs: Dict[str, Any],
         scope: str = "public",
-        logged_in_user: str = "",
         stream: bool = False,
     ) -> Any:
         """
@@ -68,12 +67,11 @@ class SessionService:
         return self._foreground.run(
             session=session,
             scope=scope,
-            logged_in_user=logged_in_user,
             stream=stream,
         )
 
     def submit(self, session_id: str, inputs: Dict[str, Any],
-               scope: str = "public", logged_in_user: str = "") -> str:
+               scope: str = "public") -> str:
         """
         Non-blocking submit: stage inputs, then start a background workflow
         and return its handle/ID immediately (HTTP 202 pattern).
@@ -85,10 +83,8 @@ class SessionService:
             )
         self._stage(session_id, inputs)
         session = self._manager.get_session(session_id)
-        request = SubmitSessionRequest(
-            scope=scope,
-            logged_in_user=logged_in_user,
-        )
+        execution_ctx = session.run_context.with_scope(scope)
+        request = SubmitSessionRequest(execution_context=execution_ctx)
         return self._submitter.submit(session, request)
 
     # ---- Private staging ----
@@ -125,17 +121,23 @@ class SessionService:
 
     def get_state(self, run_id: str) -> Dict[str, Any]:
         """
-        Get the graph state of a session by its run_id.
+        Get the full graph state of a session by its run_id.
         """
         record = self._manager.get_record(run_id)
         return record.graph_state.model_dump(mode="json")
 
-    def get_user_sessions_chat_history(self, user_id: str) -> list:
+    def get_chat(self, run_id: str) -> SessionChat:
         """
-        Get chat history for all sessions created by a user.
+        Get only messages and output for a session (lightweight, projected from DB).
+        """
+        return self._manager.get_chat(run_id)
+
+    def list_user_sessions(self, user_id: str) -> list:
+        """
+        List all sessions created by a user (metadata only, no messages).
         """
         docs = self._manager.list_docs(user_id)
-        chat_items = []
+        items = []
 
         for doc in docs:
             blueprint_id = doc.get("blueprint_id", "")
@@ -148,10 +150,10 @@ class SessionService:
                 if source == "public_link":
                     public_usage_scope = bp_metadata.get("usageScope") == "public"
 
-            chat_item = ChatHistoryItem.from_doc(doc, blueprint_exists=blueprint_exists, public_usage_scope=public_usage_scope, blueprint_metadata=bp_metadata)
-            chat_items.append(chat_item.model_dump())
+            item = SessionListItem.from_doc(doc, blueprint_exists=blueprint_exists, public_usage_scope=public_usage_scope, blueprint_metadata=bp_metadata)
+            items.append(item.model_dump())
 
-        return chat_items
+        return items
 
     def get_user_blueprints(self, user_id) -> List[str]:
         """

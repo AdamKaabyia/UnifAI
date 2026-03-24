@@ -19,7 +19,7 @@ export interface OptionItem {
  * display_field/label_field in the populateHint. If not specified, we use the
  * value field as the display (shows the ID/value as-is).
  */
-const extractDisplayName = (obj: any, displayField?: string): string => {
+export const extractDisplayName = (obj: any, displayField?: string): string => {
   if (!obj) return '';
   if (typeof obj === 'string') return obj;
   if (typeof obj !== 'object') return String(obj);
@@ -44,7 +44,7 @@ const extractDisplayName = (obj: any, displayField?: string): string => {
  * use the stringified object as the value (which will likely cause issues,
  * making it obvious the backend needs to configure the hint properly).
  */
-const extractId = (obj: any, valueField?: string): string => {
+export const extractId = (obj: any, valueField?: string): string => {
   if (!obj) return '';
   if (typeof obj === 'string') return obj;
   if (typeof obj !== 'object') return String(obj);

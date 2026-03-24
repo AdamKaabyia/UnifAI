@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Mapping, Any, Dict, Optional
 from datetime import datetime
 from mas.session.domain.session_record import SessionRecord
+from mas.session.domain.models import SessionChat, TimeSeriesPoint, SystemAnalyticsData
 from mas.core.dto import GroupedCount
-from mas.session.domain.models import TimeSeriesPoint, SystemAnalyticsData
 
 
 class SessionRepository(ABC):
@@ -19,6 +19,11 @@ class SessionRepository(ABC):
     @abstractmethod
     def fetch(self, run_id: str) -> SessionRecord:
         """Load a session record by run_id."""
+        ...
+
+    @abstractmethod
+    def fetch_chat(self, run_id: str) -> SessionChat:
+        """Fetch only messages and output from a session's graph state (projected)."""
         ...
 
     @abstractmethod

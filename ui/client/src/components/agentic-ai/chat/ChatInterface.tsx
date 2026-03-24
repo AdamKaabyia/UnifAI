@@ -546,7 +546,7 @@ export default function ChatInterface({
       if (wasReconnection && runId) {
         (async () => {
           try {
-            const response = await axios.get(`/sessions/session.state.get?sessionId=${runId}`);
+            const response = await axios.get(`/sessions/session.chat.get?sessionId=${runId}`);
             const finalAnswer = response.data?.output;
             
             if (finalAnswer) {
@@ -607,24 +607,6 @@ export default function ChatInterface({
     }));
   }, []);
 
-  const getSessionState = async (sid: string) => {
-    try {
-      // Make API call to get the session state
-      const response = await axios.get(
-        `/session.state.get?sessionId=${sid}`,
-      );
-      const data = response.data;
-
-      if (data && data.response) {
-        return data.response;
-      }
-
-      return "I'm sorry, I couldn't retrieve a response for your query.";
-    } catch (error) {
-      console.error("Failed to get session state:", error);
-      return "I'm sorry, I couldn't retrieve a response for your query.";
-    }
-  };
 
   // User sends message → Creates an AI message with empty streamLogs
   // Streaming starts → Interval polls for node updates and updates the message

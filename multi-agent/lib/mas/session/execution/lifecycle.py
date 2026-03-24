@@ -9,11 +9,12 @@ Input staging (projecting raw inputs onto GraphState) is NOT this class's
 job — that belongs to SessionInputProjector.  This class only manages
 execution state transitions: begin → complete | fail.
 """
+from datetime import datetime, timezone
+
 from mas.graph.state.graph_state import GraphState
 from mas.session.repository.repository import SessionRepository
 from mas.session.domain.session_record import SessionRecord
 from mas.session.domain.status import SessionStatus
-from mas.core.context import set_current_context
 
 
 class SessionLifecycle:
@@ -30,18 +31,13 @@ class SessionLifecycle:
         self,
         record: SessionRecord,
         scope: str,
-        logged_in_user: str,
     ) -> None:
         """
-        Start execution: bind run context, mark RUNNING, persist.
+        Start execution: bind scope into run context, mark RUNNING, persist.
 
         Called AFTER inputs have already been staged by SessionInputProjector.
         """
-        ctx = record.run_context.change_scope(scope)
-        ctx = ctx.set_logged_in_user(logged_in_user)
-        set_current_context(ctx)
-        record.run_context = ctx
-
+        record.update_context(scope=scope)
         record.status = SessionStatus.RUNNING
         self._repo.save(record)
 
@@ -54,8 +50,7 @@ class SessionLifecycle:
         Post-execution: attach final state, mark COMPLETED, persist.
         """
         record.graph_state = final_state
-        record.run_context = record.run_context.mark_finished()
-        set_current_context(record.run_context)
+        record.update_context(finished_at=datetime.now(timezone.utc))
         record.status = SessionStatus.COMPLETED
         self._repo.save(record)
 
@@ -67,6 +62,6 @@ class SessionLifecycle:
         """
         On error: mark FAILED, persist.
         """
-        record.run_context = record.run_context.mark_finished()
+        record.update_context(finished_at=datetime.now(timezone.utc))
         record.status = SessionStatus.FAILED
         self._repo.save(record)

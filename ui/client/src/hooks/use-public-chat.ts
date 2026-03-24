@@ -80,7 +80,7 @@ export const usePublicChat = (blueprintId: string | null): UsePublicChatReturn =
 
     setIsLoading(true);
     try {
-      const response = await axios.get(`/sessions/session.user.chat.get?userId=${user.username}`);
+      const response = await axios.get(`/sessions/session.user.list?userId=${user.username}`);
       const allSessions: ChatSessionData[] = response.data;
 
       // Filter sessions for this blueprint
@@ -135,7 +135,7 @@ export const usePublicChat = (blueprintId: string | null): UsePublicChatReturn =
 
           // Refresh sessions list to get proper data (do this in background, don't wait)
           axios
-            .get(`/sessions/session.user.chat.get?userId=${user.username}`)
+            .get(`/sessions/session.user.list?userId=${user.username}`)
             .then(async (refreshResponse) => {
               const refreshSessions: ChatSessionData[] = refreshResponse.data;
               const refreshBlueprintSessions = refreshSessions.filter(
@@ -281,7 +281,7 @@ export const usePublicChat = (blueprintId: string | null): UsePublicChatReturn =
       setRunId(newSessionId);
 
       // Refresh sessions list to get proper data (this will update the list but preserve selection)
-      const response2 = await axios.get(`/sessions/session.user.chat.get?userId=${user.username}`);
+      const response2 = await axios.get(`/sessions/session.user.list?userId=${user.username}`);
       const allSessions: ChatSessionData[] = response2.data;
       const blueprintSessions = allSessions.filter(
         (session) => session.blueprint_id === blueprintId && session.blueprint_exists
@@ -371,8 +371,8 @@ export const usePublicChat = (blueprintId: string | null): UsePublicChatReturn =
           }
         }
 
-        // After stream completes, fetch the final output from session state
-        const sessionResponse = await axios.get(`/sessions/session.state.get?sessionId=${runId}`);
+        // After stream completes, fetch the final output
+        const sessionResponse = await axios.get(`/sessions/session.chat.get?sessionId=${runId}`);
 
         const output = sessionResponse.data.output;
 

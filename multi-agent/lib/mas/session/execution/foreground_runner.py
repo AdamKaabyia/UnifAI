@@ -13,7 +13,7 @@ is no ``stream()`` on the executor.
 """
 import logging
 import threading
-from typing import Any, Iterator, Optional, Union
+from typing import Any, Iterator, Union
 
 from mas.core.channels import ChannelFactory
 from mas.core.enums import ResourceCategory
@@ -45,7 +45,6 @@ class ForegroundSessionRunner:
         self,
         session: WorkflowSession,
         scope: str = "public",
-        logged_in_user: str = "",
         stream: bool = False,
     ) -> Union[GraphState, Iterator[Any]]:
         """
@@ -53,8 +52,7 @@ class ForegroundSessionRunner:
 
         Args:
             session: Fully hydrated workflow session.
-            scope: Execution scope.
-            logged_in_user: Authenticated user performing the action.
+            scope: Visibility scope for this execution.
             stream: If True, returns an event iterator instead of the
                     final state.  The lifecycle is completed internally
                     once execution finishes.
@@ -64,8 +62,8 @@ class ForegroundSessionRunner:
             ``Iterator[Any]`` of channel events when *stream* is True.
         """
         if stream:
-            return self._run_streaming(session, scope, logged_in_user)
-        return self._run_blocking(session, scope, logged_in_user)
+            return self._run_streaming(session, scope)
+        return self._run_blocking(session, scope)
 
     # ── Blocking path ────────────────────────────────────────────
 
@@ -73,9 +71,9 @@ class ForegroundSessionRunner:
         self,
         session: WorkflowSession,
         scope: str,
-        logged_in_user: str,
     ) -> GraphState:
-        self._lifecycle.begin(session.record, scope, logged_in_user)
+        self._lifecycle.begin(session.record, scope)
+        session.execution_holder.context = session.record.run_context
 
         try:
             final_state = session.executable_graph.run(
@@ -94,9 +92,9 @@ class ForegroundSessionRunner:
         self,
         session: WorkflowSession,
         scope: str,
-        logged_in_user: str,
     ) -> Iterator[Any]:
-        self._lifecycle.begin(session.record, scope, logged_in_user)
+        self._lifecycle.begin(session.record, scope)
+        session.execution_holder.context = session.record.run_context
 
         channel = self._channel_factory.create(session.get_run_id())
         reader = self._channel_factory.create_reader(session.get_run_id())

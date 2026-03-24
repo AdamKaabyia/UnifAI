@@ -6,7 +6,7 @@ import logging
 
 from mas.session.repository.repository import SessionRepository
 from mas.session.domain.session_record import SessionRecord
-from mas.session.domain.models import TimeSeriesPoint, SystemAnalyticsData
+from mas.session.domain.models import SessionChat, TimeSeriesPoint, SystemAnalyticsData
 from mas.core.dto import GroupedCount
 from global_utils.utils.time_utils import format_utc_iso
 
@@ -87,6 +87,16 @@ class MongoSessionRepository(SessionRepository):
         if not doc:
             raise KeyError(f"No session for {run_id}")
         return SessionRecord.model_validate(doc)
+
+    def fetch_chat(self, run_id: str) -> SessionChat:
+        doc = self._col.find_one(
+            {self._RUN_ID_FIELD: run_id},
+            {"_id": 0, "graph_state.messages": 1, "graph_state.output": 1},
+        )
+        if not doc:
+            raise KeyError(f"No session for {run_id}")
+        gs = doc.get("graph_state", {})
+        return SessionChat.model_validate(gs)
 
     def list_runs(self, user_id: str) -> List[str]:
         cursor = self._col.find(

@@ -54,7 +54,6 @@ def execute_user_session(session_id, inputs, stream_mode, stream, scope, logged_
             session_id=session_id,
             inputs=inputs,
             scope=scope,
-            logged_in_user=logged_in_user,
         )
         return json.dumps(result, default=pydantic_encoder), 200
 
@@ -63,16 +62,17 @@ def execute_user_session(session_id, inputs, stream_mode, stream, scope, logged_
             session_id=session_id,
             inputs=inputs,
             scope=scope,
-            logged_in_user=logged_in_user,
             stream=True,
         )
         for chunk in with_heartbeats(stream_iter):
             yield json.dumps(chunk, default=pydantic_encoder) + "\n"
 
-    return Response(
+    resp = Response(
         generate(),
-        mimetype="application/x-ndjson"
+        mimetype="application/x-ndjson",
     )
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
     # except BlueprintNotFoundError as e:
     #     return jsonify({
@@ -106,7 +106,6 @@ def submit_user_session(session_id, inputs, scope, logged_in_user):
             session_id=session_id,
             inputs=inputs,
             scope=scope,
-            logged_in_user=logged_in_user,
         )
         return jsonify({"sessionId": session_id, "workflowId": workflow_id}), 202
     except TypeError as e:
@@ -128,6 +127,19 @@ def get_session_state(session_id):
         return jsonify({"error": str(e)}), 500
 
 
+@sessions_bp.route("/session.chat.get", methods=["GET"])
+@from_query({
+    "session_id": fields.Str(data_key="sessionId", required=True),
+})
+def get_session_chat(session_id):
+    try:
+        svc = current_app.container.session_service
+        chat = svc.get_chat(run_id=session_id)
+        return jsonify(chat.model_dump(mode="json")), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @sessions_bp.route("/session.status.get", methods=["GET"])
 @from_query({
     "session_id": fields.Str(data_key="sessionId", required=True),
@@ -141,14 +153,14 @@ def get_session_status(session_id):
         return jsonify({"error": str(e)}), 500
 
 
-@sessions_bp.route("/session.user.chat.get", methods=["GET"])
+@sessions_bp.route("/session.user.list", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
 })
-def get_session_user_chat(user_id):
+def list_user_sessions(user_id):
     try:
         svc = current_app.container.session_service
-        return jsonify(svc.get_user_sessions_chat_history(user_id)), 200
+        return jsonify(svc.list_user_sessions(user_id)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -233,11 +245,13 @@ def subscribe_session(session_id):
     def generate():
         try:
             for event in with_heartbeats(reader):
-                yield json.dumps(event, default=str) + "\n"
+                yield json.dumps(event, default=pydantic_encoder) + "\n"
         finally:
             reader.close()
 
-    return Response(
+    resp = Response(
         generate(),
         mimetype="application/x-ndjson",
     )
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp

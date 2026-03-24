@@ -19,6 +19,7 @@ class so they remain thin one-liner wrappers with zero business logic.
 from typing import Optional
 
 from mas.core.channels import ChannelFactory
+from mas.core.execution_context import ExecutionContext
 from mas.graph.state.graph_state import GraphState
 from mas.session.execution.lifecycle import SessionLifecycle
 from mas.session.management.user_session_manager import UserSessionManager
@@ -39,12 +40,11 @@ class BackgroundLifecycleHandler:
     def begin(
         self,
         run_id: str,
-        scope: str,
-        logged_in_user: str,
+        execution_context: ExecutionContext,
     ) -> GraphState:
         """Mark RUNNING, bind context, persist. Return the staged GraphState."""
         record = self._manager.get_record(run_id)
-        self._lifecycle.begin(record, scope, logged_in_user)
+        self._lifecycle.begin(record, execution_context.scope)
         return record.graph_state
 
     def complete(self, run_id: str, final_state: GraphState) -> None:

@@ -76,6 +76,19 @@ type ChunkData = {
   workplan?: any; // Will contain the full workplan data
 };
 
+/**
+ * Loader component displayed while session messages are being fetched.
+ * Prevents showing stale messages from the previous session.
+ */
+const SessionMessagesLoader: React.FC = () => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-8 h-8 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+      <p className="text-gray-400 text-sm">Loading session messages...</p>
+    </div>
+  </div>
+);
+
 export default function ExecutionTab({
   runId
 }: ExecutionTabProps): React.ReactElement {
@@ -94,6 +107,7 @@ export default function ExecutionTab({
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [selectedFlowForModal, setSelectedFlowForModal] = useState<FlowObject | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isLoadingSessionMessages, setIsLoadingSessionMessages] = useState(false);
   // Three panel widths: Available Chats, ChatInterface, Blueprint Graph
   const [chatSidebarWidth, setChatSidebarWidth] = useState(15);
   const [chatInterfaceWidth, setChatInterfaceWidth] = useState(55);
@@ -308,6 +322,10 @@ export default function ExecutionTab({
     let currentSession = session;
     setSelectedSession(currentSession);
 
+    // Show loader immediately and clear old messages to prevent showing stale data
+    setIsLoadingSessionMessages(true);
+    setCurrentSessionMessages([]);
+
     // Cancel any existing stream subscription before switching sessions
     // This ensures the UI stops receiving events from the previous session
     sessionStream.cancelStream();
@@ -411,6 +429,7 @@ export default function ExecutionTab({
     } else {
       setCurrentSessionMessages([]);
     }
+    setIsLoadingSessionMessages(false);
 
     // Check if this session has an active Redis stream and reconnect if so
     // This enables persistent streaming - when user navigates away and returns,
@@ -489,6 +508,8 @@ export default function ExecutionTab({
 
       // Fetch updated sessions
       const response = await axios.get(`/sessions/session.user.chat.get?userId=${contextUserId}`);
+      const userId = user?.username || "default";
+      const response = await axios.get(`/sessions/session.user.list?userId=${userId}`);
       const transformedSessions = transformApiDataToSessions(response.data);
       const sortedSessions = sortSessionsByTimestamp(transformedSessions);
       setChatSessions(sortedSessions);
@@ -714,9 +735,9 @@ export default function ExecutionTab({
       console.log('Streaming completed.');
       console.log('Final Node List:', nodeListRef.current);
 
-      // Fetch the final session state
+      // Fetch the final session output
       const session_response = await axios.get(
-        `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`
+        `/sessions/session.chat.get?sessionId=${sessionPayload.sessionId}`
       );
       return session_response.data.output;
     } catch (error) {
@@ -915,21 +936,25 @@ export default function ExecutionTab({
           }}
         >
           <div className="flex-grow">
-            <ChatInterface
-              key={selectedSession?.id || 'no-session'}
-              runId={selectedSession?.id || ''}
-              triggerExecution={triggerExecution}
-              initialMessages={currentSessionMessages}
-              blueprintExists={selectedSession?.blueprintExists ?? true}
-              isSharingDisabled={isSharingDisabled}
-              blueprintValid={isBlueprintValid}
-              isValidatingBlueprint={isValidatingBlueprint}
-              isBlueprintGraphHidden={carouselMode === 'chat'}
-              isChatOnlyMode={isChatOnlyMode}
-              onSetCarouselMode={handleSetCarouselMode}
-              carouselMode={carouselMode}
-              isLiveRequest={isLiveRequest}
-            />
+            {isLoadingSessionMessages ? (
+              <SessionMessagesLoader />
+            ) : (
+              <ChatInterface
+                key={selectedSession?.id || 'no-session'}
+                runId={selectedSession?.id || ''}
+                triggerExecution={triggerExecution}
+                initialMessages={currentSessionMessages}
+                blueprintExists={selectedSession?.blueprintExists ?? true}
+                isSharingDisabled={isSharingDisabled}
+                blueprintValid={isBlueprintValid}
+                isValidatingBlueprint={isValidatingBlueprint}
+                isBlueprintGraphHidden={carouselMode === 'chat'}
+                isChatOnlyMode={isChatOnlyMode}
+                onSetCarouselMode={handleSetCarouselMode}
+                carouselMode={carouselMode}
+                isLiveRequest={isLiveRequest}
+              />
+            )}
           </div>
           
           {/* ExecutionStream - conditionally rendered within ChatInterface area */}

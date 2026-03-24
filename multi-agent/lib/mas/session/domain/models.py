@@ -67,3 +67,9 @@ class SessionMeta(BaseModel):
     title: str | None = None
     tags: Dict[str, str] = Field(default_factory=dict)
     source: Optional[str] = None
+
+
+class SessionChat(BaseModel):
+    """Lightweight projection of a session's chat-relevant graph state."""
+    messages: List = Field(default_factory=list)
+    output: str = ""

@@ -43,6 +43,7 @@ class AppConfig(SharedConfig):
     # External Docling Service Configuration
     docling_service_url: str = "http://docling-service:5001"
     docling_service_timeout: int = 300
+    docling_pdf_backend: str = "dlparse_v4"
 
     # External Embedding Service Configuration
     embedding_service_url: str = "http://embedding-service:5002"

@@ -14,10 +14,11 @@ Key features
 """
 
 from collections import deque
-from typing import Dict, List, Type
+from typing import Dict, List, Optional, Type
 from mas.session.domain.session_registry import SessionRegistry
 from mas.blueprints.models.blueprint import BlueprintSpec
 from mas.core.enums import ResourceCategory
+from mas.core.element_deps import ElementDeps
 
 # concrete builders
 from .category_builders.provider_builder import ProviderBuilder
@@ -62,14 +63,21 @@ class SessionElementBuilder:
         self._ordered_builders: List[CategoryBuilder] = self._topological_order()
 
     # -- main entry ------------------------------------------------------------
-    def build(self, blueprint: BlueprintSpec) -> SessionRegistry:
-        """Return a fully populated, optionally frozen SessionRegistry."""
+    def build(
+        self,
+        blueprint: BlueprintSpec,
+        deps: Optional[ElementDeps] = None,
+    ) -> SessionRegistry:
+        """Return a fully populated SessionRegistry.
+
+        Cross-cutting runtime concerns are forwarded via the typed
+        ``ElementDeps`` bag to each CategoryBuilder.
+        """
         registry = SessionRegistry()
 
         for builder in self._ordered_builders:
-            builder.build(blueprint, registry)
+            builder.build(blueprint, registry, deps=deps)
 
-        # optional: lock down to prevent run-time mutation
         registry.freeze()
         return registry
 

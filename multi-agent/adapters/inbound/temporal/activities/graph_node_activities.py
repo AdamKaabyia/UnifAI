@@ -43,6 +43,7 @@ class GraphNodeActivities:
             step_context=params.step_context,
             state=params.state,
             channel=channel,
+            execution_context=params.execution_context,
         )
 
     @activity.defn(name="evaluate_condition")

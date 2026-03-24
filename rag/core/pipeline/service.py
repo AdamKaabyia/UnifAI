@@ -66,8 +66,11 @@ class PipelineService:
 
         # Calculate processing time when done
         if status == PipelineStatus.DONE:
+            created_at = record.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
             record.stats.processing_time = (
-                record.last_updated - record.created_at
+                record.last_updated - created_at
             ).total_seconds()
 
         self._repo.save(record)

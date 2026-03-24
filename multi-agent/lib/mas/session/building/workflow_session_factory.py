@@ -1,3 +1,5 @@
+from typing import Optional
+
 from mas.catalog.element_registry import ElementRegistry
 from mas.session.building.element_builder import SessionElementBuilder
 from mas.session.domain.session_registry import SessionRegistry
@@ -7,7 +9,8 @@ from mas.session.domain.workflow_session import WorkflowSession
 from mas.graph.state.graph_state import GraphState
 from mas.graph.plan_builder import PlanBuilder
 from mas.graph.rt_graph_plan import RTGraphPlan
-from mas.core.context import set_current_context
+from mas.core.execution_context import ExecutionContextHolder
+from mas.core.element_deps import ElementDeps
 from mas.blueprints.models.blueprint import BlueprintSpec
 
 
@@ -34,15 +37,22 @@ class WorkflowSessionFactory:
     def engine_name(self) -> str:
         return self._engine_name
 
-    def build_runtime_plan(self, blueprint_spec: BlueprintSpec) -> RTGraphPlan:
+    def build_runtime_plan(
+        self,
+        blueprint_spec: BlueprintSpec,
+        ctx_holder: Optional[ExecutionContextHolder] = None,
+    ) -> RTGraphPlan:
         """
         Build an RTGraphPlan from a blueprint spec.
 
         Creates all session components, binds callables, injects StepContext.
+        The caller owns the ExecutionContextHolder and passes it in.
         """
+        holder = ctx_holder if ctx_holder is not None else ExecutionContextHolder()
+        deps = ElementDeps(execution_ctx=holder)
         logical_plan = PlanBuilder(self._elements).build(blueprint_spec)
-        session_registry = self._session_builder.build(blueprint_spec)
-        return RTGraphPlan(logical_plan, session_registry, self._elements)
+        registry = self._session_builder.build(blueprint_spec, deps=deps)
+        return RTGraphPlan(logical_plan, registry, self._elements)
 
     def build_session_registry(self, blueprint_spec: BlueprintSpec) -> SessionRegistry:
         """
@@ -60,9 +70,8 @@ class WorkflowSessionFactory:
         Compiles the graph, creates node instances, and wires them into a
         session that shares the record by reference (mutations propagate).
         """
-        set_current_context(record.run_context)
-
-        rt_graph_plan = self.build_runtime_plan(blueprint_spec)
+        ctx_holder = ExecutionContextHolder()
+        rt_graph_plan = self.build_runtime_plan(blueprint_spec, ctx_holder=ctx_holder)
         rt_graph_plan.pretty_print()
 
         engine_builder = GraphBuilderFactory(GraphState).create(self._engine_name)
@@ -74,4 +83,5 @@ class WorkflowSessionFactory:
             rt_graph_plan=rt_graph_plan,
             executable_graph=executable_graph,
             builder=engine_builder,
+            execution_holder=ctx_holder,
         )

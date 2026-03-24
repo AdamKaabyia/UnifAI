@@ -5,6 +5,7 @@ from mas.engine.domain.base_executor import BaseGraphExecutor
 from mas.graph.state.graph_state import GraphState
 from mas.session.domain.status import SessionStatus
 from mas.session.domain.session_record import SessionRecord
+from mas.core.execution_context import ExecutionContextHolder
 
 
 class WorkflowSession:
@@ -28,12 +29,14 @@ class WorkflowSession:
             rt_graph_plan: RTGraphPlan,
             executable_graph: BaseGraphExecutor,
             builder: BaseGraphBuilder,
+            execution_holder: ExecutionContextHolder = None,
     ) -> None:
         self.record = record
         self.session_registry = session_registry
         self.rt_graph_plan = rt_graph_plan
         self.executable_graph = executable_graph
         self.builder = builder
+        self.execution_holder = execution_holder or ExecutionContextHolder()
 
     # ---- Delegated properties (backward-compatible access) ----
 

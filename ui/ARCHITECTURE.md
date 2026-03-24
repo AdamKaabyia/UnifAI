@@ -426,9 +426,9 @@ POST /sessions/user.session.create
 { blueprintId, userId }
 → returns sessionId
 
-// Load existing session
-GET /sessions/session.state.get?sessionId={id}
-→ returns { messages[], final_output, metadata }
+// Load existing session (lightweight - chat data only)
+GET /sessions/session.chat.get?sessionId={id}
+→ returns { messages[], output }
 
 // Execute session with streaming
 POST /sessions/session.stream.run

@@ -78,8 +78,8 @@ export const getValidRefOptions = (
   category: string | null
 ): any[] => {
   if (!category) return [];
-  return (refOptions[category] || []).filter(
-    (option: any) => option.rid && option.rid.trim() !== "",
-  );
+  return (refOptions[category] || [])
+    .filter((option: any) => option.rid && option.rid.trim() !== "")
+    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
 };
 

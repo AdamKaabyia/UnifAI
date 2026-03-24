@@ -11,6 +11,7 @@ global:
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 #command: ["/bin/bash"]
+globalConfigMapName: shared-config
 
 env:
   MONGODB_IP: mongodb

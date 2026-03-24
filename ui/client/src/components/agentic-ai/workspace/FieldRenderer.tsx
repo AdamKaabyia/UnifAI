@@ -606,9 +606,9 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
     const category = extractCategoryFromField(fieldSchema);
 
     if (category) {
-      const validOptions = (refOptions[category] || []).filter(
-        (option: any) => option.rid && option.rid.trim() !== "",
-      );
+      const validOptions = (refOptions[category] || [])
+        .filter((option: any) => option.rid && option.rid.trim() !== "")
+        .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
 
       return (
         <div key={fieldName} className="space-y-2">

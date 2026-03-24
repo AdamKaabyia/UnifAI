@@ -1,13 +1,17 @@
 from typing import Dict, List, Optional
+
 from mas.elements.retrievers.common.base_retriever import BaseRetriever
+from mas.elements.retrievers.common.protocols import RetrievalIdentity
 from mas.elements.providers.rag_client.config import RagProviderConfig
 from mas.elements.providers.rag_client.rag_provider_factory import RagProviderFactory
-from mas.core.context import get_current_context
 
 
 class DocsRagRetriever(BaseRetriever):
     """
     Retrieves document passages via RAG vector database.
+
+    Depends on ``RetrievalIdentity`` (Protocol) for access control —
+    knows nothing about ``ExecutionContext`` or holders.
     """
 
     def __init__(
@@ -17,10 +21,12 @@ class DocsRagRetriever(BaseRetriever):
             timeout: float = 30.0,
             docs: Optional[List[Dict]] = None,
             tags: Optional[List[str]] = None,
+            identity: Optional[RetrievalIdentity] = None,
     ):
         self.threshold = threshold
         self.docs = docs
         self.tags = tags
+        self._identity = identity
         config = RagProviderConfig(
             top_k=top_k_results,
             timeout=timeout,
@@ -29,15 +35,14 @@ class DocsRagRetriever(BaseRetriever):
         self._provider = factory.create(config)
 
     def retrieve(self, query: str) -> List[dict]:
-        context = get_current_context()
-
-        # Extract document IDs from docs list
+        scope = self._identity.scope if self._identity else "public"
+        user_id = self._identity.user_id if self._identity else ""
         doc_ids = [doc['id'] for doc in self.docs] if self.docs else None
 
         response = self._provider.query(
             query=query,
-            scope=context.scope,
-            logged_in_user=context.logged_in_user,
+            scope=scope,
+            logged_in_user=user_id,
             doc_ids=doc_ids,
             tags=self.tags,
         )
