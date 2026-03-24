@@ -69,7 +69,7 @@ export function buildMemberDisplay(username: string, index: number): MemberDispl
   };
 }
 
-function WarRoomAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
+function CollabAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
   const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
   return (
     <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
@@ -78,7 +78,7 @@ function WarRoomAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: 
   );
 }
 
-interface WarRoomViewProps {
+interface CollaborationHubViewProps {
   runId: string | null;
   teamMembers: MemberDisplay[];
   teamName: string;
@@ -93,7 +93,7 @@ export interface QueuedMessage {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomViewProps) {
+export default function CollaborationHubView({ runId, teamMembers, teamName }: CollaborationHubViewProps) {
   // Session state
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
@@ -163,7 +163,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
       setIsLoading(true);
       setError(null);
       const response = await axios.get(
-        `/sessions/session.user.chat.get?userId=${contextUserId}`,
+        `/sessions/session.user.list?userId=${contextUserId}`,
       );
       const sorted = sortSessionsByTimestamp(
         transformApiDataToSessions(response.data),
@@ -285,7 +285,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
         userId: contextUserId,
       });
       const response = await axios.get(
-        `/sessions/session.user.chat.get?userId=${contextUserId}`,
+        `/sessions/session.user.list?userId=${contextUserId}`,
       );
       const sorted = sortSessionsByTimestamp(
         transformApiDataToSessions(response.data),
@@ -471,7 +471,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
-        Loading war room sessions...
+        Loading sessions...
       </div>
     );
   }
@@ -562,7 +562,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
                         key={m.id}
                         className="ring-2 ring-background-card rounded-full"
                       >
-                        <WarRoomAvatar member={m} size="xs" />
+                        <CollabAvatar member={m} size="xs" />
                       </div>
                     ))}
                     {teamMembers.length > 3 && (
@@ -597,7 +597,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
                       key={m.id}
                       className="ring-2 ring-background-surface rounded-full"
                     >
-                      <WarRoomAvatar member={m} size="xs" />
+                      <CollabAvatar member={m} size="xs" />
                     </div>
                   ))}
                   <span className="text-xs text-gray-500 ml-2">
@@ -652,7 +652,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
               {teamMembers.map((m) => (
                 <div key={m.id} className="flex items-center gap-2 py-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <WarRoomAvatar member={m} size="xs" />
+                  <CollabAvatar member={m} size="xs" />
                   <span className="text-xs text-gray-300 flex-1 truncate">
                     {m.name}
                   </span>
@@ -778,7 +778,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
             <DialogTitle className="text-lg">Start New Session</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
-            <div key={`warroom-add-${showAddFlowModal}`}>
+            <div key={`collab-hub-add-${showAddFlowModal}`}>
               <WorkflowsPanel
                 selectedFlow={selectedFlowForModal}
                 onFlowSelect={(flow: FlowObject | null) => setSelectedFlowForModal(flow)}
@@ -834,7 +834,7 @@ export default function WarRoomView({ runId, teamMembers, teamName }: WarRoomVie
           <div className="flex-1 min-h-0 bg-background-dark border border-gray-800 rounded-lg overflow-hidden">
             {selectedSession?.blueprintId && showGraphDialog ? (
               <GraphDisplay
-                key={`warroom-graph-dialog-${selectedSession.id}`}
+                key={`collab-hub-graph-dialog-${selectedSession.id}`}
                 blueprintId={selectedSession.blueprintId}
                 specDict={blueprintSpecCache.get(selectedSession.blueprintId)}
                 height="100%"

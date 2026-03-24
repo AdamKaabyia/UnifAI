@@ -17,7 +17,7 @@ import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { FlowObject } from "./graphs/interfaces";
 import GraphDisplay from "./graphs/GraphDisplay";
 import { fetchActiveSessions } from "@/api/agentic";
-import { fetchBlueprintSummaries, deleteBlueprint, fetchResolvedBlueprint, fetchResolvedBlueprints } from "@/api/blueprints";
+import { fetchBlueprintSummaries, deleteBlueprint, fetchResolvedBlueprint } from "@/api/blueprints";
 import { convertGraphFlowToFlowObject } from "@/utils/blueprintHelpers";
 import ShareWorkflow from "./ShareWorkflow";
 import { BlueprintValidationResult } from "@/types/validation";
@@ -91,11 +91,9 @@ export default function WorkflowsPanel({
   // Fetch available blueprints from API using lightweight summary endpoint
   const fetchAvailableFlows = async (): Promise<void> => {
     try {
-      const blueprints = await fetchResolvedBlueprints(contextUserId);
-      const userId = user?.username || "default";
       // Use summary endpoint - returns name, description, metadata without heavy spec_dict.
       // Full resolved data is fetched on selection for the graph + sharing status.
-      const summaries = await fetchBlueprintSummaries(userId);
+      const summaries = await fetchBlueprintSummaries(contextUserId);
 
       // Convert summaries to FlowObject format
       const processedFlows = summaries

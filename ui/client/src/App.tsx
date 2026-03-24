@@ -6,6 +6,7 @@ import JiraIntegration from "@/pages/JiraIntegration";
 import AgenticWorkflows from "@/pages/AgenticWorkflows";
 import AgentRepository from "@/pages/AgentRepository";
 import AgenticChats from "@/pages/AgenticChats";
+import CommandCenter from "@/pages/CommandCenter";
 import AgenticTemplates from "@/pages/AgenticTemplates";
 import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
@@ -34,8 +35,9 @@ function AppRoutes() {
   const [isInventory] = useRoute("/inventory");
   const [isAgenticChats] = useRoute("/agentic-chats");
   const [isTemplates] = useRoute("/templates");
+  const [isCommandCenter] = useRoute("/command-center");
 
-  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
+  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates || isCommandCenter;
 
   if (isAgenticRoute) {
     return (
@@ -47,6 +49,7 @@ function AppRoutes() {
             <Route path="/inventory" component={AgentRepository} />
             <Route path="/agentic-chats" component={AgenticChats} />
             <Route path="/templates" component={AgenticTemplates} />
+            <Route path="/command-center" component={CommandCenter} />
             <Route path="/chat/:token" component={PublicChat} />
           </Switch>
         </AgenticLayout>

@@ -290,7 +290,7 @@ export default function ExecutionTab({
       setIsLoading(true);
       setError(null);
 
-      const response = await axios.get(`/sessions/session.user.chat.get?userId=${contextUserId}`);
+      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}`);
       const transformedSessions = transformApiDataToSessions(response.data);
 
       // Sort chat sessions based on the latest date
@@ -507,9 +507,7 @@ export default function ExecutionTab({
       );
 
       // Fetch updated sessions
-      const response = await axios.get(`/sessions/session.user.chat.get?userId=${contextUserId}`);
-      const userId = user?.username || "default";
-      const response = await axios.get(`/sessions/session.user.list?userId=${userId}`);
+      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}`);
       const transformedSessions = transformApiDataToSessions(response.data);
       const sortedSessions = sortSessionsByTimestamp(transformedSessions);
       setChatSessions(sortedSessions);

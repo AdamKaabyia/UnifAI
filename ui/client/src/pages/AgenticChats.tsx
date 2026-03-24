@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useView } from "@/contexts/ViewContext";
 
 import ExecutionTab from "@/components/agentic-ai/ExecutionTab";
-import WarRoomView, { buildMemberDisplay } from "@/components/agentic-ai/WarRoomView";
+import CollaborationHubView, { buildMemberDisplay } from "@/components/agentic-ai/CollaborationHubView";
 import { StreamingDataProvider } from "@/components/agentic-ai/StreamingDataContext";
 
 export default function AgenticChats() {
@@ -26,13 +26,13 @@ export default function AgenticChats() {
   return (
     <>
       <Header
-        title={isTeam ? "War Room" : "Agentic Chats"}
+        title={isTeam ? "Collaboration Hub" : "Agentic Chats"}
         onToggleSidebar={() => {}}
       />
 
       {isTeam ? (
         <StreamingDataProvider>
-          <WarRoomView
+          <CollaborationHubView
             runId={urlRunId}
             teamMembers={teamMembers}
             teamName={selectedTeam?.name || "Team"}

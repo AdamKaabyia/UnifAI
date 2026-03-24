@@ -74,7 +74,7 @@ const DEMO_MEMBERS: MemberDisplay[] = [
 ];
 
 const DEMO_ACTIVITY = [
-  { user: DEMO_MEMBERS[0], action: "joined War Room", target: "Incident Triage", time: "Just now" },
+  { user: DEMO_MEMBERS[0], action: "joined Collaboration Hub", target: "Incident Triage", time: "Just now" },
   { user: DEMO_MEMBERS[1], action: "published", target: "OpenShift Retrieval Tool", suffix: "to Team Registry", time: "2m ago" },
   { user: DEMO_MEMBERS[2], action: "forked", target: "SRE Auto-Medic", time: "8m ago" },
   { user: DEMO_MEMBERS[3], action: "started", target: "Compliance Audit", time: "15m ago" },
@@ -237,7 +237,7 @@ export default function AgenticOverview() {
                   <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={DEMO_MEMBERS.length} subtext={`${DEMO_MEMBERS.length} active today`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
-                  <StatCard icon={<Radio className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={DEMO_LIVE_SESSIONS.length} subtext="War Rooms open" iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
+                  <StatCard icon={<Radio className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={DEMO_LIVE_SESSIONS.length} subtext="sessions open" iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
                   <StatCard icon={<TrendingUp className="w-4 h-4" />} title={<span className="flex items-center"><FaTrophy className="text-amber-400 mr-3 h-5 w-5" />Total Runs (7d)</span>} value={58} subtext="+22% vs last week" iconColor="#fbbf24" iconBgColor="rgba(251,191,36,.15)" />
@@ -251,7 +251,7 @@ export default function AgenticOverview() {
                     <CardHeader className="px-4 py-3 border-b border-gray-800/50">
                       <CardTitle className="text-base flex items-center gap-2">
                         <motion.div className="w-2 h-2 rounded-full bg-emerald-400" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-                        Live War Room Sessions
+                        Live Collaboration Sessions
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
