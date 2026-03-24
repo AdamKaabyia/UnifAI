@@ -13,6 +13,7 @@ import json
 import threading
 from typing import Any
 
+from pydantic.json import pydantic_encoder
 from redis import Redis
 
 from mas.core.channels import SessionChannel
@@ -39,7 +40,7 @@ class RedisSessionChannel(SessionChannel):
             return
         self._redis.xadd(
             self._stream_key,
-            {StreamField.PAYLOAD: json.dumps(data, default=str)},
+            {StreamField.PAYLOAD: json.dumps(data, default=pydantic_encoder)},
         )
         self._touch_ttl()
 

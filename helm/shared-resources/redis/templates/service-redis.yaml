@@ -9,7 +9,6 @@ spec:
   ports:
     - port: {{ .Values.service.port }}
       name: {{ .Values.service.name }}
-  clusterIP: None
   selector:
     app: {{ .Chart.Name }}
 

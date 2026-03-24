@@ -38,6 +38,7 @@ ENV CURL_CA_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 
 ADD  --chown=default:root --chmod=777 ./multi-agent $HOME/app
 ADD  --chown=default:root --chmod=777 ./global_utils $HOME/global_utils
+ADD  --chown=default:root --chmod=777 ./scripts $HOME/scripts
 
 WORKDIR $HOME
 COPY ./multi-agent/entrypoint.sh ./app/entrypoint.sh
@@ -54,10 +55,8 @@ RUN pip3 install --upgrade pip virtualenv
 RUN python3 -m venv --prompt "virtualenv" venv
 ENV VIRTUAL_ENV=$HOME/app/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-#RUN /bin/bash -c "pip install -r ./app/requirements.txt "
+
 RUN pip install -e "./app/[all]"
 RUN /bin/bash -c "pip install -e ./global_utils/"
-#RUN /bin/bash -c "pip install ./app/"
-
 
 ENTRYPOINT ["./app/entrypoint.sh"]

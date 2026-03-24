@@ -20,7 +20,7 @@ UMAMI_URL=$umami_url
 UMAMI_WEBSITE_NAME=$umami_website_name
 UMAMI_USERNAME=$umami_username
 UMAMI_PASSWORD=$umami_password
-
+REDIS_PASSWORD=$redis_password
 # Create configmap
 create_or_update_configmap shared-config \
   --from-literal=MONGODB_PORT="$MONGO_PORT" \
@@ -34,4 +34,5 @@ create_or_update_configmap shared-config \
   --from-literal=UMAMI_URL="$UMAMI_URL" \
   --from-literal=UMAMI_WEBSITE_NAME="$UMAMI_WEBSITE_NAME" \
   --from-literal=UMAMI_USERNAME="$UMAMI_USERNAME" \
-  --from-literal=UMAMI_PASSWORD="$UMAMI_PASSWORD"
+  --from-literal=UMAMI_PASSWORD="$UMAMI_PASSWORD" \
+  --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD"

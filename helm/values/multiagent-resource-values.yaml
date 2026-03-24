@@ -22,14 +22,14 @@ multiagent_server:
     VERSION: ""
 
 multiagent_temporal_worker:
-  replicaCount: 1
+  replicaCount: 2
   resources: 
     limits:
       cpu: '4'
-      memory: '32Gi'
-    requests:
-      cpu: '4'
       memory: '16Gi'
+    requests:
+      cpu: '2'
+      memory: '8Gi'
   image: 
     repository: images.paas.redhat.com/unifai/multiagent
     tag: "latest"

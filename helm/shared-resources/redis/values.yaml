@@ -88,8 +88,6 @@ resources:
     memory: 12Gi
 
 env:
-  - name: REDIS_PASSWORD
-    value: "Mc10vin!!"
   - name: ALLOW_EMPTY_PASSWORD
     value: "no"
   # We usually recommend not to specify default resources and to leave this as a conscious

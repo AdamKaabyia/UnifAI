@@ -102,10 +102,10 @@ resources:
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   limits:
     cpu: '4'
-    memory: '32Gi'
-  requests:
-    cpu: '4'
     memory: '16Gi'
+  requests:
+    cpu: '2'
+    memory: '8Gi'
 
 ##### currently the liveness/readyness probes are set manually in the deployment file and taking the port from the service in this file.
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/

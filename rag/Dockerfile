@@ -8,6 +8,7 @@ USER default
 # Copy all backend files (including entrypoint.sh) and global_utils
 ADD  --chown=default:root --chmod=777 ./rag $HOME/rag
 ADD  --chown=default:root --chmod=777 ./global_utils $HOME/global_utils
+ADD  --chown=default:root --chmod=777 ./scripts $HOME/scripts
 
 WORKDIR $HOME/rag
 

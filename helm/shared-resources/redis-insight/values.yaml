@@ -30,6 +30,9 @@ storage:
 
 env:
   REDISINSIGHT_HOST: "0.0.0.0"
+  #REDISINSIGHT_DB_0_NAME: "workflows"
+  REDISINSIGHT_DB_0_HOST: "redis"
+  REDISINSIGHT_DB_0_PORT: 6379
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   # Specifies whether a service account should be created
