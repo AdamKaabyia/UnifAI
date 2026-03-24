@@ -70,7 +70,7 @@ class DoclingClient:
             file_path: Path to the file to convert
             to_formats: List of output formats (e.g., ["md", "text"])
             image_export_mode: Mode for image export (e.g., "placeholder")
-            pdf_backend: PDF parsing backend (e.g., "pypdfium2")
+            pdf_backend: PDF parsing backend (e.g., "dlparse_v4")
         
         Returns:
             Raw JSON response from the service

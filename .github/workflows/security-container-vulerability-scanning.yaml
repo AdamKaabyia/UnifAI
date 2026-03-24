@@ -1,0 +1,112 @@
+name: Security Container Vulnerability Scanning
+
+on:
+  # pull_request:
+  #   types: 
+  #     - opened
+  #   branches:
+  #     - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The branch to scan
+        required: true
+        default: main
+
+jobs:
+  vulnerability-scan:
+    name: Build & Scan Components
+    runs-on: linux
+    permissions:
+      security-events: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # BE folder isn't pushed yet to main
+          # - component: backend
+          #   dockerfile: backend/Dockerfile
+          #   context: .
+          - component: multiagentbackend
+            dockerfile: multi-agent/Dockerfile
+            context: .
+          - component: ssobackend
+            dockerfile: shared-resources/sso-backend/Dockerfile
+            context: .
+          - component: ui
+            dockerfile: ui/deployment/Dockerfile
+            context: .
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Checkout code for certificates
+        if: ${{ matrix.component == 'ui' }}
+        uses: actions/checkout@v4
+        with:
+          repository: 'redhat-community-ai-tools/UnifAI-secrets'
+          ref: main
+          token: ${{ secrets.UNIFAI_SECRETS_TOKEN }}
+          persist-credentials: false
+          path: ui/genie-cred-data
+          
+
+      - name: check repo exist
+        if: ${{ matrix.component == 'ui' }}
+        run: |
+          ls -la ui | grep genie-cred-data
+          ls -la ui/genie-cred-data 
+      
+      - name: Build image for ${{ matrix.component }}
+        run: |
+          podman build -t ${{ matrix.component }}:${{ github.sha }} -f ${{ matrix.dockerfile }} ${{ matrix.context }}
+          podman save ${{ matrix.component }}:${{ github.sha }} -o ${{ matrix.component }}.tar
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          #image-ref: 'localhost/${{ matrix.component }}:${{ github.sha }}'
+          #scan-type: 'image.tar'
+          input: ${{ matrix.component }}.tar
+          exit-code: '0'  # TODO: switch to exit-code: '1' once baseline is established
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: '${{ matrix.component }}-results.sarif'
+        # env:
+        #   TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: '${{ matrix.component }}-results.sarif'
+          category: ${{ matrix.component }}
+
+  analyze:
+    needs: [vulnerability-scan]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+
+    - name: Generate Token
+      id: generate_token
+      #uses: tibdex/github-app-token@v2
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ secrets.LOG_ANALYZER_APP_ID }}
+        private-key: ${{ secrets.LOG_ANALYZER_PRIVATE_KEY }}
+
+    - name: GitHub Actions Failure Analysis
+      uses: calebevans/gha-failure-analysis@v0.1.9
+      with:
+        llm-provider: gemini
+        llm-model: gemini-3-pro-preview
+        llm-api-key: ${{ secrets.GEMINI_API_KEY }}
+        github-token: ${{ steps.generate_token.outputs.token }}
+        post-pr-comment: false

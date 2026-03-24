@@ -38,7 +38,7 @@ class DocumentConverterFactory:
         base_url: str,
         timeout: int = 300,
         image_export_mode: str = "placeholder",
-        pdf_backend: str = "pypdfium2",
+        pdf_backend: str = "dlparse_v4",
     ) -> DocumentConverterPort:
         """Create a remote docling adapter."""
         from global_utils.docling import DoclingClient, DoclingService
@@ -85,6 +85,7 @@ class DocumentConnectorFactory:
             converter = DocumentConverterFactory.create_remote(
                 base_url=service_url,
                 timeout=config.get("timeout", 300),
+                pdf_backend=config.get("pdf_backend", "dlparse_v4"),
             )
         else:
             raise ValueError(f"Unknown connector type: {connector_type}")
@@ -115,6 +116,7 @@ class DocumentConnectorFactory:
                 "type": "remote",
                 "service_url": config.docling_service_url,
                 "timeout": config.docling_service_timeout,
+                "pdf_backend": config.docling_pdf_backend,
             })
         return cls.create({"type": "local"})
 

@@ -51,7 +51,7 @@ class DoclingService:
         Args:
             client: DoclingClient instance for HTTP communication
             image_export_mode: Default mode for image export (e.g., "placeholder")
-            pdf_backend: Default PDF backend (e.g., "pypdfium2")
+            pdf_backend: Default PDF backend (e.g., "dlparse_v4")
             default_formats: Default output formats (defaults to MARKDOWN and TEXT)
         """
         self._client = client

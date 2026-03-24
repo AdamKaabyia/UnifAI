@@ -87,6 +87,8 @@ export interface PlatformResource {
     { name: "Umami", icon: "umami", category: "frontend" },
     { name: "LangGraph", icon: "langgraph", category: "agentic" },
     { name: "LangChain", icon: "langchain", category: "agentic" },
-    { name: "A2A (Agents-to-Agents)", icon: "a2a", category: "agentic" }
+    { name: "A2A (Agents-to-Agents)", icon: "a2a", category: "agentic" },
+    { name: "Redis", icon: "redis", category: "backend" },
+    { name: "Temporal", icon: "temporal", category: "agentic" }
   ];
   
