@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, List, Tuple, Set, Optional, Any
 from uuid import uuid4
 from dataclasses import dataclass, field
@@ -230,11 +231,11 @@ class ShareCloner:
         original_doc = cache_data.doc
         new_rid = rid_mapping[original_doc.rid]
 
-        # Resolve name with "(from sender)" suffix, consistent with blueprint naming
+        sender_display = self._sanitize_sender_display(sender_user_id)
         new_name = self._resolve_name_conflict(
             recipient_user_id, original_doc.category,
             original_doc.type, original_doc.name,
-            sender_user_id=sender_user_id
+            sender_display=sender_display
         )
 
         # Use typed model for clean remapping (Ref objects), then dump to dict
@@ -263,11 +264,32 @@ class ShareCloner:
         for doc in docs:
             self.resources.create(doc)
 
+    @staticmethod
+    def _sanitize_sender_display(sender_user_id: str) -> str:
+        """Produce a safe display label from a raw user identifier.
+
+        Prevents leaking emails, internal UUIDs, or other sensitive IDs into
+        persistent resource/blueprint names.
+        """
+        MAX_DISPLAY_LEN = 32
+        value = sender_user_id.strip()
+
+        if "@" in value:
+            value = value.split("@", 1)[0]
+
+        if re.fullmatch(r"[0-9a-fA-F]{24,}", value):
+            value = value[:8]
+
+        if len(value) > MAX_DISPLAY_LEN:
+            value = value[:MAX_DISPLAY_LEN]
+
+        return value or "shared"
+
     def _resolve_name_conflict(self, user_id: str, category: str,
                                type_: str, preferred_name: str,
-                               sender_user_id: str) -> str:
+                               sender_display: str) -> str:
         """Resolve name conflicts by adding '(from sender)' suffix."""
-        base_name = f"{preferred_name} (from {sender_user_id})"
+        base_name = f"{preferred_name} (from {sender_display})"
         current_name = base_name
 
         for counter in range(2, 101):
@@ -293,10 +315,10 @@ class ShareCloner:
             for category in ResourceCategory
         }
 
-        # Create new BlueprintDraft with cloned data
+        sender_display = self._sanitize_sender_display(sender_user_id)
         return BlueprintDraft(
             plan=self._clone_plan(draft.plan, rid_mapping),
-            name=f"{draft.name} (from {sender_user_id})",
+            name=f"{draft.name} (from {sender_display})",
             description=draft.description,
             **resource_fields
         )
