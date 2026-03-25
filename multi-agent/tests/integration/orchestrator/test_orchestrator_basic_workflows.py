@@ -13,8 +13,8 @@ Tests end-to-end scenarios with minimal complexity:
 
 import pytest
 from unittest.mock import Mock, patch
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.common.workload import (
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.common.workload import (
     WorkPlan, WorkItem, WorkItemKind, WorkItemStatus, Task
 )
 from tests.base import (

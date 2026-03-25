@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
-from elements.nodes.common.workload import WorkPlan, WorkItem, WorkItemStatus
+from mas.elements.nodes.common.workload import WorkPlan, WorkItem, WorkItemStatus
 
 
 # =============================================================================

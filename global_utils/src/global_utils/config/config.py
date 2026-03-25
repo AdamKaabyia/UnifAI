@@ -16,6 +16,13 @@ class SharedConfig(BaseSettings):
     rabbitmq_port: str = "5672"
     rabbitmq_ip: str = "0.0.0.0"
 
+    temporal_ip: str = "localhost"
+    temporal_port: str = "7233"
+    temporal_namespace: str = "default"
+
+    redis_ip: str = "localhost"
+    redis_port: str = "6379"
+
     # shared loading order
     model_config = SettingsConfigDict(
         env_prefix="",

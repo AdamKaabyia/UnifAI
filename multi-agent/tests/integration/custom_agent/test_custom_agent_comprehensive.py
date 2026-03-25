@@ -23,25 +23,26 @@ from datetime import datetime
 from typing import Dict, List, Any, Set
 
 # Core imports
-from elements.nodes.custom_agent.custom_agent import CustomAgentNode
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.common.workload import Task, AgentResult
-from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
-from elements.llms.common.chat.message import ChatMessage, Role
-from graph.state.state_view import StateView
-from graph.topology.models import StepTopology
-from graph.state.graph_state import Channel
-from core.iem.packets import TaskPacket
-from core.models import ElementCard
-from core.enums import ResourceCategory
-from elements.nodes.common.agent.constants import StrategyType
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.nodes.custom_agent.custom_agent import CustomAgentNode
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.common.workload import Task, AgentResult
+from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+from mas.elements.llms.common.chat.message import ChatMessage, Role
+from mas.graph.state.state_view import StateView
+from mas.graph.topology.models import StepTopology
+from mas.graph.state.graph_state import Channel
+from mas.core.iem.packets import TaskPacket
+from mas.elements.common.card import ElementCard
+from mas.elements.common.card.models.card import Skill, Capability
+from mas.core.enums import ResourceCategory
+from mas.elements.nodes.common.agent.constants import StrategyType
+from mas.elements.tools.common.base_tool import BaseTool
 
 # Import fixtures
 from tests.fixtures.orchestrator_integration import (
     PredictableLLM, ExecutionTracker, create_step_context_local
 )
-from core.iem.models import ElementAddress
+from mas.core.iem.models import ElementAddress
 
 # Import generic helper for workspace access
 from tests.base import get_workspace_from_node
@@ -168,7 +169,7 @@ class TestCustomAgentBasicFunctionality:
         def track_response(packet):
             # Extract task from packet and get destination
             task = packet.payload  # TaskPacket stores task as payload dict
-            from elements.nodes.common.workload import Task
+            from mas.elements.nodes.common.workload import Task
             task_obj = Task.model_validate(task)
             destination = packet.dst.uid
             response_calls.append({
@@ -235,7 +236,7 @@ class TestCustomAgentBasicFunctionality:
         def track_broadcast(packet):
             # Extract task from packet
             task = packet.payload  # TaskPacket stores task as payload dict
-            from elements.nodes.common.workload import Task
+            from mas.elements.nodes.common.workload import Task
             task_obj = Task.model_validate(task)
             broadcast_calls.append({
                 'task_content': task_obj.content,
@@ -300,7 +301,7 @@ class TestCustomAgentBasicFunctionality:
         def track_normal_broadcast(packet):
             # Extract task from packet
             task = packet.payload  # TaskPacket stores task as payload dict
-            from elements.nodes.common.workload import Task
+            from mas.elements.nodes.common.workload import Task
             task_obj = Task.model_validate(task)
             broadcast_calls.append({
                 'task_content': task_obj.content,
@@ -376,7 +377,7 @@ class TestCustomAgentCommunication:
             def track_communication(packet):
                 # Extract task from packet
                 task = packet.payload  # TaskPacket stores task as payload dict
-                from elements.nodes.common.workload import Task
+                from mas.elements.nodes.common.workload import Task
                 task_obj = Task.model_validate(task)
                 destination = packet.dst.uid
                 chain_communications.append({
@@ -473,7 +474,7 @@ class TestCustomAgentCommunication:
         
         stage_4 = agents['stage_4']
         def track_stage_4_broadcast(packet):
-            from elements.nodes.common.workload import Task
+            from mas.elements.nodes.common.workload import Task
             task_obj = Task.model_validate(packet.payload)
             chain_communications.append({
                 'from': "stage_4_agent",
@@ -553,7 +554,7 @@ class TestCustomAgentCommunication:
             def track_parallel(packet):
                 # Extract task from packet
                 task = packet.payload  # TaskPacket stores task as payload dict
-                from elements.nodes.common.workload import Task
+                from mas.elements.nodes.common.workload import Task
                 task_obj = Task.model_validate(task)
                 destination = packet.dst.uid
                 parallel_communications.append({
@@ -686,9 +687,9 @@ class TestCustomAgentOrchestrationIntegration:
                 type_key="custom_agent_node",
                 name=spec.replace('_', ' ').title(),
                 description=f"{spec.replace('_', ' ')} specialist",
-                capabilities={spec, "specialized_processing"},
-                reads=set(), writes=set(), instance=Mock(), config={},
-                skills={"tools": [{"name": f"{spec}_tool", "description": f"{spec} operations"}]}
+                capabilities=[Capability(name=spec), Capability(name="specialized_processing")],
+                skills=[Skill(name=f"{spec}_tool", description=f"{spec} operations")],
+                configuration={},
             )
 
         # Process through orchestrator (using new flow - no immediate cycle)
@@ -733,7 +734,7 @@ class TestCustomAgentOrchestrationIntegration:
             def track_agent_response(packet):
                 # Extract task from packet
                 task = packet.payload  # TaskPacket stores task as payload dict
-                from elements.nodes.common.workload import Task
+                from mas.elements.nodes.common.workload import Task
                 task_obj = Task.model_validate(task)
                 destination = packet.dst.uid
                 agent_responses.append({
@@ -829,7 +830,7 @@ class TestCustomAgentOrchestrationIntegration:
         def track_coordination_request(packet):
             # Extract task from packet
             task = packet.payload  # TaskPacket stores task as payload dict
-            from elements.nodes.common.workload import Task
+            from mas.elements.nodes.common.workload import Task
             task_obj = Task.model_validate(task)
             destination = packet.dst.uid
             coordination_comms.append({
@@ -888,9 +889,9 @@ class TestCustomAgentOrchestrationIntegration:
                 type_key="custom_agent_node",
                 name="Initiator Agent",
                 description="Workflow initiating agent",
-                capabilities={"workflow_initiation", "coordination_requests"},
-                reads=set(), writes=set(), instance=Mock(), config={},
-                skills={"tools": [{"name": "initiate_workflow", "description": "Initiates workflows"}]}
+                capabilities=[Capability(name="workflow_initiation"), Capability(name="coordination_requests")],
+                skills=[Skill(name="initiate_workflow", description="Initiates workflows")],
+                configuration={},
             )
         }):
             with patch.object(orchestrator, 'send_task', side_effect=track_orchestrator_response):

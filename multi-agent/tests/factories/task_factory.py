@@ -8,7 +8,7 @@ reducing duplication in test setup.
 import uuid
 from typing import Optional, Dict, Any
 
-from elements.nodes.common.workload import Task
+from mas.elements.nodes.common.workload import Task
 
 
 class TaskFactory:

@@ -9,12 +9,12 @@ import pytest
 from typing import List, Dict, Any, Optional, Type
 from unittest.mock import Mock
 
-from graph.state.state_view import StateView
-from graph.state.graph_state import GraphState
-from graph.models import StepContext
-from elements.nodes.common.workload import Task, WorkPlan, UnifiedWorkloadService
-from core.iem.packets import TaskPacket
-from core.iem.models import ElementAddress
+from mas.graph.state.state_view import StateView
+from mas.graph.state.graph_state import GraphState
+from mas.graph.models import StepContext
+from mas.elements.nodes.common.workload import Task, WorkPlan, UnifiedWorkloadService
+from mas.core.iem.packets import TaskPacket
+from mas.core.iem.models import ElementAddress
 
 
 class BaseNodeTest:
@@ -111,14 +111,14 @@ class BaseNodeTest:
     
     def get_workspace(self, thread_id: str):
         """Get workspace for a thread from the node's workload service."""
-        from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+        from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
         storage = StateBoundStorage(self.state)
         service = UnifiedWorkloadService(storage)
         return service.get_workspace(thread_id)
     
     def get_thread(self, thread_id: str):
         """Get thread from the workload service."""
-        from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+        from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
         storage = StateBoundStorage(self.state)
         service = UnifiedWorkloadService(storage)
         return service.get_thread(thread_id)
@@ -169,7 +169,7 @@ class BaseNodeTest:
         Returns:
             The WorkPlan if found
         """
-        from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+        from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
         storage = StateBoundStorage(self.state)
         service = UnifiedWorkloadService(storage)
         
@@ -227,7 +227,7 @@ class BaseOrchestratorTest(BaseNodeTest):
         Returns:
             Configured OrchestratorNode instance
         """
-        from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+        from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
         from tests.fixtures.common.llm_fixtures import create_mock_llm
         
         if llm is None:
@@ -336,7 +336,7 @@ class BaseCustomAgentTest(BaseNodeTest):
         Returns:
             Configured CustomAgentNode instance
         """
-        from elements.nodes.custom_agent.custom_agent import CustomAgentNode
+        from mas.elements.nodes.custom_agent.custom_agent import CustomAgentNode
         from tests.fixtures.common.llm_fixtures import create_mock_llm
         
         if llm is None:

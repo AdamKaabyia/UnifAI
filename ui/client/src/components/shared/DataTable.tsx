@@ -257,6 +257,7 @@ export function DataTable<T extends object>({
     data,
     columns: columnsWithSelection,
     filterFns,
+    autoResetPageIndex: false,
     getRowId: getRowId as any,
     enableRowSelection: enableRowSelection,
     // Handle TanStack's updater pattern (can be value or function)

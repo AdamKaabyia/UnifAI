@@ -1,6 +1,6 @@
 """MongoDB adapter for TermsApprovalRepository port."""
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pymongo.collection import Collection
 
@@ -27,7 +27,7 @@ class MongoTermsApprovalRepository(TermsApprovalRepository):
 
     def record_approval(self, username: str) -> TermsApproval:
         """Record a user's approval by creating/updating their approval document."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         self._col.update_one(
             {"username": username},
             {

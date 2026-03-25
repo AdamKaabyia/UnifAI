@@ -41,7 +41,7 @@ CRITICAL PATTERN - Shared State Architecture:
 
 import pytest
 from unittest.mock import Mock
-from elements.nodes.common.workload import Task, AgentResult, WorkItemStatus
+from mas.elements.nodes.common.workload import Task, AgentResult, WorkItemStatus
 from tests.base import (
     # Node creation
     create_orchestrator_node,

@@ -1,6 +1,6 @@
 """Pipeline domain model."""
 from dataclasses import dataclass, field, fields, asdict, MISSING
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from enum import Enum
 
@@ -67,8 +67,8 @@ class PipelineRecord:
             pipeline_id=data.get("pipeline_id", ""),
             source_type=data.get("source_type", ""),
             status=status,
-            created_at=data.get("created_at", datetime.utcnow()),
-            last_updated=data.get("last_updated", datetime.utcnow()),
+            created_at=data.get("created_at", datetime.now(timezone.utc)),
+            last_updated=data.get("last_updated", datetime.now(timezone.utc)),
             stats=PipelineStats.from_dict(data.get("stats", {}) or {}),
             metadata=data.get("metadata", {}),
         )

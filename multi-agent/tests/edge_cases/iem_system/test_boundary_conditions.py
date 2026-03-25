@@ -16,10 +16,10 @@ from unittest.mock import Mock, patch, MagicMock
 from concurrent.futures import ThreadPoolExecutor
 import sys
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress, PacketType
-from core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket, DebugPacket
-from core.iem.exceptions import IEMException, IEMValidationException
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress, PacketType
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket, SystemPacket, DebugPacket
+from mas.core.iem.exceptions import IEMException, IEMValidationException
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context,
     PacketFactory, IEMPerformanceMonitor

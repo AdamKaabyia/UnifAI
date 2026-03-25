@@ -15,7 +15,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import Mock
 
-from elements.nodes.common.workload import (
+from mas.elements.nodes.common.workload import (
     WorkPlan, WorkItem, WorkItemStatus, WorkItemKind,
     UnifiedWorkloadService, InMemoryStorage,
     WorkItemResult

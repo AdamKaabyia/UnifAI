@@ -8,10 +8,10 @@ reducing duplication and ensuring consistency across tests.
 from typing import List, Dict, Any, Optional, Type
 from unittest.mock import Mock
 
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.custom_agent.custom_agent import CustomAgentNode
-from elements.tools.common.base_tool import BaseTool
-from graph.state.state_view import StateView
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.custom_agent.custom_agent import CustomAgentNode
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.graph.state.state_view import StateView
 from tests.base.test_helpers import create_test_step_context
 
 

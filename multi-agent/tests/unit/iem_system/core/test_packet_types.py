@@ -9,9 +9,9 @@ import pytest
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
-from core.iem.packets import TaskPacket, SystemPacket, DebugPacket
-from core.iem.models import ElementAddress, PacketType
-from elements.nodes.common.workload import Task
+from mas.core.iem.packets import TaskPacket, SystemPacket, DebugPacket
+from mas.core.iem.models import ElementAddress, PacketType
+from mas.elements.nodes.common.workload import Task
 from tests.fixtures.iem_testing_tools import PacketFactory
 
 

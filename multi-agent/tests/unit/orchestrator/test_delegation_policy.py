@@ -7,14 +7,14 @@ which adjacent nodes can receive delegated work.
 
 import pytest
 from unittest.mock import Mock
-from graph.models import AdjacentNodes
-from core.models import ElementCard
-from graph.topology.models import StepTopology, FinalizerPathInfo
-from elements.nodes.common.agent.delegation_policy import (
+from mas.graph.models import AdjacentNodes
+from mas.elements.common.card import ElementCard
+from mas.graph.topology.models import StepTopology, FinalizerPathInfo
+from mas.elements.nodes.common.agent.delegation_policy import (
     DelegationPolicy,
     PermissiveDelegationPolicy
 )
-from elements.nodes.orchestrator.delegation_policy import OrchestratorDelegationPolicy
+from mas.elements.nodes.orchestrator.delegation_policy import OrchestratorDelegationPolicy
 
 
 class TestPermissiveDelegationPolicy:

@@ -19,12 +19,12 @@ from dataclasses import dataclass, field
 from unittest.mock import Mock
 import pytest
 
-from elements.llms.common.base_llm import BaseLLM
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.tools.common.base_tool import BaseTool
-from elements.nodes.common.workload import Task, WorkPlan, WorkItem
-from core.iem.packets import TaskPacket
-from core.iem.models import ElementAddress
+from mas.elements.llms.common.base_llm import BaseLLM
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.nodes.common.workload import Task, WorkPlan, WorkItem
+from mas.core.iem.packets import TaskPacket
+from mas.core.iem.models import ElementAddress
 
 
 # Legacy class for backward compatibility with other test files
@@ -238,11 +238,11 @@ def create_step_context_local(uid: str, adjacent_nodes: List[str] = None):
     Returns:
         StepContext instance for testing
     """
-    from graph.models import StepContext
-    from graph.models import AdjacentNodes
-    from core.models import ElementCard
-    from core.enums import ResourceCategory
-    from blueprints.models.blueprint import StepMeta
+    from mas.graph.models import StepContext
+    from mas.graph.models import AdjacentNodes
+    from mas.elements.common.card import ElementCard
+    from mas.core.enums import ResourceCategory
+    from mas.blueprints.models.blueprint import StepMeta
     
     if adjacent_nodes is None:
         adjacent_nodes = []
@@ -256,12 +256,9 @@ def create_step_context_local(uid: str, adjacent_nodes: List[str] = None):
             type_key="test_node",
             name=node_uid,
             description=f"Test node {node_uid}",
-            capabilities=set(),
-            reads=set(),
-            writes=set(),
-            instance=None,
-            config={},
-            skills={}
+            capabilities=[],
+            skills=[],
+            configuration={},
         )
         adjacent_nodes_dict[node_uid] = card
     
@@ -359,7 +356,7 @@ def orchestrator_integration_state(state_view):
 @pytest.fixture
 def orchestrator_workspace_service(orchestrator_integration_state):
     """Provide a workspace service bound to the integration state."""
-    from elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
+    from mas.elements.nodes.common.workload import UnifiedWorkloadService, StateBoundStorage
     storage = StateBoundStorage(orchestrator_integration_state)
     return UnifiedWorkloadService(storage)
 
@@ -367,7 +364,7 @@ def orchestrator_workspace_service(orchestrator_integration_state):
 @pytest.fixture
 def integration_orchestrator(predictable_llm, orchestrator_integration_state):
     """Provide a fully configured orchestrator for integration testing."""
-    from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+    from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
     
     orchestrator = OrchestratorNode(llm=predictable_llm)
     

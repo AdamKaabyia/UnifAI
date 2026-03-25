@@ -10,13 +10,13 @@ import time
 import threading
 from unittest.mock import Mock
 
-from elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from elements.nodes.common.agent.parsers import ToolCallParser
-from elements.nodes.common.agent.strategies.react import ReActStrategy
-from elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
-from elements.nodes.common.agent.execution.executor import AgentActionExecutor
-from elements.tools.common.execution import ToolExecutorManager, ExecutorConfig
-from elements.tools.common.execution.models import ExecutionMode as ToolExecutionMode
+from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
+from mas.elements.nodes.common.agent.parsers import ToolCallParser
+from mas.elements.nodes.common.agent.strategies.react import ReActStrategy
+from mas.elements.nodes.common.agent.execution import AgentIterator, ExecutionMode, ExecutionHandlerFactory
+from mas.elements.nodes.common.agent.execution.executor import AgentActionExecutor
+from mas.elements.tools.common.execution import ToolExecutorManager, ExecutorConfig
+from mas.elements.tools.common.execution.models import ExecutionMode as ToolExecutionMode
 
 
 @pytest.fixture

@@ -8,8 +8,8 @@ Uses GENERIC test helpers from tests.base.test_helpers.
 import pytest
 from unittest.mock import Mock
 
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.common.workload import (
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.common.workload import (
     UnifiedWorkloadService, InMemoryStorage, WorkItem, WorkItemKind, WorkItemStatus
 )
 

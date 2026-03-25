@@ -12,10 +12,10 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, Mock
 from typing import List
 
-from core.iem.packets import BaseIEMPacket, TaskPacket
-from core.iem.models import ElementAddress, PacketType
-from core.iem.messenger import DefaultInterMessenger
-from graph.state.graph_state import Channel
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.core.iem.models import ElementAddress, PacketType
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.graph.state.graph_state import Channel
 from tests.fixtures.iem_testing_tools import (
     PacketFactory, create_test_state_view, MockIEMNode,
     IEMPerformanceMonitor

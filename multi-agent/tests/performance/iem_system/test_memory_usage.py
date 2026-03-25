@@ -16,10 +16,10 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress
-from core.iem.packets import BaseIEMPacket, TaskPacket
-from graph.state.graph_state import Channel
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import BaseIEMPacket, TaskPacket
+from mas.graph.state.graph_state import Channel
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context,
     PacketFactory, IEMPerformanceMonitor

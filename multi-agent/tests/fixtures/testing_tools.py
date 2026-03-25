@@ -12,7 +12,7 @@ import json
 import threading
 from typing import Optional, Union, Any
 from pydantic import BaseModel, Field
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 # =============================================================================

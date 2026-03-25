@@ -9,7 +9,7 @@ from typing import List
 from unittest.mock import Mock
 from pydantic import BaseModel, Field
 
-from elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.base_tool import BaseTool
 
 
 class TestToolInput(BaseModel):

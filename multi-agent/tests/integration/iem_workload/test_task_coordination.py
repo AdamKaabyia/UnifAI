@@ -10,11 +10,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from unittest.mock import Mock, patch
 
-from core.iem.messenger import DefaultInterMessenger
-from core.iem.models import ElementAddress
-from core.iem.packets import TaskPacket
-from elements.nodes.common.workload import Task, ThreadStatus
-from elements.nodes.common.workload.models import AgentResult as BaseAgentResult
+from mas.core.iem.messenger import DefaultInterMessenger
+from mas.core.iem.models import ElementAddress
+from mas.core.iem.packets import TaskPacket
+from mas.elements.nodes.common.workload import Task, ThreadStatus
+from mas.elements.nodes.common.workload.models import AgentResult as BaseAgentResult
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
@@ -37,7 +37,7 @@ class AgentResult:
     error: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
-from graph.state.graph_state import Channel
+from mas.graph.state.graph_state import Channel
 from tests.fixtures.iem_testing_tools import (
     create_test_state_view, create_test_step_context, 
     PacketFactory, IEMPerformanceMonitor

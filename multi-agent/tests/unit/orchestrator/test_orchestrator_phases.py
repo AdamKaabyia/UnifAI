@@ -14,9 +14,9 @@ Uses GENERIC test helpers that work for ALL phase-based systems.
 import pytest
 from unittest.mock import Mock, patch
 
-from elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
-from elements.nodes.orchestrator.orchestrator_phase_provider import OrchestratorPhase, OrchestratorPhaseProvider
-from elements.nodes.orchestrator.phases.models import PhaseIterationLimits, PhaseIterationState
+from mas.elements.nodes.orchestrator.orchestrator_node import OrchestratorNode
+from mas.elements.nodes.orchestrator.orchestrator_phase_provider import OrchestratorPhase, OrchestratorPhaseProvider
+from mas.elements.nodes.orchestrator.phases.models import PhaseIterationLimits, PhaseIterationState
 from tests.base import BaseUnitTest, setup_node_with_state, setup_node_with_context
 
 

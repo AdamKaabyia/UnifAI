@@ -7,7 +7,9 @@ import {
   SiMongodb, 
   SiReact, 
   SiTypescript, 
-  SiUmami
+  SiUmami,
+  SiRedis,
+  SiTemporal
 } from "react-icons/si";
 import { FaDatabase, FaLink, FaRobot, FaCubes } from "react-icons/fa";
 
@@ -30,6 +32,8 @@ const techIconMap: Record<string, React.ReactNode> = {
   langchain: <FaLink className="w-6 h-6" />,
   a2a: <FaRobot className="w-6 h-6" />,
   umami: <SiUmami className="w-6 h-6" />,
+  redis: <SiRedis className="w-6 h-6" />,
+  temporal: <SiTemporal className="w-6 h-6" />,
   default: <FaCubes className="w-6 h-6" />
 };
 
@@ -46,6 +50,8 @@ const techColorMap: Record<string, string> = {
   langchain: "text-teal-400 bg-teal-400/10",
   a2a: "text-pink-400 bg-pink-400/10",
   umami: "text-black-400 bg-black-400/10",
+  redis: "text-red-400 bg-red-400/10",
+  temporal: "text-blue-400 bg-blue-400/10",
   default: "text-gray-400 bg-gray-400/10"
 };
 
