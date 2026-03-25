@@ -1,27 +1,28 @@
 import axios from 'axios';
 
-const backendApi = axios.create({
+/**
+ * Axios instance for the backend (admin config, cross-cutting concerns).
+ * Proxied via /api4 -> http://127.0.0.1:8005/api
+ */
+export const backendApi = axios.create({
   baseURL: '/api4',
+  timeout: 20000,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 backendApi.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('Backend API Error:', error);
+
     let errorMsg = 'Failed to fetch data. Please try again.';
     const errorData = error.response?.data as { error?: string };
     if (errorData?.error) {
       errorMsg = errorData.error;
     }
 
-    const err = new Error(errorMsg) as Error & { status?: number };
-    err.status = error.response?.status;
-    return Promise.reject(err);
+    return Promise.reject(new Error(errorMsg));
   },
 );
 
-export { backendApi };
 export default backendApi;

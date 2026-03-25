@@ -30,21 +30,26 @@ export const MarkdownComponents = {
     <li className="text-gray-200 leading-normal pl-1" {...props}>{children}</li>
   ),
   
-  // Code blocks - Simplified approach
-  code: ({ inline, className, children, ...props }: any) => {
-    // Block code (triple backticks)
-    if (!inline) {
+  // Block code: react-markdown v10 wraps fenced blocks in <pre><code class="language-*">.
+  // Override <pre> to pass children through so our code component controls all styling.
+  pre: ({ children }: any) => <>{children}</>,
+
+  // Code: detect fenced blocks via the language-* className that react-markdown v10
+  // attaches to <code> inside <pre>. Everything else is inline.
+  code: ({ className, children, ...props }: any) => {
+    const isBlock = /^language-/.test(className || '');
+
+    if (isBlock) {
       return (
-        <pre className="bg-gray-900 text-cyan-300 p-3 rounded-lg overflow-x-auto mb-3 mt-2">
+        <pre className="bg-gray-900 text-cyan-300 p-3 rounded-lg overflow-x-auto mb-3 mt-2 whitespace-pre">
           <code className="font-mono text-sm">{children}</code>
         </pre>
       );
     }
-    
-    // Inline code (single backticks) - Always render inline
+
     return (
-      <code 
-        className="bg-gray-800 text-cyan-300 px-1.5 py-0.5 mx-0.5 rounded text-sm font-mono" 
+      <code
+        className="bg-gray-800 text-cyan-300 px-1.5 py-0.5 mx-0.5 rounded text-sm font-mono"
         {...props}
       >
         {children}
@@ -97,8 +102,9 @@ export const MarkdownComponents = {
   ),
 };
 
-// Minimal preprocessing - let react-markdown handle most formatting
+// Convert literal \n sequences from the LLM into real newlines so that
+// standard CommonMark rendering (via react-markdown without remark-breaks)
+// handles paragraphs, code fences, lists, and headings natively.
 export const preprocessText = (text: string): string => {
-  // Only convert literal \n to actual newlines
   return text.replace(/\\n/g, '\n').trim();
 };

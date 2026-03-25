@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ui.fullname" . }}
+  name: {{ include "unifai-backend.fullname" . }}
   labels:
-    {{- include "ui.labels" . | nindent 4 }}
+    {{- include "unifai-backend.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "ui.selectorLabels" . | nindent 6 }}
+      {{- include "unifai-backend.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,7 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "ui.labels" . | nindent 8 }}
+        {{- include "unifai-backend.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,6 +27,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ include "unifai-backend.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -39,27 +40,24 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.debug }}
-          command: {{ .Values.command | toYaml | nindent 12 }}
-          {{- end }}
-          ports:
-          {{- range .Values.service.portList }}
-            - name: http-{{ .name }}
-              containerPort: {{ .port }}
-              protocol: TCP
-          {{- end }}
+
           env:
           {{- range $key, $value := .Values.env }}
-              - name: "{{ $key }}"
-                value: "{{ $value }}"
+          - name: "{{ $key }}"
+            value: "{{ $value }}"
           {{- end }}
+
           envFrom:
-          {{- range $value := .Values.globalConfigMapNames }}
           - configMapRef:
-              name: {{ $value }}
-              optional: true
-          {{- end }}
-          {{- if not .Values.debug  }}
+              name: {{ .Values.globalConfigMapName }}
+          - configMapRef:
+              name: backend-be-security
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -67,7 +65,6 @@ spec:
           {{- with .Values.readinessProbe }}
           readinessProbe:
             {{- toYaml . | nindent 12 }}
-          {{- end }}
           {{- end }}
           {{- with .Values.resources }}
           resources:

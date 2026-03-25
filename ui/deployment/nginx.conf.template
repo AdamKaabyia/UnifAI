@@ -132,6 +132,17 @@ http {
            # Using nginx default timeouts (60s) for regular API calls
         }
 
+        # Platform backend (admin config service)
+        location /api4/ {
+           proxy_pass http://${BACKEND_IP}:${BACKEND_PORT}/api/;
+           proxy_set_header X-Real-IP ${DOLLAR}remote_addr;
+           proxy_set_header X-Forwarded-For ${DOLLAR}proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+           proxy_set_header X-Username ${DOLLAR}http_x_username;
+           proxy_set_header X-User-Id ${DOLLAR}http_x_user_id;
+           proxy_cookie_path / /;
+        }
+
         location / {
             index index.html;
             try_files ${DOLLAR}uri /index.html;

@@ -16,7 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AccessDenied } from "@/components/analytics/AccessDenied";
+import { AccessDenied } from "@/components/shared/AccessDenied";
 import { LoadingSkeleton } from "@/components/analytics/LoadingSkeleton";
 import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { StatusBreakdownChart } from "@/components/analytics/StatusBreakdownChart";

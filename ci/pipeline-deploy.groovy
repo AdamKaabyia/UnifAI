@@ -8,11 +8,12 @@ properties([
         choice(name: 'deploy_location', choices: ['STAGING', 'PRODUCTION'], description: 'Deployment environment'),
         choice(name: 'deploy_type', choices: ['FRESH_INSTALL', 'APPLICATION_UPGRADE'], description: 'Deployment type'),
         string(name: "VERSION", defaultValue: "", description: "DONT SET THIS VALUE!"),
+        string(name: "BACKEND_VERSION", defaultValue: "", description: "Image tag for backend"),
         string(name: "RAG_VERSION", defaultValue: "", description: "Image tag for rag"),
         string(name: "MA_VERSION", defaultValue: "", description: "Image tag for multi-agent"),
         string(name: "GUI_VERSION", defaultValue: "", description: "Image tag for UI"),
         string(name: "SSO_VERSION", defaultValue: "", description: "Image tag for SSO"),
-        string(name: "MODULES_TO_DEPLOY", defaultValue: "", description: "Comma-separated list of modules to update (e.g. rag,multiagent,ui,sso)"),
+        string(name: "MODULES_TO_DEPLOY", defaultValue: "", description: "Comma-separated list of modules to update (e.g. rag,multiagent,backend,ui,sso)"),
         booleanParam(name: 'debug_mode', defaultValue: false, description: 'debug the pods'),
     ])
 ])
@@ -150,7 +151,7 @@ def deployModules(module){
 def deleteRunningApplication(){
     echo("Removing running UnifAI application")
     cleanOldDataflow()
-    def charts = ["rag", "multiagent", "shared-resources","ui", "sso"]
+    def charts = ["backend", "rag", "multiagent", "ui", "sso", "shared-resources"]
 
     charts.each { chart ->
         sh("podman exec -t helmfile bash -c 'helmfile destroy -f ${chart}.yaml.gotmpl --deleteWait'")
@@ -310,6 +311,13 @@ pipeline {
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/shared-resources/sso/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/sso-values.yaml", version)
                                         deployModules('sso')
+                                        break
+
+                                    case 'backend':
+                                        def version = params.BACKEND_VERSION?.trim() ?: params.VERSION?.trim()
+                                        updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/backend/", version)
+                                        updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/backend-resource-values.yaml", version)
+                                        deployModules('backend')
                                         break
 
                                     case 'rag':
