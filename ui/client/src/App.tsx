@@ -6,7 +6,7 @@ import JiraIntegration from "@/pages/JiraIntegration";
 import AgenticWorkflows from "@/pages/AgenticWorkflows";
 import AgentRepository from "@/pages/AgentRepository";
 import AgenticChats from "@/pages/AgenticChats";
-import CommandCenter from "@/pages/CommandCenter";
+
 import AgenticTemplates from "@/pages/AgenticTemplates";
 import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
@@ -27,6 +27,7 @@ import SlackAddSourcePage from "./features/slack/SlackAddSourcePage";
 import GuidesPage from "./components/guides/GuidesPage";
 import PublicChat from "./components/agentic-ai/chat/PublicChat";
 import AgenticLayout from "./components/layout/AgenticLayout";
+import { Toaster } from "./components/ui/toaster";
 
 function AppRoutes() {
   const [isChat] = useRoute("/chat/:token");
@@ -35,9 +36,8 @@ function AppRoutes() {
   const [isInventory] = useRoute("/inventory");
   const [isAgenticChats] = useRoute("/agentic-chats");
   const [isTemplates] = useRoute("/templates");
-  const [isCommandCenter] = useRoute("/command-center");
 
-  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates || isCommandCenter;
+  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
 
   if (isAgenticRoute) {
     return (
@@ -49,7 +49,6 @@ function AppRoutes() {
             <Route path="/inventory" component={AgentRepository} />
             <Route path="/agentic-chats" component={AgenticChats} />
             <Route path="/templates" component={AgenticTemplates} />
-            <Route path="/command-center" component={CommandCenter} />
             <Route path="/chat/:token" component={PublicChat} />
           </Switch>
         </AgenticLayout>
@@ -98,6 +97,7 @@ function App() {
           </ViewProvider>
         </SharedProvider>
       </AuthProvider>
+      <Toaster />
     </ThemeProvider>
   );
 }

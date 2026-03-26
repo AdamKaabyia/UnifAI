@@ -14,7 +14,7 @@ import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { useAuth, User } from '@/contexts/AuthContext';
 import { useView, TeamInfo } from '@/contexts/ViewContext';
 import { useAdminAccess } from '@/hooks/use-admin-access';
-import { Users, ChevronDown, User as UserIcon, Settings, Plus, Rocket } from "lucide-react";
+import { Users, ChevronDown, User as UserIcon, Settings, Plus } from "lucide-react";
 import TeamSettingsModal from "@/components/teams/TeamSettingsModal";
 
 export default function Sidebar() {
@@ -232,16 +232,6 @@ export default function Sidebar() {
           </motion.div>
         )}
         <ul>
-          {viewMode === 'team' && (
-            <NavItem 
-              icon={<Rocket className="sidebar-icon w-[14px] h-[14px]" />} 
-              label="AI Command Center"
-              to="/command-center"
-              isActive={location === '/command-center'}
-              status={null}
-              isCollapsed={isCollapsed}
-            />
-          )}
           <NavItem 
             icon={<FaTachometerAlt className="sidebar-icon" />} 
             label={viewMode === 'team' ? 'Team Dashboard' : 'Agentic AI Overview'}

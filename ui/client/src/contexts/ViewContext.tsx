@@ -11,7 +11,7 @@ export interface TeamInfo {
   created_by: string;
 }
 
-interface ViewContextType {
+export interface ViewContextType {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   selectedTeam: TeamInfo | null;
@@ -30,7 +30,17 @@ function toTeamInfo(t: Team): TeamInfo {
   };
 }
 
-const ViewContext = createContext<ViewContextType | undefined>(undefined);
+const defaultViewContext: ViewContextType = {
+  viewMode: "private",
+  setViewMode: () => {},
+  selectedTeam: null,
+  setSelectedTeam: () => {},
+  teams: [],
+  refreshTeams: async () => {},
+  teamsLoading: false,
+};
+
+const ViewContext = createContext<ViewContextType>(defaultViewContext);
 
 export function ViewProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -87,9 +97,5 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useView() {
-  const context = useContext(ViewContext);
-  if (!context) {
-    throw new Error("useView must be used within a ViewProvider");
-  }
-  return context;
+  return useContext(ViewContext);
 }
