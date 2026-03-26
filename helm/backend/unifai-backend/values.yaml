@@ -1,5 +1,13 @@
 env:
   BACKEND_ENV: "production"
+  TEAM_DIRECTORY_PROVIDER: "ldap"
+  TEAM_DIRECTORY_URL: "ldaps://ldap.corp.redhat.com"
+  TEAM_DIRECTORY_TIMEOUT: "10"
+  TEAM_DIRECTORY_VERIFY_SSL: "false"
+  TEAM_DIRECTORY_LDAP_USER_BASE_DN: "ou=users,dc=redhat,dc=com"
+  TEAM_DIRECTORY_LDAP_GROUP_BASE_DN: ""
+  TEAM_DIRECTORY_LDAP_BIND_DN: ""
+  TEAM_DIRECTORY_LDAP_BIND_PASSWORD: ""
 
 debug: false
 

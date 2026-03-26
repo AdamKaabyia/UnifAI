@@ -2,9 +2,10 @@ from typing import List, Optional
 import pymongo
 from pymongo.database import Database
 from teams.models import Team
+from teams.repository.repository import TeamRepository
 
 
-class MongoTeamRepository:
+class MongoTeamRepository(TeamRepository):
     def __init__(self, db: Database, coll_name: str = "teams"):
         self.col = db[coll_name]
         self.col.create_index("name", unique=True)
