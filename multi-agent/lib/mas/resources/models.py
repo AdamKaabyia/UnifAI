@@ -20,6 +20,7 @@ class Resource(BaseModel):
     version: int = Field(default=1, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
     cfg_dict: Dict[str, Any] = Field(json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())  # raw config
     nested_refs: List[str] = Field(default_factory=list, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
+    contributed_by: Optional[str] = Field(default=None, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
     created: datetime = Field(default_factory=datetime.utcnow, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
     updated: datetime = Field(default_factory=datetime.utcnow, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
 

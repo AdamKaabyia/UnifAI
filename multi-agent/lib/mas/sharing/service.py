@@ -90,6 +90,43 @@ class ShareService:
         except Exception as e:
             raise ValueError(f"Failed to accept share: {str(e)}")
 
+    def share_to_team(self, *, sender_user_id: str, team_name: str,
+                      item_kind: ShareItemKind, item_id: str) -> ShareResult:
+        """
+        Share an item directly to a team workspace (no invite/accept flow).
+        Clones the item immediately into the team's namespace.
+        """
+        item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
+
+        try:
+            if item_kind == ShareItemKind.RESOURCE:
+                rid_mapping, name_conflicts = self._cloner.clone_resource_graph(
+                    root_rid=item_id,
+                    sender_user_id=sender_user_id,
+                    recipient_user_id=team_name,
+                    contributed_by=sender_user_id
+                )
+                new_item_id = rid_mapping[item_id]
+            elif item_kind == ShareItemKind.BLUEPRINT:
+                new_item_id, rid_mapping, name_conflicts = self._cloner.clone_blueprint(
+                    blueprint_id=item_id,
+                    sender_user_id=sender_user_id,
+                    recipient_user_id=team_name,
+                    contributed_by=sender_user_id
+                )
+            else:
+                raise ValueError(f"Unknown item kind: {item_kind}")
+
+            return ShareResult(
+                share_id="",
+                new_item_id=new_item_id,
+                rid_mapping=rid_mapping,
+                created_resources=len(rid_mapping),
+                name_conflicts=name_conflicts
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to share to team: {str(e)}")
+
     def decline_invite(self, share_id: str, *, recipient_user_id: str) -> None:
         """Decline invitation."""
         invite = self._repo.get(share_id)

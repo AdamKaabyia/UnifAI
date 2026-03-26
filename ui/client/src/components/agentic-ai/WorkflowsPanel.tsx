@@ -112,7 +112,11 @@ export default function WorkflowsPanel({
       const processedFlows = summaries
         .map((summary, index) =>
           convertGraphFlowToFlowObject(
-            { name: summary.name, description: summary.description },
+            {
+              name: summary.name,
+              description: summary.description,
+              contributedBy: summary.metadata?.contributed_by,
+            },
             index,
             summary.blueprint_id
           ),
@@ -396,6 +400,14 @@ export default function WorkflowsPanel({
                   <p className="text-xs text-gray-400 mt-1 truncate">
                     {flow.description}
                   </p>
+                  {flow.contributedBy && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
+                        <Users className="h-2.5 w-2.5" />
+                        {flow.contributedBy}
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               ))
             )}

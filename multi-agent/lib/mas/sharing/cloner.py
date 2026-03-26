@@ -57,7 +57,8 @@ class ShareCloner:
         self.elements = element_registry
 
     def clone_resource_graph(self, *, root_rid: str, sender_user_id: str,
-                             recipient_user_id: str) -> Tuple[Dict[str, str], Dict[str, str]]:
+                             recipient_user_id: str,
+                             contributed_by: Optional[str] = None) -> Tuple[Dict[str, str], Dict[str, str]]:
         """Clone resource and all its dependencies."""
         logger.info(f"Starting resource graph clone: {root_rid} from {sender_user_id} to {recipient_user_id}")
 
@@ -65,7 +66,7 @@ class ShareCloner:
         closure_data = self._compute_closure({root_rid}, sender_user_id)
 
         # Clone using pre-computed data
-        result = self._clone_resource_set(closure_data, recipient_user_id)
+        result = self._clone_resource_set(closure_data, recipient_user_id, contributed_by=contributed_by)
 
         if not result.success:
             raise ValueError(f"Resource cloning failed: {result.errors}")
@@ -74,7 +75,8 @@ class ShareCloner:
         return result.rid_mapping, result.name_conflicts
 
     def clone_blueprint(self, *, blueprint_id: str, sender_user_id: str,
-                        recipient_user_id: str) -> Tuple[str, Dict[str, str], Dict[str, str]]:
+                        recipient_user_id: str,
+                        contributed_by: Optional[str] = None) -> Tuple[str, Dict[str, str], Dict[str, str]]:
         """Clone blueprint and all its dependencies."""
         logger.info(f"Starting blueprint clone: {blueprint_id} from {sender_user_id} to {recipient_user_id}")
 
@@ -91,16 +93,24 @@ class ShareCloner:
 
             # Clone dependencies and build RID mapping
             rid_mapping, name_conflicts, resources_cloned = self._clone_dependencies(
-                external_rids, sender_user_id, recipient_user_id
+                external_rids, sender_user_id, recipient_user_id,
+                contributed_by=contributed_by
             )
 
             # Clone blueprint with proper ref handling and new step UIDs
-            new_draft = self._clone_blueprint_draft(draft, rid_mapping, sender_user_id)
+            new_draft = self._clone_blueprint_draft(draft, rid_mapping, sender_user_id,
+                                                     contributed_by=contributed_by)
+
+            # Build metadata for the cloned blueprint
+            bp_metadata = {}
+            if contributed_by:
+                bp_metadata["contributed_by"] = contributed_by
 
             # Save blueprint through service
             new_blueprint_id = self.blueprints.save_draft(
                 user_id=recipient_user_id,
-                draft_dict=new_draft.model_dump(mode="json")
+                draft_dict=new_draft.model_dump(mode="json"),
+                metadata=bp_metadata or None
             )
 
             logger.info(f"Blueprint clone completed: {new_blueprint_id}, {resources_cloned} resources cloned")
@@ -111,7 +121,8 @@ class ShareCloner:
             raise
 
     def _clone_dependencies(self, external_rids: Set[str], sender_user_id: str,
-                            recipient_user_id: str) -> Tuple[Dict[str, str], Dict[str, str], int]:
+                            recipient_user_id: str,
+                            contributed_by: Optional[str] = None) -> Tuple[Dict[str, str], Dict[str, str], int]:
         """Clone external dependencies and return mapping info."""
         if not external_rids:
             return {}, {}, 0
@@ -125,7 +136,7 @@ class ShareCloner:
             return {}, {}, 0
 
         logger.debug(f"Total closure to clone: {set(closure_data.keys())}")
-        clone_result = self._clone_resource_set(closure_data, recipient_user_id)
+        clone_result = self._clone_resource_set(closure_data, recipient_user_id, contributed_by=contributed_by)
 
         if not clone_result.success:
             raise ValueError(f"Failed to clone resources: {clone_result.errors}")
@@ -134,7 +145,8 @@ class ShareCloner:
         return clone_result.rid_mapping, clone_result.name_conflicts, clone_result.resources_cloned
 
     def _clone_resource_set(self, closure_data: Dict[str, ResourceCacheData],
-                            recipient_user_id: str) -> CloneResult:
+                            recipient_user_id: str,
+                            contributed_by: Optional[str] = None) -> CloneResult:
         """Clone a set of resources using pre-computed closure data."""
         try:
             logger.debug(f"Cloning {len(closure_data)} resources using cached data")
@@ -147,7 +159,8 @@ class ShareCloner:
             new_docs = []
             for old_rid, cache_data in closure_data.items():
                 try:
-                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient_user_id)
+                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient_user_id,
+                                                          contributed_by=contributed_by)
 
                     # Track name conflicts
                     if new_doc.name != cache_data.doc.name:
@@ -225,7 +238,8 @@ class ShareCloner:
         return closure_cache
 
     def _clone_single_resource(self, cache_data: ResourceCacheData, rid_mapping: Dict[str, str],
-                               recipient_user_id: str) -> Resource:
+                               recipient_user_id: str,
+                               contributed_by: Optional[str] = None) -> Resource:
         """Clone a single resource using pre-computed data."""
         original_doc = cache_data.doc
         new_rid = rid_mapping[original_doc.rid]
@@ -253,7 +267,8 @@ class ShareCloner:
             name=new_name,
             version=1,
             cfg_dict=new_cfg_dict,
-            nested_refs=new_nested_refs
+            nested_refs=new_nested_refs,
+            contributed_by=contributed_by
         )
 
     def _batch_create_resources(self, docs: List[Resource]) -> None:
@@ -279,7 +294,8 @@ class ShareCloner:
         return f"{base_name} ({uuid4().hex[:8]})"
 
     def _clone_blueprint_draft(self, draft: BlueprintDraft, rid_mapping: Dict[str, str],
-                               sender_user_id: str) -> BlueprintDraft:
+                               sender_user_id: str,
+                               contributed_by: Optional[str] = None) -> BlueprintDraft:
         """Clone a BlueprintDraft with proper ref replacement and new step UIDs."""
 
         # Clone resource categories using ResourceCategory enum
@@ -291,10 +307,16 @@ class ShareCloner:
             for category in ResourceCategory
         }
 
-        # Create new BlueprintDraft with cloned data
+        # For team shares (contributed_by set), keep the name clean.
+        # For user-to-user shares, append "(from sender)" for identification.
+        if contributed_by:
+            clone_name = draft.name
+        else:
+            clone_name = f"{draft.name} (from {sender_user_id})"
+
         return BlueprintDraft(
             plan=self._clone_plan(draft.plan, rid_mapping),
-            name=f"{draft.name} (from {sender_user_id})",
+            name=clone_name,
             description=draft.description,
             **resource_fields
         )

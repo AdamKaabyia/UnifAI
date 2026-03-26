@@ -10,19 +10,15 @@ import {
   DeclineShareRequest 
 } from '@/api/shares';
 import { useAuth } from './AuthContext';
+import { useView } from './ViewContext';
 
 interface NotificationContextType {
-  // State
   receivedNotifications: ShareInvite[];
   sentNotifications: ShareInvite[];
   isLoading: boolean;
   error: string | null;
-  
-  // Computed
   pendingNotificationsCount: number;
   hasUnreadNotifications: boolean;
-  
-  // Actions
   refreshNotifications: () => Promise<void>;
   sendNotification: (request: CreateShareRequest) => Promise<void>;
   acceptNotification: (shareId: string) => Promise<void>;
@@ -38,12 +34,16 @@ interface NotificationProviderProps {
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
+  const { viewMode, selectedTeam } = useView();
   const [receivedNotifications, setReceivedNotifications] = useState<ShareInvite[]>([]);
   const [sentNotifications, setSentNotifications] = useState<ShareInvite[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const userId = user?.username || '';
+  const contextUserId = viewMode === 'team' && selectedTeam
+    ? selectedTeam.name
+    : userId;
 
   // Computed values
   const pendingNotificationsCount = receivedNotifications.filter(
@@ -76,24 +76,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
   };
 
-  // Send a new notification
   const sendNotification = async (request: CreateShareRequest) => {
     setError(null);
     
     try {
       const requestWithSender = {
         ...request,
-        senderUserId: userId
+        senderUserId: contextUserId
       };
       
       await createShare(requestWithSender);
-      
-      // Refresh sent notifications after creating a new one
       await refreshNotifications();
     } catch (err) {
       console.error('Failed to send notification:', err);
       setError(err instanceof Error ? err.message : 'Failed to send notification');
-      throw err; // Re-throw to allow components to handle it
+      throw err;
     }
   };
 

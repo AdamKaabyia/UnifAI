@@ -217,6 +217,15 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
                     </span>
                   </div>
                 )}
+                {element.contributed_by && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Contributed by:</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
+                      <Users className="h-2.5 w-2.5" />
+                      {element.contributed_by}
+                    </span>
+                  </div>
+                )}
                 {element.config && (
                   <div className="mt-3">
                     <span className="text-xs text-gray-500">Configuration:</span>

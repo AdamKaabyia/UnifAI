@@ -108,6 +108,23 @@ export async function declineShare(request: DeclineShareRequest): Promise<Declin
   return data;
 }
 
+export interface ShareToTeamRequest {
+  senderUserId: string;
+  teamName: string;
+  itemKind: 'resource' | 'blueprint';
+  itemId: string;
+}
+
+export interface ShareToTeamResponse {
+  status: string;
+  result: ShareResult;
+}
+
+export async function shareToTeam(request: ShareToTeamRequest): Promise<ShareToTeamResponse> {
+  const { data } = await axios.post<ShareToTeamResponse>('/shares/share.to_team', request);
+  return data;
+}
+
 // Get share details
 export async function getShare(shareId: string, userId?: string): Promise<ShareInvite> {
   const params: any = { shareId };

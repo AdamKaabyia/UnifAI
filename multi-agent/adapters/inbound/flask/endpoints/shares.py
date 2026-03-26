@@ -88,6 +88,40 @@ def decline_share(share_id, recipient_user_id="alice"):
         return jsonify({"error": str(e)}), 500
 
 
+@shares_bp.route("/share.to_team", methods=["POST"])
+@from_body({
+    "sender_user_id": fields.Str(data_key="senderUserId", required=True),
+    "team_name": fields.Str(data_key="teamName", required=True),
+    "item_kind": fields.Str(data_key="itemKind", required=True),
+    "item_id": fields.Str(data_key="itemId", required=True),
+})
+def share_to_team(sender_user_id, team_name, item_kind, item_id):
+    """Share item directly to a team workspace."""
+    try:
+        try:
+            kind = ShareItemKind(item_kind)
+        except ValueError:
+            return jsonify({"error": "Invalid itemKind. Must be 'resource' or 'blueprint'"}), 400
+
+        svc = current_app.container.share_service
+        result = svc.share_to_team(
+            sender_user_id=sender_user_id,
+            team_name=team_name,
+            item_kind=kind,
+            item_id=item_id
+        )
+
+        return jsonify({
+            "status": "success",
+            "result": result.model_dump(mode="json")
+        }), 201
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @shares_bp.route("/share.cancel", methods=["POST"])
 @from_body({
     "share_id": fields.Str(data_key="shareId", required=True),
