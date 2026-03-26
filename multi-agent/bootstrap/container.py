@@ -29,6 +29,7 @@ from mas.sharing.service import ShareService
 from mas.statistics.service import StatisticsService
 from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
+from run.fixtures.seeder import seed_templates
 from config.app_config import AppConfig
 
 from outbound.mongo import (
@@ -174,7 +175,18 @@ class AppContainer(metaclass=SingletonMeta):
             resources_service=self.resources_service,
         )
 
+        self._seed_templates()
+
         self._initialized = True
+
+    def _seed_templates(self):
+        """Load YAML template fixtures into the database if not already present."""
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            seed_templates(self.template_repo)
+        except Exception:
+            logger.exception("Template seeding failed — continuing startup.")
 
     @staticmethod
     def _create_channel_factory(cfg: AppConfig):

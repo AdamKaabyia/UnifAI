@@ -3,20 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { Clock, ArrowRight } from 'lucide-react';
+import { Clock, ArrowRight, Code, Trash2 } from 'lucide-react';
 import { TemplateListItem } from '@/types/templates';
 import { getCategoryIcon } from '@/utils/templateHelpers';
 
 interface TemplateCardProps {
   template: TemplateListItem;
   index: number;
+  isAdmin?: boolean;
   onSelect: (template: TemplateListItem) => void;
+  onViewYaml?: (template: TemplateListItem) => void;
+  onDelete?: (template: TemplateListItem) => void;
 }
 
 export const TemplateCard: React.FC<TemplateCardProps> = ({ 
   template, 
   index, 
-  onSelect 
+  isAdmin = false,
+  onSelect,
+  onViewYaml,
+  onDelete,
 }) => {
   return (
     <motion.div
@@ -43,6 +49,35 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
                 </Badge>
               </div>
             </div>
+
+            {isAdmin && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-primary"
+                  title="View YAML"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewYaml?.(template);
+                  }}
+                >
+                  <Code className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-red-400"
+                  title="Delete template"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(template);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         

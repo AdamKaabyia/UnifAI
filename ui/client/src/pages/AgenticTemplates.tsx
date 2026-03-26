@@ -6,13 +6,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   TemplateCatalog,
   TemplateDetailView,
-  InstantiationProgress
+  InstantiationProgress,
+  ViewYamlDialog,
+  CreateTemplateDialog,
 } from '@/components/agentic-ai/templates';
 import type { TemplateDetailViewRef } from '@/components/agentic-ai/templates';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useTemplates } from '@/hooks/use-templates';
+import { useAdminAccess } from '@/hooks/use-admin-access';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { createSession } from '@/api/sessions';
+import { getTemplate, createTemplate, deleteTemplate } from '@/api/templates';
 import { TemplateListItem, TemplateFormData } from '@/types/templates';
 
 type ViewMode = 'catalog' | 'detail';
@@ -25,6 +30,17 @@ export default function AgenticTemplates() {
   const templateDetailRef = useRef<TemplateDetailViewRef>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin } = useAdminAccess();
+
+  // Admin dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [showYamlDialog, setShowYamlDialog] = useState(false);
+  const [yamlViewDraft, setYamlViewDraft] = useState<Record<string, any> | null>(null);
+  const [yamlViewName, setYamlViewName] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<TemplateListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     templates,
@@ -62,7 +78,6 @@ export default function AgenticTemplates() {
   const handleGenerateWorkflow = useCallback(async (data: TemplateFormData) => {
     if (!selectedTemplate || !user) return;
     
-    // Generate a blueprint name based on template name
     const blueprintName = `${selectedTemplate.name} - ${new Date().toLocaleDateString()}`;
     
     await materialize(selectedTemplate.template_id, data, user.username, blueprintName);
@@ -70,7 +85,6 @@ export default function AgenticTemplates() {
 
   const handleRetryInstantiation = useCallback(() => {
     resetInstantiation();
-    // Reset form fields to defaults
     templateDetailRef.current?.resetForm();
   }, [resetInstantiation]);
 
@@ -91,7 +105,6 @@ export default function AgenticTemplates() {
 
     setIsCreatingSession(true);
     try {
-      // Create a new chat session with the blueprint
       await createSession({ blueprintId: instantiationResult.blueprint_id, userId: user.username });
       resetInstantiation();
       navigate('/agentic-chats');
@@ -110,6 +123,69 @@ export default function AgenticTemplates() {
   const handleCloseProgress = useCallback(() => {
     resetInstantiation();
   }, [resetInstantiation]);
+
+  // ── Admin handlers ──────────────────────────────────────────────────
+
+  const handleViewYaml = useCallback(async (template: TemplateListItem) => {
+    try {
+      const detail = await getTemplate(template.template_id);
+      setYamlViewDraft(detail.draft);
+      setYamlViewName(template.name);
+      setShowYamlDialog(true);
+    } catch (err) {
+      console.error('Error fetching template for YAML view:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load template YAML.',
+        variant: 'destructive'
+      });
+    }
+  }, [toast]);
+
+  const handleDeleteRequest = useCallback((template: TemplateListItem) => {
+    setTemplateToDelete(template);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!templateToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteTemplate(templateToDelete.template_id);
+      toast({ title: 'Deleted', description: `Template "${templateToDelete.name}" deleted.` });
+      setShowDeleteConfirm(false);
+      setTemplateToDelete(null);
+      fetchTemplates();
+    } catch (err) {
+      console.error('Error deleting template:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete template.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [templateToDelete, fetchTemplates, toast]);
+
+  const handleCreateTemplate = useCallback(async (data: {
+    draft: Record<string, any>;
+    placeholders: Record<string, any>;
+    metadata: Record<string, any>;
+  }) => {
+    setIsCreatingTemplate(true);
+    try {
+      const result = await createTemplate(data);
+      toast({ title: 'Created', description: `Template created (${result.template_id}).` });
+      setShowCreateDialog(false);
+      fetchTemplates();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to create template.';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setIsCreatingTemplate(false);
+    }
+  }, [fetchTemplates, toast]);
 
   const categories = getCategories();
 
@@ -152,7 +228,11 @@ export default function AgenticTemplates() {
                     templates={templates}
                     categories={categories}
                     isLoading={isLoading}
+                    isAdmin={isAdmin}
                     onSelectTemplate={handleSelectTemplate}
+                    onAddTemplate={() => setShowCreateDialog(true)}
+                    onViewYaml={handleViewYaml}
+                    onDeleteTemplate={handleDeleteRequest}
                   />
                 </>
               )}
@@ -185,6 +265,31 @@ export default function AgenticTemplates() {
         onNavigateToWorkflow={handleNavigateToWorkflow}
         onNavigateToChat={handleNavigateToChat}
         isCreatingSession={isCreatingSession}
+      />
+
+      {/* Admin dialogs */}
+      <CreateTemplateDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSubmit={handleCreateTemplate}
+        isSubmitting={isCreatingTemplate}
+      />
+
+      <ViewYamlDialog
+        open={showYamlDialog}
+        onOpenChange={setShowYamlDialog}
+        templateName={yamlViewName}
+        draft={yamlViewDraft}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => { setShowDeleteConfirm(false); setTemplateToDelete(null); }}
+        loading={isDeleting}
       />
     </div>
   );

@@ -40,9 +40,11 @@ class TemplateRepository(ABC):
     @abstractmethod
     def delete(self, template_id: str) -> bool:
         """
-        Delete a template by ID.
+        Soft-delete a template by ID (marks deleted=True).
         
-        Returns True if a document was removed.
+        Returns True if a document was marked deleted.
+        The document stays in the database so the seeder
+        knows not to re-insert fixture templates.
         """
 
     # ────────────────────────────── Reads ───────────────────────────────

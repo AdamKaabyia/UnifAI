@@ -51,6 +51,41 @@ export async function getTemplateSchema(templateId: string): Promise<TemplateInp
   });
   return response.data;
 }
+export interface CreateTemplateParams {
+  draft: Record<string, any>;
+  placeholders: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface CreateTemplateResponse {
+  status: string;
+  template_id: string;
+}
+
+/**
+ * Create a new template (admin only)
+ * POST /templates/template.create
+ */
+export async function createTemplate(params: CreateTemplateParams): Promise<CreateTemplateResponse> {
+  const response = await axios.post<CreateTemplateResponse>('/templates/template.create', params);
+  return response.data;
+}
+
+export interface DeleteTemplateResponse {
+  status: string;
+  message: string;
+}
+
+/**
+ * Delete a template by ID (admin only)
+ * DELETE /templates/template.delete
+ */
+export async function deleteTemplate(templateId: string): Promise<DeleteTemplateResponse> {
+  const response = await axios.delete<DeleteTemplateResponse>('/templates/template.delete', {
+    params: { templateId }
+  });
+  return response.data;
+}
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Template Validation & Materialization

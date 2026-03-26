@@ -9,7 +9,8 @@ import {
   Grid3X3, 
   List,
   LoaderCircle,
-  FolderOpen
+  FolderOpen,
+  Plus
 } from 'lucide-react';
 import { TemplateListItem, TemplateCategory } from '@/types/templates';
 import { TemplateCard } from './TemplateCard';
@@ -18,14 +19,22 @@ interface TemplateCatalogProps {
   templates: TemplateListItem[];
   categories: TemplateCategory[];
   isLoading: boolean;
+  isAdmin?: boolean;
   onSelectTemplate: (template: TemplateListItem) => void;
+  onAddTemplate?: () => void;
+  onViewYaml?: (template: TemplateListItem) => void;
+  onDeleteTemplate?: (template: TemplateListItem) => void;
 }
 
 export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
   templates,
   categories,
   isLoading,
-  onSelectTemplate
+  isAdmin = false,
+  onSelectTemplate,
+  onAddTemplate,
+  onViewYaml,
+  onDeleteTemplate,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -66,6 +75,16 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
         </div>
         
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="sm"
+              onClick={onAddTemplate}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Template
+            </Button>
+          )}
           <Button
             variant={viewMode === 'grid' ? 'default' : 'outline'}
             size="sm"
@@ -139,7 +158,10 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
               key={template.template_id}
               template={template}
               index={index}
+              isAdmin={isAdmin}
               onSelect={onSelectTemplate}
+              onViewYaml={onViewYaml}
+              onDelete={onDeleteTemplate}
             />
           ))}
         </div>
