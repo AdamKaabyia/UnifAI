@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, UTC
 
@@ -58,11 +59,14 @@ class ShareService:
 
         # Perform cloning
         try:
+            sender_display = self._sanitize_sender_display(invite.sender_user_id)
+
             if invite.item_kind == ShareItemKind.RESOURCE:
                 rid_mapping, name_conflicts = self._cloner.clone_resource_graph(
                     root_rid=invite.item_id,
                     sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id
+                    recipient_user_id=recipient_user_id,
+                    sender_display=sender_display
                 )
                 new_item_id = rid_mapping[invite.item_id]
                 result_mapping = rid_mapping
@@ -71,7 +75,8 @@ class ShareService:
                 new_blueprint_id, rid_mapping, name_conflicts = self._cloner.clone_blueprint(
                     blueprint_id=invite.item_id,
                     sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id
+                    recipient_user_id=recipient_user_id,
+                    sender_display=sender_display
                 )
                 new_item_id = new_blueprint_id
                 result_mapping = {**rid_mapping, "blueprint_id": new_blueprint_id}
@@ -215,3 +220,24 @@ class ShareService:
             return True
         
         return False
+
+    @staticmethod
+    def _sanitize_sender_display(sender_user_id: str) -> str:
+        """Produce a safe display label from a raw user identifier.
+
+        Prevents leaking emails, internal UUIDs, or other sensitive IDs into
+        persistent resource/blueprint names.
+        """
+        MAX_DISPLAY_LEN = 32
+        value = sender_user_id.strip()
+
+        if "@" in value:
+            value = value.split("@", 1)[0]
+
+        if re.fullmatch(r"[0-9a-fA-F]{24,}", value):
+            value = value[:8]
+
+        if len(value) > MAX_DISPLAY_LEN:
+            value = value[:MAX_DISPLAY_LEN]
+
+        return value or "shared"
