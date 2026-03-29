@@ -3,6 +3,8 @@ from typing import List, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field
 
+from global_utils.directory.models import DirectoryUser
+
 
 class Team(BaseModel):
     team_id: str = Field(default_factory=lambda: uuid4().hex)
@@ -13,10 +15,4 @@ class Team(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class DirectoryUser(BaseModel):
-    """A user record from an external directory (e.g. LDAP, SSO user-store)."""
-    user_id: str
-    username: str
-    display_name: str
-    email: str = ""
-    title: str = ""
+__all__ = ["Team", "DirectoryUser"]

@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import SimpleTooltip from '@/components/shared/SimpleTooltip';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useShared, SharedPanelView } from '@/contexts/SharedContext';
 import { useView } from '@/contexts/ViewContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShareInvite, shareToTeam } from '@/api/shares';
+import UserDirectorySearch from '@/components/shared/UserDirectorySearch';
+import type { DirectoryUser } from '@/api/directory';
 
 interface SharedPanelProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
 
   const [isSending, setIsSending] = useState(false);
   const [teamShareError, setTeamShareError] = useState<string | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = useState<DirectoryUser | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -69,17 +71,25 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
     if (shareItem) {
       setSendForm({ recipientUserId: '', message: '' });
       setTeamShareError(null);
+      setSelectedRecipient(null);
     }
   }, [shareItem]);
 
-  const handleSendFormChange = (field: string, value: string) => {
-    setSendForm(prev => ({ ...prev, [field]: value }));
+  const handleRecipientSelect = (dirUser: DirectoryUser) => {
+    setSelectedRecipient(dirUser);
+    setSendForm(prev => ({ ...prev, recipientUserId: dirUser.user_id || dirUser.username }));
+    if (error) clearError();
+  };
+
+  const handleRecipientInputChange = () => {
+    setSelectedRecipient(null);
+    setSendForm(prev => ({ ...prev, recipientUserId: '' }));
     if (error) clearError();
   };
 
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sendForm.recipientUserId || !shareItem) return;
+    if (!selectedRecipient || !sendForm.recipientUserId || !shareItem) return;
 
     setIsSending(true);
     try {
@@ -90,6 +100,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
         message: sendForm.message || undefined,
       });
       setSendForm({ recipientUserId: '', message: '' });
+      setSelectedRecipient(null);
       setSharedPanelView('list');
     } catch (err) {
       // Error handled by context
@@ -168,8 +179,6 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
-
-  const isSendFormValid = sendForm.recipientUserId && shareItem;
 
   const getHeaderTitle = (view: SharedPanelView) => {
     switch (view) {
@@ -282,14 +291,26 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
             <FaUser className="w-3 h-3 text-accent" />
             Recipient User ID *
           </Label>
-          <Input
-            id="recipientUserId"
-            placeholder="Enter recipient username"
-            value={sendForm.recipientUserId}
-            onChange={(e) => handleSendFormChange('recipientUserId', e.target.value)}
-            className="input-dark-theme-text-white placeholder:text-gray-400 bg-gray-800 border-gray-600"
-            required
+          <UserDirectorySearch
+            key={shareItem?.itemId ?? 'no-item'}
+            onSelect={handleRecipientSelect}
+            onInputChange={handleRecipientInputChange}
+            clearOnSelect={false}
+            placeholder="Search for a user..."
+            inputClassName="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
           />
+          {selectedRecipient && (
+            <div className="mt-2 p-2 bg-accent/10 border border-accent/30 rounded-md flex items-center gap-2">
+              <FaUser className="w-3 h-3 text-accent flex-shrink-0" />
+              <div className="min-w-0">
+                <span className="text-sm text-white font-medium">{selectedRecipient.display_name}</span>
+                <span className="text-xs text-gray-400 ml-2">({selectedRecipient.username})</span>
+                {selectedRecipient.email && (
+                  <span className="text-xs text-gray-500 ml-2">{selectedRecipient.email}</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -301,7 +322,10 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
             id="message"
             placeholder="Add a message..."
             value={sendForm.message}
-            onChange={(e) => handleSendFormChange('message', e.target.value)}
+            onChange={(e) => {
+              setSendForm(prev => ({ ...prev, message: e.target.value }));
+              if (error) clearError();
+            }}
             className="input-dark-theme-text-white placeholder:text-gray-400 bg-gray-800 border-gray-600"
           />
         </div>
@@ -309,7 +333,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
         <div className="flex justify-end pt-2">
           <Button
             type="submit"
-            disabled={!isSendFormValid || isSending}
+            disabled={!selectedRecipient || !shareItem || isSending}
             className="bg-accent hover:bg-accent/90"
           >
             {isSending ? (

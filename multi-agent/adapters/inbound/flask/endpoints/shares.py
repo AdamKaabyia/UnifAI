@@ -23,6 +23,12 @@ def create_share(recipient_user_id, item_kind, item_id, message=None, sender_use
         except ValueError:
             return jsonify({"error": "Invalid itemKind. Must be 'resource' or 'blueprint'"}), 400
 
+        directory = current_app.container.directory_provider
+        if directory:
+            resolved = directory.get_user(recipient_user_id)
+            if not resolved:
+                return jsonify({"error": f"Recipient '{recipient_user_id}' not found in directory"}), 400
+
         svc = current_app.container.share_service
         share_id = svc.create_invite(
             sender_user_id=sender_user_id,

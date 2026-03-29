@@ -24,3 +24,4 @@ safehttpx
 anyio
 typing-inspection
 a2a-sdk[all]
+ldap3

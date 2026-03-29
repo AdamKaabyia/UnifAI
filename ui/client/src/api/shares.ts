@@ -64,13 +64,11 @@ export interface DeclineShareResponse {
   status: string;
 }
 
-// Create a share invitation
 export async function createShare(request: CreateShareRequest): Promise<CreateShareResponse> {
   const { data } = await axios.post<CreateShareResponse>('/shares/share.create', request);
   return data;
 }
 
-// List share invitations
 export async function listShares(
   direction: 'received' | 'sent',
   userId?: string,
@@ -96,13 +94,11 @@ export async function listShares(
   return data;
 }
 
-// Accept a share invitation
 export async function acceptShare(request: AcceptShareRequest): Promise<AcceptShareResponse> {
   const { data } = await axios.post<AcceptShareResponse>('/shares/share.accept', request);
   return data;
 }
 
-// Decline a share invitation
 export async function declineShare(request: DeclineShareRequest): Promise<DeclineShareResponse> {
   const { data } = await axios.post<DeclineShareResponse>('/shares/share.decline', request);
   return data;
@@ -125,7 +121,6 @@ export async function shareToTeam(request: ShareToTeamRequest): Promise<ShareToT
   return data;
 }
 
-// Get share details
 export async function getShare(shareId: string, userId?: string): Promise<ShareInvite> {
   const params: any = { shareId };
   if (userId) {

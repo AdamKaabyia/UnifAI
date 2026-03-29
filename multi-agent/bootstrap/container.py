@@ -143,6 +143,8 @@ class AppContainer(metaclass=SingletonMeta):
             background_submitter=background_submitter,
         )
 
+        self.directory_provider = self._build_directory_provider(cfg)
+
         self.share_repo = MongoShareRepository(
             db_name=cfg.mongo_db,
             coll_name=cfg.shares_coll
@@ -196,3 +198,39 @@ class AppContainer(metaclass=SingletonMeta):
             from outbound.temporal.submitter import TemporalSessionSubmitter
             return TemporalSessionSubmitter()
         return None
+
+    @staticmethod
+    def _build_directory_provider(cfg: AppConfig):
+        provider_name = cfg.directory_provider.strip().lower()
+        if not provider_name:
+            return None
+
+        if provider_name != "ldap":
+            raise ValueError(
+                f"Unknown directory_provider: '{provider_name}'. Supported: ldap"
+            )
+
+        from global_utils.directory import LdapDirectoryProvider, LdapConfig
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not cfg.directory_url:
+            raise ValueError(
+                "directory_url is required when directory_provider='ldap'"
+            )
+        if not cfg.directory_ldap_user_base_dn:
+            raise ValueError(
+                "directory_ldap_user_base_dn is required when "
+                "directory_provider='ldap'"
+            )
+
+        ldap_cfg = LdapConfig(
+            url=cfg.directory_url,
+            user_base_dn=cfg.directory_ldap_user_base_dn,
+            bind_dn=cfg.directory_ldap_bind_dn,
+            bind_password=cfg.directory_ldap_bind_password,
+            skip_tls_verify=not cfg.directory_verify_ssl,
+            timeout_seconds=cfg.directory_timeout,
+        )
+        logger.info("Directory provider: ldap (%s)", cfg.directory_url)
+        return LdapDirectoryProvider(config=ldap_cfg)

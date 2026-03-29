@@ -1,17 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView, TeamInfo } from "@/contexts/ViewContext";
-import {
-  createTeam,
-  updateTeam,
-  deleteTeam,
-  searchDirectoryUsers,
-  DirectoryUser,
-} from "@/api/teams";
+import { createTeam, updateTeam, deleteTeam } from "@/api/teams";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { X, Crown, Trash2, Users, Loader2, Search } from "lucide-react";
+import { X, Crown, Trash2, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +22,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import UserDirectorySearch from "@/components/shared/UserDirectorySearch";
+import type { DirectoryUser } from "@/api/directory";
 
 interface TeamSettingsModalProps {
   open: boolean;
@@ -39,20 +35,11 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   const { user, accessToken } = useAuth();
   const { refreshTeams } = useView();
   const [teamName, setTeamName] = useState("");
-  const [memberSearch, setMemberSearch] = useState("");
   const [members, setMembers] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
-  const [suggestions, setSuggestions] = useState<DirectoryUser[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchIdRef = useRef(0);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [searchResetKey, setSearchResetKey] = useState(0);
 
   const isEditing = !!team;
 
@@ -65,78 +52,17 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
         setTeamName("");
         setMembers(user?.username ? [user.username] : []);
       }
-      setMemberSearch("");
-      setSuggestions([]);
       setError("");
-      setSearchError("");
-      setDropdownOpen(false);
-      searchIdRef.current = 0;
+      setSearchResetKey((k) => k + 1);
     }
   }, [open, team, user?.username]);
 
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current && !inputRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [dropdownOpen]);
-
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setMemberSearch(value);
-      setSearchError("");
-
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-
-      if (value.trim().length < 2) {
-        setSuggestions([]);
-        setDropdownOpen(false);
-        setSearching(false);
-        return;
-      }
-
-      setSearching(true);
-      setDropdownOpen(true);
-
-      debounceRef.current = setTimeout(async () => {
-        const id = ++searchIdRef.current;
-        try {
-          const results = await searchDirectoryUsers(value.trim(), 10, accessToken);
-          if (id !== searchIdRef.current) return;
-          const filtered = results.filter((u) => !members.includes(u.user_id));
-          setSuggestions(filtered);
-        } catch (err: any) {
-          if (id !== searchIdRef.current) return;
-          setSuggestions([]);
-          const status = err?.response?.status;
-          if (status === 501) {
-            setSearchError("Directory provider is not configured");
-          } else {
-            setSearchError("Search failed — try again");
-          }
-        } finally {
-          if (id === searchIdRef.current) setSearching(false);
-        }
-      }, 300);
-    },
-    [members, accessToken],
-  );
-
   const addMemberFromDirectory = (dirUser: DirectoryUser) => {
     if (!members.includes(dirUser.user_id)) {
-      setMembers([...members, dirUser.user_id]);
+      setMembers((prev) => [...prev, dirUser.user_id]);
     }
-    setMemberSearch("");
-    setSuggestions([]);
-    setDropdownOpen(false);
     setError("");
+    setSearchResetKey((k) => k + 1);
   };
 
   const removeMember = (username: string) => {
@@ -209,60 +135,14 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
 
             <div>
               <Label className="text-sm text-gray-400">Members</Label>
-              <div className="relative mt-1.5">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                  <Input
-                    ref={inputRef}
-                    value={memberSearch}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    onFocus={() => {
-                      if (suggestions.length > 0 || searching) setDropdownOpen(true);
-                    }}
-                    placeholder="Search people by name or username…"
-                    className="pl-9 bg-background-dark border-gray-700 text-gray-100 placeholder:text-gray-500"
-                  />
-                  {searching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
-                  )}
-                </div>
-
-                {dropdownOpen && memberSearch.trim().length >= 2 && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute z-[50] w-full mt-1 max-h-[220px] overflow-y-auto rounded-md border border-gray-700 bg-black shadow-lg"
-                  >
-                    {searching ? (
-                      <div className="flex items-center justify-center py-4 text-sm text-gray-400">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Searching…
-                      </div>
-                    ) : searchError ? (
-                      <div className="px-3 py-4 text-sm text-amber-400 text-center">
-                        {searchError}
-                      </div>
-                    ) : suggestions.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-gray-400 text-center">
-                        No users found
-                      </div>
-                    ) : (
-                      suggestions.map((u) => (
-                        <button
-                          key={u.user_id}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => addMemberFromDirectory(u)}
-                          className="w-full flex flex-col px-3 py-2 text-left hover:bg-white/10 transition-colors cursor-pointer"
-                        >
-                          <span className="text-sm text-gray-100">{u.display_name}</span>
-                          <span className="text-xs text-gray-400">
-                            {u.username}{u.email ? ` · ${u.email}` : ""}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+              <div className="mt-1.5">
+                <UserDirectorySearch
+                  key={searchResetKey}
+                  onSelect={addMemberFromDirectory}
+                  excludeUserIds={members}
+                  accessToken={accessToken}
+                  inputClassName="bg-background-dark border-gray-700 text-gray-100 placeholder:text-gray-500"
+                />
               </div>
 
               {members.length > 0 && (

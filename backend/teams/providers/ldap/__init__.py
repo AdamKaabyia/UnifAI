@@ -1,4 +1,4 @@
-from teams.providers.ldap.ldap_provider import LdapDirectoryProvider
-from teams.providers.ldap.config import LdapConfig
+from global_utils.directory.ldap_provider import LdapDirectoryProvider
+from global_utils.directory.config import LdapConfig
 
 __all__ = ["LdapDirectoryProvider", "LdapConfig"]
