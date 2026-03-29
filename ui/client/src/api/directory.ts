@@ -1,4 +1,4 @@
-import backendApi from '@/http/backendClient';
+import ssoApi from '@/http/ssoClient';
 
 export interface DirectoryUser {
   user_id: string;
@@ -8,8 +8,26 @@ export interface DirectoryUser {
   title: string;
 }
 
+export interface DirectoryGroup {
+  group_id: string;
+  name: string;
+  description: string;
+  members: string[];
+}
+
+export interface DirectorySearchResult {
+  users: DirectoryUser[];
+  groups: DirectoryGroup[];
+}
+
+function authHeaders(accessToken?: string | null): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (accessToken) h['X-User-Token'] = accessToken;
+  return h;
+}
+
 export async function getDirectoryStatus(): Promise<{ enabled: boolean }> {
-  const { data } = await backendApi.get<{ enabled: boolean }>('/teams/directory.status');
+  const { data } = await ssoApi.get<{ enabled: boolean }>('/directory/directory.status');
   return data;
 }
 
@@ -18,13 +36,32 @@ export async function searchDirectoryUsers(
   limit: number = 10,
   accessToken?: string | null,
 ): Promise<DirectoryUser[]> {
-  const headers: Record<string, string> = {};
-  if (accessToken) {
-    headers['X-User-Token'] = accessToken;
-  }
-  const { data } = await backendApi.get<{ users: DirectoryUser[] }>(
-    '/teams/directory.search_users',
-    { params: { q: query, limit }, headers },
+  const { data } = await ssoApi.get<{ users: DirectoryUser[] }>(
+    '/directory/directory.search_users',
+    { params: { q: query, limit }, headers: authHeaders(accessToken) },
   );
   return data.users;
+}
+
+export async function searchDirectory(
+  query: string,
+  limit: number = 10,
+  accessToken?: string | null,
+): Promise<DirectorySearchResult> {
+  const { data } = await ssoApi.get<DirectorySearchResult>(
+    '/directory/directory.search',
+    { params: { q: query, limit }, headers: authHeaders(accessToken) },
+  );
+  return data;
+}
+
+export async function getDirectoryGroup(
+  groupId: string,
+  accessToken?: string | null,
+): Promise<DirectoryGroup> {
+  const { data } = await ssoApi.get<DirectoryGroup>(
+    '/directory/directory.get_group',
+    { params: { groupId }, headers: authHeaders(accessToken) },
+  );
+  return data;
 }

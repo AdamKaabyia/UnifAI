@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pydantic import BaseModel
 
+from global_utils.identity import Identity
 from mas.resources.registry import ResourcesRegistry
 from mas.catalog.element_registry import ElementRegistry
 from mas.resources.models import Resource, ResourceQuery
@@ -44,7 +45,7 @@ class ResourcesService:
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
         doc = Resource(
-            user_id=user_id,
+            identity=Identity.from_user_id(user_id),
             category=category,
             type=type,
             name=name,

@@ -5,7 +5,7 @@ import { createTeam, updateTeam, deleteTeam } from "@/api/teams";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { X, Crown, Trash2, Users } from "lucide-react";
+import { X, Crown, Trash2, Users, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import UserDirectorySearch from "@/components/shared/UserDirectorySearch";
-import type { DirectoryUser } from "@/api/directory";
+import type { DirectoryUser, DirectoryGroup } from "@/api/directory";
 
 interface TeamSettingsModalProps {
   open: boolean;
@@ -38,6 +38,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   const [members, setMembers] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [expandingGroup, setExpandingGroup] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [searchResetKey, setSearchResetKey] = useState(0);
 
@@ -63,6 +64,24 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
     }
     setError("");
     setSearchResetKey((k) => k + 1);
+  };
+
+  const addGroupMembers = async (group: DirectoryGroup) => {
+    setExpandingGroup(true);
+    setError("");
+    try {
+      const newMembers = group.members.filter((uid) => !members.includes(uid));
+      if (newMembers.length === 0) {
+        setError(`All members of "${group.name}" are already in this team`);
+      } else {
+        setMembers((prev) => [...prev, ...newMembers]);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to expand group");
+    } finally {
+      setExpandingGroup(false);
+      setSearchResetKey((k) => k + 1);
+    }
   };
 
   const removeMember = (username: string) => {
@@ -139,11 +158,19 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
                 <UserDirectorySearch
                   key={searchResetKey}
                   onSelect={addMemberFromDirectory}
+                  onSelectGroup={addGroupMembers}
                   excludeUserIds={members}
                   accessToken={accessToken}
                   inputClassName="bg-background-dark border-gray-700 text-gray-100 placeholder:text-gray-500"
                 />
               </div>
+
+              {expandingGroup && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Adding group members…
+                </div>
+              )}
 
               {members.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
@@ -190,7 +217,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
                 <Button variant="outline" onClick={() => onOpenChange(false)} className="border-gray-700">
                   Cancel
                 </Button>
-                <Button className="bg-primary" onClick={handleSubmit} disabled={saving}>
+                <Button className="bg-primary" onClick={handleSubmit} disabled={saving || expandingGroup}>
                   {saving ? "Saving..." : isEditing ? "Save Changes" : "Create Team"}
                 </Button>
               </div>

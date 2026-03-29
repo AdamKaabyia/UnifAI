@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   DirectoryUser,
-  searchDirectoryUsers,
+  DirectoryGroup,
+  searchDirectory,
   getDirectoryStatus,
 } from '@/api/directory';
 
-export type { DirectoryUser };
+export type { DirectoryUser, DirectoryGroup };
 
 interface UserDirectorySearchProps {
   onSelect: (user: DirectoryUser) => void;
+  onSelectGroup?: (group: DirectoryGroup) => void;
   onInputChange?: (value: string) => void;
   excludeUserIds?: string[];
   placeholder?: string;
@@ -21,6 +23,7 @@ interface UserDirectorySearchProps {
 
 export default function UserDirectorySearch({
   onSelect,
+  onSelectGroup,
   onInputChange,
   excludeUserIds = [],
   placeholder,
@@ -30,7 +33,8 @@ export default function UserDirectorySearch({
 }: UserDirectorySearchProps) {
   const [directoryEnabled, setDirectoryEnabled] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<DirectoryUser[]>([]);
+  const [userResults, setUserResults] = useState<DirectoryUser[]>([]);
+  const [groupResults, setGroupResults] = useState<DirectoryGroup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -75,7 +79,8 @@ export default function UserDirectorySearch({
       if (debounceRef.current) clearTimeout(debounceRef.current);
 
       if (!directoryEnabled || value.trim().length < 2) {
-        setResults([]);
+        setUserResults([]);
+        setGroupResults([]);
         setDropdownOpen(false);
         setIsSearching(false);
         return;
@@ -87,15 +92,17 @@ export default function UserDirectorySearch({
       debounceRef.current = setTimeout(async () => {
         const id = ++searchIdRef.current;
         try {
-          const users = await searchDirectoryUsers(value.trim(), 10, accessToken);
+          const result = await searchDirectory(value.trim(), 10, accessToken);
           if (id !== searchIdRef.current) return;
-          const filtered = users.filter((u) => !excludeUserIds.includes(u.user_id));
-          setResults(filtered);
-        } catch (err: any) {
+          const filteredUsers = result.users.filter((u) => !excludeUserIds.includes(u.user_id));
+          setUserResults(filteredUsers);
+          setGroupResults(result.groups);
+        } catch (err: unknown) {
           if (id !== searchIdRef.current) return;
-          setResults([]);
-          const status = err?.response?.status;
-          if (status === 501) {
+          setUserResults([]);
+          setGroupResults([]);
+          const axiosErr = err as { response?: { status?: number } };
+          if (axiosErr?.response?.status === 501) {
             setSearchError('Directory provider is not configured');
           } else {
             setSearchError('Search failed — try again');
@@ -108,19 +115,29 @@ export default function UserDirectorySearch({
     [directoryEnabled, excludeUserIds, accessToken, onInputChange],
   );
 
-  const handleSelect = (user: DirectoryUser) => {
+  const handleSelectUser = (user: DirectoryUser) => {
     onSelect(user);
     if (clearOnSelect) {
       setQuery('');
     } else {
       setQuery(user.username);
     }
-    setResults([]);
+    setUserResults([]);
+    setGroupResults([]);
     setDropdownOpen(false);
   };
 
+  const handleSelectGroup = (group: DirectoryGroup) => {
+    onSelectGroup?.(group);
+    if (clearOnSelect) setQuery('');
+    setUserResults([]);
+    setGroupResults([]);
+    setDropdownOpen(false);
+  };
+
+  const hasResults = userResults.length > 0 || groupResults.length > 0;
   const defaultPlaceholder = directoryEnabled
-    ? 'Search people by name or username\u2026'
+    ? 'Search people or groups\u2026'
     : 'Enter username';
 
   return (
@@ -134,7 +151,7 @@ export default function UserDirectorySearch({
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => {
-            if (results.length > 0 || isSearching) setDropdownOpen(true);
+            if (hasResults || isSearching) setDropdownOpen(true);
           }}
           placeholder={placeholder ?? defaultPlaceholder}
           className={`${directoryEnabled ? 'pl-9' : ''} ${inputClassName ?? ''}`}
@@ -150,7 +167,7 @@ export default function UserDirectorySearch({
       {dropdownOpen && directoryEnabled && query.trim().length >= 2 && (
         <div
           ref={dropdownRef}
-          className="absolute z-[60] w-full mt-1 max-h-[220px] overflow-y-auto rounded-md border border-gray-700 bg-gray-900 shadow-lg"
+          className="absolute z-[60] w-full mt-1 max-h-[280px] overflow-y-auto rounded-md border border-gray-700 bg-gray-900 shadow-lg"
         >
           {isSearching ? (
             <div className="flex items-center justify-center py-4 text-sm text-gray-400">
@@ -161,25 +178,62 @@ export default function UserDirectorySearch({
             <div className="px-3 py-4 text-sm text-amber-400 text-center">
               {searchError}
             </div>
-          ) : results.length === 0 ? (
+          ) : !hasResults ? (
             <div className="px-3 py-4 text-sm text-gray-400 text-center">
-              No users found
+              No results found
             </div>
           ) : (
-            results.map((u) => (
-              <button
-                key={u.user_id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(u)}
-                className="w-full flex flex-col px-3 py-2 text-left hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <span className="text-sm text-gray-100">{u.display_name}</span>
-                <span className="text-xs text-gray-400">
-                  {u.username}{u.email ? ` \u00b7 ${u.email}` : ''}
-                </span>
-              </button>
-            ))
+            <>
+              {groupResults.length > 0 && onSelectGroup && (
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                    Groups
+                  </div>
+                  {groupResults.map((g) => (
+                    <button
+                      key={`group-${g.group_id}`}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectGroup(g)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <Users className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm text-gray-100 truncate">{g.name}</span>
+                        <span className="text-xs text-gray-400 truncate">
+                          {g.members.length} member{g.members.length !== 1 ? 's' : ''}
+                          {g.description ? ` \u00b7 ${g.description}` : ''}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {userResults.length > 0 && (
+                <>
+                  {groupResults.length > 0 && onSelectGroup && (
+                    <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                      People
+                    </div>
+                  )}
+                  {userResults.map((u) => (
+                    <button
+                      key={u.user_id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectUser(u)}
+                      className="w-full flex flex-col px-3 py-2 text-left hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <span className="text-sm text-gray-100">{u.display_name}</span>
+                      <span className="text-xs text-gray-400">
+                        {u.username}{u.email ? ` \u00b7 ${u.email}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       )}

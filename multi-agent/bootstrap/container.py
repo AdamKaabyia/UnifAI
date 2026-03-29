@@ -205,32 +205,25 @@ class AppContainer(metaclass=SingletonMeta):
         if not provider_name:
             return None
 
-        if provider_name != "ldap":
-            raise ValueError(
-                f"Unknown directory_provider: '{provider_name}'. Supported: ldap"
-            )
+        if provider_name == "sso":
+            return AppContainer._build_sso_provider(cfg)
 
-        from global_utils.directory import LdapDirectoryProvider, LdapConfig
+        raise ValueError(
+            f"Unknown directory_provider: '{provider_name}'. Supported: sso"
+        )
+
+    @staticmethod
+    def _build_sso_provider(cfg: AppConfig):
+        from outbound.sso_directory import SsoDirectoryClient
         import logging
         logger = logging.getLogger(__name__)
 
-        if not cfg.directory_url:
+        if not cfg.directory_sso_url:
             raise ValueError(
-                "directory_url is required when directory_provider='ldap'"
+                "directory_sso_url is required when directory_provider='sso'"
             )
-        if not cfg.directory_ldap_user_base_dn:
-            raise ValueError(
-                "directory_ldap_user_base_dn is required when "
-                "directory_provider='ldap'"
-            )
-
-        ldap_cfg = LdapConfig(
-            url=cfg.directory_url,
-            user_base_dn=cfg.directory_ldap_user_base_dn,
-            bind_dn=cfg.directory_ldap_bind_dn,
-            bind_password=cfg.directory_ldap_bind_password,
-            skip_tls_verify=not cfg.directory_verify_ssl,
-            timeout_seconds=cfg.directory_timeout,
+        logger.info("Directory provider: sso (%s)", cfg.directory_sso_url)
+        return SsoDirectoryClient(
+            base_url=cfg.directory_sso_url,
+            timeout=cfg.directory_timeout,
         )
-        logger.info("Directory provider: ldap (%s)", cfg.directory_url)
-        return LdapDirectoryProvider(config=ldap_cfg)

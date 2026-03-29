@@ -14,8 +14,8 @@ class MongoShareRepository(ShareRepository):
         
         # Create indexes following existing patterns
         self._col.create_index([("share_id", pymongo.ASCENDING)], unique=True)
-        self._col.create_index([("recipient_user_id", 1), ("status", 1), ("created_at", -1)])
-        self._col.create_index([("sender_user_id", 1), ("status", 1), ("created_at", -1)])
+        self._col.create_index([("recipient_identity.id", 1), ("status", 1), ("created_at", -1)])
+        self._col.create_index([("sender_identity.id", 1), ("status", 1), ("created_at", -1)])
         # TTL index for automatic expiration
         self._col.create_index("expires_at", expireAfterSeconds=0)
 
@@ -50,7 +50,7 @@ class MongoShareRepository(ShareRepository):
     def list_for_recipient(self, recipient_user_id: str, 
                           status: Optional[ShareStatus] = None,
                           skip: int = 0, limit: int = 100) -> List[ShareInvite]:
-        query = {"recipient_user_id": recipient_user_id}
+        query = {"recipient_identity.id": recipient_user_id}
         if status:
             query["status"] = status.value
             
@@ -64,7 +64,7 @@ class MongoShareRepository(ShareRepository):
     def list_for_sender(self, sender_user_id: str,
                        status: Optional[ShareStatus] = None,
                        skip: int = 0, limit: int = 100) -> List[ShareInvite]:
-        query = {"sender_user_id": sender_user_id}
+        query = {"sender_identity.id": sender_user_id}
         if status:
             query["status"] = status.value
             

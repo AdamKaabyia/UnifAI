@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from global_utils.identity import Identity
+
 
 class ExecutionContext(BaseModel):
     """Runtime execution context — who, what scope, when.
@@ -16,6 +18,7 @@ class ExecutionContext(BaseModel):
     """
 
     user_id: str = ""
+    identity: Optional[Identity] = None
     scope: str = "public"
     engine_name: str = ""
 
@@ -70,3 +73,7 @@ class ExecutionContextHolder:
     @property
     def user_id(self) -> str:
         return self.context.user_id
+
+    @property
+    def identity(self) -> Optional[Identity]:
+        return self.context.identity

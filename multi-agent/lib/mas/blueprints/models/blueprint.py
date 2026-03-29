@@ -3,6 +3,8 @@ from uuid import uuid4
 from datetime import datetime
 from pydantic import BaseModel, Field, Extra
 
+from global_utils.identity import Identity
+
 # -----------------------------------------------------------------------------
 # Import the *catalog* specs (single source of truth for field validation)
 # -----------------------------------------------------------------------------
@@ -71,14 +73,18 @@ class StepDef(BaseModel):
 #  Blueprint summary (lightweight view – no spec details)
 # ─────────────────────────────────────────────────────────────────────────────
 class BlueprintSummary(BaseModel):
-    """Lightweight view of a blueprint for listing – no spec details."""
+    """Lightweight view of a blueprint for listing -- no spec details."""
     blueprint_id: str
-    user_id: str
+    identity: Identity
     name: str = "Untitled blueprint"
     description: str = ""
     created_at: datetime
     updated_at: datetime
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def user_id(self) -> str:
+        return self.identity.id
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -129,7 +135,7 @@ class BlueprintDocument(BaseModel):
     Wraps the spec_dict together with its database-level metadata.
     """
     blueprint_id: str
-    user_id: str
+    identity: Identity
     created_at: Any = None
     updated_at: Any = None
     spec_dict: Dict[str, Any]
@@ -137,4 +143,8 @@ class BlueprintDocument(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
-        extra = Extra.ignore  # silently drop extra Mongo fields like _id
+        extra = Extra.ignore
+
+    @property
+    def user_id(self) -> str:
+        return self.identity.id

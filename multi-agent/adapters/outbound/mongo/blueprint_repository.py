@@ -6,6 +6,7 @@ from mas.blueprints.models.blueprint import BlueprintDraft, BlueprintDocument, B
 from mas.blueprints.repository.repository import BlueprintRepository
 from mas.core.enums import ResourceCategory
 from global_utils.utils.util import get_mongo_url
+from global_utils.identity import Identity
 
 
 class MongoBlueprintRepository(BlueprintRepository):
@@ -20,14 +21,15 @@ class MongoBlueprintRepository(BlueprintRepository):
 
     def save(self, user_id, spec: BlueprintDraft, rid_refs: list[str], metadata: Dict[str, Any] = {}) -> str:
         new_id = str(uuid4())
+        identity = Identity.from_user_id(user_id)
         doc = {
             "blueprint_id": new_id,
-            "user_id": user_id,
+            "identity": identity.model_dump(mode="json"),
             "created_at": getattr(spec, "created_at", datetime.now(timezone.utc)),
             "updated_at": datetime.now(timezone.utc),
             "spec_dict": spec.model_dump(mode="json"),
             "rid_refs": rid_refs,
-            "metadata": metadata
+            "metadata": metadata,
         }
         self._col.insert_one(doc)
         return new_id
@@ -84,7 +86,7 @@ class MongoBlueprintRepository(BlueprintRepository):
 
     # --------- listing & counting with optional user filter -------
     def _user_q(self, user_id: str | None) -> Dict[str, Any]:
-        return {} if user_id is None else {"user_id": user_id}
+        return {} if user_id is None else {"identity.id": user_id}
 
     def list_ids(
             self, *, user_id: str | None = None, skip=0, limit=100, sort_desc=True
@@ -125,7 +127,7 @@ class MongoBlueprintRepository(BlueprintRepository):
         projection = {
             "_id": 0,
             "blueprint_id": 1,
-            "user_id": 1,
+            "identity": 1,
             "created_at": 1,
             "updated_at": 1,
             "metadata": 1,
@@ -143,7 +145,7 @@ class MongoBlueprintRepository(BlueprintRepository):
             spec = doc.get("spec_dict", {})
             summaries.append(BlueprintSummary(
                 blueprint_id=doc["blueprint_id"],
-                user_id=doc["user_id"],
+                identity=Identity(**doc["identity"]),
                 name=spec.get("name", "Untitled blueprint"),
                 description=spec.get("description", ""),
                 created_at=doc["created_at"],

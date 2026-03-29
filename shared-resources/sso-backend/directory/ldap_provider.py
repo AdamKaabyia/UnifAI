@@ -1,11 +1,8 @@
 """
 LDAP adapter for DirectoryProvider.
 
-Queries the corporate LDAP directory for user information.  No other
-module should import from this package directly — only the composition
-root of each service references it.
-
-Requires the ``ldap3`` package to be installed by the consuming service.
+Queries the corporate LDAP directory for user and group information.
+Requires the ``ldap3`` package.
 """
 import logging
 from typing import List, Optional
@@ -14,9 +11,9 @@ import ldap3
 from ldap3 import Server, ServerPool, Connection, SUBTREE, ROUND_ROBIN
 from ldap3.core.exceptions import LDAPException
 
-from global_utils.directory.models import DirectoryUser
-from global_utils.directory.provider import DirectoryProvider
-from global_utils.directory.config import LdapConfig
+from directory.models import DirectoryUser, DirectoryGroup
+from directory.provider import DirectoryProvider
+from directory.config import LdapConfig
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +24,13 @@ class LdapDirectoryProvider(DirectoryProvider):
         self._user_base = config.user_base_dn
         self._user_attrs = [
             config.attr_uid, config.attr_cn, config.attr_mail, config.attr_title,
+        ]
+
+        self._group_base = config.group_base_dn or None
+        self._group_attrs = [
+            config.attr_group_cn,
+            config.attr_group_description,
+            config.attr_group_member,
         ]
 
         tls = None
@@ -46,8 +50,10 @@ class LdapDirectoryProvider(DirectoryProvider):
         self._timeout = config.timeout_seconds
 
         logger.info(
-            "LDAP provider: %s, user_base=%s, bind=%s",
-            config.url, self._user_base, self._bind_dn or "anonymous",
+            "LDAP provider: %s, user_base=%s, group_base=%s, bind=%s",
+            config.url, self._user_base,
+            self._group_base or "(disabled)",
+            self._bind_dn or "anonymous",
         )
 
     def _connect(self) -> Connection:
@@ -72,19 +78,28 @@ class LdapDirectoryProvider(DirectoryProvider):
                     attributes=attributes,
                     size_limit=limit,
                 )
-                return [
+                results = [
                     entry for entry in conn.entries
                     if str(entry.entry_dn) != base_dn
                 ]
+                logger.debug(
+                    "LDAP search base=%s filter=%s → %d result(s)",
+                    base_dn, search_filter, len(results),
+                )
+                return results
             finally:
                 conn.unbind()
         except LDAPException:
-            logger.exception("LDAP search failed: %s", search_filter)
+            logger.exception(
+                "LDAP search failed: base=%s filter=%s", base_dn, search_filter,
+            )
             return []
 
     @staticmethod
     def _escape(value: str) -> str:
         return ldap3.utils.conv.escape_filter_chars(value)
+
+    # ── user helpers ───────────────────────────────────────────────────
 
     def _entry_to_user(self, entry) -> DirectoryUser:
         attrs = entry.entry_attributes_as_dict
@@ -124,8 +139,65 @@ class LdapDirectoryProvider(DirectoryProvider):
             return None
         return self._entry_to_user(entries[0])
 
+    # ── group helpers ──────────────────────────────────────────────────
+
+    def _entry_to_group(self, entry) -> DirectoryGroup:
+        attrs = entry.entry_attributes_as_dict
+        cn = _first(attrs.get(self._cfg.attr_group_cn, []))
+        description = _first(attrs.get(self._cfg.attr_group_description, []))
+        raw_members = attrs.get(self._cfg.attr_group_member, [])
+        members = [_dn_to_uid(str(m)) for m in raw_members if m]
+
+        return DirectoryGroup(
+            group_id=cn or "",
+            name=cn or "",
+            description=description or "",
+            members=members,
+        )
+
+    def _object_class_filter(self) -> str:
+        """Build objectClass filter supporting comma-separated values."""
+        classes = [c.strip() for c in self._cfg.group_object_class.split(",") if c.strip()]
+        if len(classes) == 1:
+            return f"(objectClass={classes[0]})"
+        return "(|" + "".join(f"(objectClass={c})" for c in classes) + ")"
+
+    def search_groups(self, query: str, limit: int = 20) -> List[DirectoryGroup]:
+        if not self._group_base:
+            return []
+        q = self._escape(query)
+        cn = self._cfg.attr_group_cn
+        oc_filter = self._object_class_filter()
+        search_filter = f"(&{oc_filter}({cn}=*{q}*))"
+        logger.info(
+            "LDAP group search: base=%s filter=%s",
+            self._group_base, search_filter,
+        )
+        entries = self._search(self._group_base, search_filter,
+                               self._group_attrs, limit=limit)
+        return [self._entry_to_group(e) for e in entries]
+
+    def get_group(self, group_id: str) -> Optional[DirectoryGroup]:
+        if not self._group_base:
+            return None
+        q = self._escape(group_id)
+        oc_filter = self._object_class_filter()
+        search_filter = f"(&{oc_filter}({self._cfg.attr_group_cn}={q}))"
+        entries = self._search(self._group_base, search_filter,
+                               self._group_attrs, limit=1)
+        if not entries:
+            return None
+        return self._entry_to_group(entries[0])
+
 
 def _first(values: list) -> str:
     if values:
         return str(values[0])
     return ""
+
+
+def _dn_to_uid(dn: str) -> str:
+    """Extract the first RDN value from a DN, e.g. 'uid=jdoe,ou=users,...' -> 'jdoe'."""
+    if "=" not in dn:
+        return dn
+    return dn.split(",")[0].split("=", 1)[1]

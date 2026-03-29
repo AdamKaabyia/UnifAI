@@ -1,19 +1,13 @@
 from datetime import datetime
 from typing import List, Optional
 
-from teams.models import Team, DirectoryUser
+from teams.models import Team
 from teams.repository.repository import TeamRepository
-from teams.providers.provider import TeamDirectoryProvider
 
 
 class TeamService:
-    def __init__(
-        self,
-        repository: TeamRepository,
-        directory_provider: Optional[TeamDirectoryProvider] = None,
-    ):
+    def __init__(self, repository: TeamRepository):
         self._repo = repository
-        self._directory = directory_provider
 
     # ────────────────────── local team CRUD ───────────────────────────
 
@@ -59,27 +53,3 @@ class TeamService:
 
     def delete(self, team_id: str) -> None:
         self._repo.delete(team_id)
-
-    # ────────────────────── directory lookups ─────────────────────────
-
-    @property
-    def has_directory(self) -> bool:
-        return self._directory is not None
-
-    def _apply_user_token(self, user_token: Optional[str] = None) -> None:
-        if user_token and self._directory:
-            self._directory.set_user_token(user_token)
-
-    def search_directory_users(self, query: str, limit: int = 20,
-                               user_token: Optional[str] = None) -> List[DirectoryUser]:
-        if not self._directory:
-            return []
-        self._apply_user_token(user_token)
-        return self._directory.search_users(query, limit=limit)
-
-    def get_directory_user(self, user_id: str,
-                           user_token: Optional[str] = None) -> Optional[DirectoryUser]:
-        if not self._directory:
-            return None
-        self._apply_user_token(user_token)
-        return self._directory.get_user(user_id)

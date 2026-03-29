@@ -15,11 +15,10 @@ class MongoResourceRepository(ResourceRepository):
         self.col = self._client[db_name][coll_name]
         self.col.create_index("nested_refs")
         self.col.create_index(
-            [("user_id", 1), ("category", 1), ("type", 1), ("name", 1)],
-            name="uq_user_cat_type_name",
+            [("identity.id", 1), ("category", 1), ("type", 1), ("name", 1)],
+            name="uq_identity_cat_type_name",
             unique=True)
-        # Add index for better query performance
-        self.col.create_index([("user_id", 1), ("created", -1)])
+        self.col.create_index([("identity.id", 1), ("created", -1)])
 
     def save(self, doc: Resource) -> str:
         """Insert a new resource document (create only)."""
@@ -49,12 +48,12 @@ class MongoResourceRepository(ResourceRepository):
         self.col.delete_one({"_id": rid})
 
     def find_by_name(self, user_id: str, category: str, type: str, name: str):
-        raw = self.col.find_one({"user_id": user_id, "category": category, "type": type, "name": name})
+        raw = self.col.find_one({"identity.id": user_id, "category": category, "type": type, "name": name})
         return Resource(**raw) if raw else None
 
     def find_resources(self, query: ResourceQuery) -> List[Resource]:
         """Find resources based on query criteria with pagination."""
-        filter_dict = {"user_id": query.user_id}
+        filter_dict = {"identity.id": query.user_id}
         
         if query.category:
             filter_dict["category"] = query.category.value  # Use enum value
@@ -78,7 +77,7 @@ class MongoResourceRepository(ResourceRepository):
 
     def count_resources(self, query: ResourceQuery) -> int:
         """Count resources matching query criteria."""
-        filter_dict = {"user_id": query.user_id}
+        filter_dict = {"identity.id": query.user_id}
         
         if query.category:
             filter_dict["category"] = query.category.value
@@ -88,7 +87,7 @@ class MongoResourceRepository(ResourceRepository):
         return self.col.count_documents(filter_dict)
 
     def count(self, user_id, filter):
-        return self.col.count_documents({"user_id": user_id, **filter})
+        return self.col.count_documents({"identity.id": user_id, **filter})
 
     def meta(self, rid: str) -> tuple[str, str]:
         doc = self.col.find_one({"_id": rid}, {"category": 1, "type": 1})
@@ -119,7 +118,7 @@ class MongoResourceRepository(ResourceRepository):
         Transforms MongoDB's {"_id": {...}, "count": N} format to 
         database-agnostic GroupedCount DTOs.
         """
-        match = {"user_id": user_id, **(filter or {})}
+        match = {"identity.id": user_id, **(filter or {})}
         group_id = {field: f"${field}" for field in group_by}
         
         pipeline = [

@@ -10,8 +10,11 @@ Used by:
   - SessionLifecycle: mutate status/state and persist
   - BackgroundLifecycleHandler: avoid expensive full-session hydration
 """
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
+from global_utils.identity import Identity
 from mas.core.execution_context import ExecutionContext
 from mas.graph.state.graph_state import GraphState
 from mas.session.domain.models import SessionMeta
@@ -22,12 +25,16 @@ class SessionRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     run_id: str
-    user_id: str
+    identity: Identity
     blueprint_id: str
     run_context: ExecutionContext
     metadata: SessionMeta = Field(default_factory=SessionMeta)
     graph_state: GraphState = Field(default_factory=GraphState)
     status: SessionStatus = SessionStatus.PENDING
+
+    @property
+    def user_id(self) -> str:
+        return self.identity.id
 
     def update_context(self, **updates) -> None:
         """Apply updates to the frozen ExecutionContext."""

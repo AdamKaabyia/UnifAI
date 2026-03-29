@@ -123,6 +123,17 @@ backend:
     name: sso-backend
     port: 5555
   type: ClusterIP
+  env:
+    DIRECTORY_PROVIDER: "ldap"
+    DIRECTORY_URL: "ldaps://ldap.corp.redhat.com"
+    DIRECTORY_TIMEOUT: "10"
+    DIRECTORY_VERIFY_SSL: "false"
+    DIRECTORY_LDAP_USER_BASE_DN: "ou=users,dc=redhat,dc=com"
+    DIRECTORY_LDAP_GROUP_BASE_DN: "ou=adhoc,ou=managedGroups,dc=redhat,dc=com"
+    DIRECTORY_LDAP_GROUP_OBJECT_CLASS: "groupOfUniqueNames,rhatRoverGroup"
+    DIRECTORY_LDAP_GROUP_MEMBER_ATTR: "uniqueMember"
+    DIRECTORY_LDAP_BIND_DN: ""
+    DIRECTORY_LDAP_BIND_PASSWORD: ""
 
 # TODO : follow up story for sso-nginx GENIE-812
 # nginx:

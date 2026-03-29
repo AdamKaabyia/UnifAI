@@ -12,6 +12,7 @@ from mas.session.domain.status import SessionStatus
 from mas.blueprints.service import BlueprintService
 from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint, SystemAnalyticsData
 from mas.session.domain.exceptions import BlueprintNotFoundError
+from global_utils.identity import Identity
 
 
 class UserSessionManager:
@@ -58,14 +59,15 @@ class UserSessionManager:
 
         session_meta = metadata or SessionMeta()
         run_id = str(uuid.uuid4())
+        identity = Identity.from_user_id(user_id)
         ctx = ExecutionContext(
-            user_id=user_id,
+            identity=identity,
             engine_name=self._factory.engine_name,
         )
 
         record = SessionRecord(
             run_id=run_id,
-            user_id=user_id,
+            identity=identity,
             blueprint_id=blueprint_id,
             run_context=ctx,
             metadata=session_meta,

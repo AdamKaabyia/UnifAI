@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, UTC
 
+from global_utils.identity import Identity
 from .models import ShareInvite, ShareResult, ShareStatus, ShareItemKind, ShareCleanupConfig, ShareCleanupResult
 from .repository.base import ShareRepository
 from .cloner import ShareCloner
@@ -26,13 +27,13 @@ class ShareService:
         item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
         
         invite = ShareInvite(
-            sender_user_id=sender_user_id,
-            recipient_user_id=recipient_user_id,
+            sender_identity=Identity.from_user_id(sender_user_id),
+            recipient_identity=Identity.from_user_id(recipient_user_id),
             item_kind=item_kind,
             item_id=item_id,
             item_name=item_name,
             message=message,
-            ttl_days=ttl_days
+            ttl_days=ttl_days,
         )
         
         return self._repo.save(invite)

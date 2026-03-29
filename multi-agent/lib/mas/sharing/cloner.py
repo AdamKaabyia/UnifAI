@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pydantic import BaseModel
 
+from global_utils.identity import Identity
 from mas.resources.models import Resource
 from mas.resources.registry import ResourcesRegistry
 from mas.blueprints.models.blueprint import BlueprintDraft, BlueprintResource, StepDef
@@ -261,14 +262,14 @@ class ShareCloner:
 
         return Resource(
             rid=new_rid,
-            user_id=recipient_user_id,
+            identity=Identity.from_user_id(recipient_user_id),
             category=original_doc.category,
             type=original_doc.type,
             name=new_name,
             version=1,
             cfg_dict=new_cfg_dict,
             nested_refs=new_nested_refs,
-            contributed_by=contributed_by
+            contributed_by=contributed_by,
         )
 
     def _batch_create_resources(self, docs: List[Resource]) -> None:

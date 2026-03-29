@@ -23,7 +23,8 @@ class MongoSessionRepository(SessionRepository):
 
     # Field paths (centralized for easy schema changes)
     _TIME_FIELD = "run_context.started_at"
-    _USER_FIELD = "user_id"
+    _USER_FIELD = "identity.id"
+    _USER_ALIAS = "user_id"          # key used in aggregation group results
     _STATUS_FIELD = "status"
     _BLUEPRINT_FIELD = "blueprint_id"
     _RUN_ID_FIELD = "run_id"
@@ -77,7 +78,7 @@ class MongoSessionRepository(SessionRepository):
     def save(self, record: SessionRecord) -> None:
         doc = record.model_dump(mode="json")
         self._col.replace_one(
-            {self._USER_FIELD: record.user_id, self._RUN_ID_FIELD: record.run_id},
+            {self._USER_FIELD: record.identity.id, self._RUN_ID_FIELD: record.run_id},
             doc,
             upsert=True,
         )
@@ -220,7 +221,7 @@ class MongoSessionRepository(SessionRepository):
                 "user_status": [
                     {"$group": {
                         "_id": {
-                            self._USER_FIELD: f"${self._USER_FIELD}",
+                            self._USER_ALIAS: f"${self._USER_FIELD}",
                             self._STATUS_FIELD: f"${self._STATUS_FIELD}"
                         },
                         "count": {"$sum": 1}
@@ -229,7 +230,7 @@ class MongoSessionRepository(SessionRepository):
                 "user_blueprint": [
                     {"$group": {
                         "_id": {
-                            self._USER_FIELD: f"${self._USER_FIELD}",
+                            self._USER_ALIAS: f"${self._USER_FIELD}",
                             self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
                         },
                         "count": {"$sum": 1}
@@ -281,7 +282,12 @@ class MongoSessionRepository(SessionRepository):
         group_by: List[str]
     ) -> List[GroupedCount]:
         """Shared aggregation logic for both user-scoped and system-wide grouping."""
-        group_id = {field: f"${field}" for field in group_by}
+        group_id = {}
+        for field in group_by:
+            if field == self._USER_ALIAS:
+                group_id[self._USER_ALIAS] = f"${self._USER_FIELD}"
+            else:
+                group_id[field] = f"${field}"
 
         pipeline = [
             {"$match": match},

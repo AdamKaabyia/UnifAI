@@ -4,6 +4,8 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, computed_field
 from enum import Enum
 
+from global_utils.identity import Identity
+
 
 class ShareStatus(str, Enum):
     PENDING = "pending"
@@ -20,8 +22,8 @@ class ShareItemKind(str, Enum):
 class ShareInvite(BaseModel):
     """Share invitation with TTL and snapshot for deterministic copying."""
     share_id: str = Field(default_factory=lambda: str(uuid4()))
-    sender_user_id: str
-    recipient_user_id: str
+    sender_identity: Identity
+    recipient_identity: Identity
     item_kind: ShareItemKind
     item_id: str
     item_name: str
@@ -38,14 +40,21 @@ class ShareInvite(BaseModel):
     # Result tracking for idempotency
     result_mapping: Dict[str, str] = Field(default_factory=dict)
     
+    @property
+    def sender_user_id(self) -> str:
+        return self.sender_identity.id
+
+    @property
+    def recipient_user_id(self) -> str:
+        return self.recipient_identity.id
+
     @computed_field
     @property
     def is_expired(self) -> bool:
         """Check if the invitation has expired."""
         return datetime.now(UTC) > self.expires_at
-    
+
     def __init__(self, **data):
-        # Set expires_at based on ttl_days if not provided
         if 'expires_at' not in data and 'ttl_days' in data:
             data['expires_at'] = datetime.now(UTC) + timedelta(days=data['ttl_days'])
         elif 'expires_at' not in data:
