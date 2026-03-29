@@ -13,6 +13,7 @@ SOLID:
 from typing import Dict, List
 from uuid import uuid4
 
+from mas.core.identity import Identity
 from mas.blueprints.models.blueprint import BlueprintDraft, BlueprintResource, StepDef
 from mas.resources.service import ResourcesService
 from mas.resources.models import Resource
@@ -114,7 +115,7 @@ class ResourceMaterializer:
         for item in collected:
             resource = Resource(
                 rid=item.final_rid,
-                user_id=user_id,
+                identity=Identity.from_user_id(user_id),
                 category=item.category,
                 type=item.bp_resource.type or "",
                 name=f"{item.bp_resource.name or item.bp_resource.type}_{suffix}",

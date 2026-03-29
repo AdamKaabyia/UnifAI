@@ -12,7 +12,7 @@ from mas.session.domain.status import SessionStatus
 from mas.blueprints.service import BlueprintService
 from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint, SystemAnalyticsData
 from mas.session.domain.exceptions import BlueprintNotFoundError
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 
 class UserSessionManager:

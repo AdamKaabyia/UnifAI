@@ -1,9 +1,8 @@
 """
-Platform-wide Identity model.
+Lightweight Identity model for the multi-agent service.
 
-An Identity is the minimal, portable reference to "who owns this thing".
-It can represent either a single user or a team.  All services should use
-this model instead of raw ``user_id`` strings.
+Mirrors the canonical definition in sso-backend/identity/models.py
+so that this service has no cross-service import dependency.
 """
 from enum import Enum
 
@@ -16,11 +15,7 @@ class IdentityType(str, Enum):
 
 
 class Identity(BaseModel):
-    """Lightweight owner reference -- user or team.
-
-    Carries enough metadata so that consuming services can display
-    the owner without a round-trip to the directory.
-    """
+    """Lightweight owner reference -- user or team."""
     type: IdentityType
     id: str
     display_name: str = ""

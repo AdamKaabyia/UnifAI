@@ -4,7 +4,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, computed_field
 from enum import Enum
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 
 class ShareStatus(str, Enum):

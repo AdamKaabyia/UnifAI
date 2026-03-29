@@ -4,7 +4,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 from mas.core.enums import ResourceCategory
 from mas.core.field_hints import HiddenHint
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 
 class Resource(BaseModel):

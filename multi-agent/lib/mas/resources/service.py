@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pydantic import BaseModel
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 from mas.resources.registry import ResourcesRegistry
 from mas.catalog.element_registry import ElementRegistry
 from mas.resources.models import Resource, ResourceQuery

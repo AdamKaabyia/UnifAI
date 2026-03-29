@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import datetime
 from pydantic import BaseModel, Field, Extra
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 # -----------------------------------------------------------------------------
 # Import the *catalog* specs (single source of truth for field validation)

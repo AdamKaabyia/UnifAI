@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, UTC
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 from .models import ShareInvite, ShareResult, ShareStatus, ShareItemKind, ShareCleanupConfig, ShareCleanupResult
 from .repository.base import ShareRepository
 from .cloner import ShareCloner

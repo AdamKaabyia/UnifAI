@@ -6,7 +6,7 @@ from mas.blueprints.models.blueprint import BlueprintDraft, BlueprintDocument, B
 from mas.blueprints.repository.repository import BlueprintRepository
 from mas.core.enums import ResourceCategory
 from global_utils.utils.util import get_mongo_url
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 
 class MongoBlueprintRepository(BlueprintRepository):

@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 
 
 class ExecutionContext(BaseModel):
@@ -13,11 +13,9 @@ class ExecutionContext(BaseModel):
 
     Immutable (frozen) so mutations go through explicit copy methods.
     ``extra="ignore"`` ensures backward compatibility when deserializing
-    older DB documents that carried fields no longer present (e.g. run_id,
-    metadata, logged_in_user).
+    older DB documents that carried fields no longer present.
     """
 
-    user_id: str = ""
     identity: Optional[Identity] = None
     scope: str = "public"
     engine_name: str = ""
@@ -28,6 +26,10 @@ class ExecutionContext(BaseModel):
     tags: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(frozen=True, extra="ignore")
+
+    @property
+    def user_id(self) -> str:
+        return self.identity.id if self.identity else ""
 
     def with_scope(self, scope: str) -> ExecutionContext:
         return self.model_copy(update={"scope": scope})

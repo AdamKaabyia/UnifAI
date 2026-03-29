@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pydantic import BaseModel
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 from mas.resources.models import Resource
 from mas.resources.registry import ResourcesRegistry
 from mas.blueprints.models.blueprint import BlueprintDraft, BlueprintResource, StepDef

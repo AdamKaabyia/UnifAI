@@ -14,7 +14,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from global_utils.identity import Identity
+from mas.core.identity import Identity
 from mas.core.execution_context import ExecutionContext
 from mas.graph.state.graph_state import GraphState
 from mas.session.domain.models import SessionMeta
