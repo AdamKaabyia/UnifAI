@@ -7,6 +7,8 @@ import logging
 from mas.session.repository.repository import SessionRepository
 from mas.session.domain.session_record import SessionRecord
 from mas.session.domain.models import SessionChat, TimeSeriesPoint, SystemAnalyticsData
+from mas.blueprints.models.blueprint import BlueprintExecutionStats
+from mas.session.domain.status import SessionStatus
 from mas.core.dto import GroupedCount
 from global_utils.utils.time_utils import format_utc_iso
 
@@ -211,30 +213,15 @@ class MongoSessionRepository(SessionRepository):
 
         Optimizations:
         - Pre-filters by time BEFORE $facet (single collection scan)
-        - Only 2 facets (user+blueprint serves both user and blueprint views)
+        - 3 facets computed in parallel (user+status, user+blueprint, blueprint_stats)
         - Uses allowDiskUse for large datasets
         """
         pipeline = [
             {"$match": self._time_match(since)},
             {"$facet": {
-                "user_status": [
-                    {"$group": {
-                        "_id": {
-                            self._USER_FIELD: f"${self._USER_FIELD}",
-                            self._STATUS_FIELD: f"${self._STATUS_FIELD}"
-                        },
-                        "count": {"$sum": 1}
-                    }}
-                ],
-                "user_blueprint": [
-                    {"$group": {
-                        "_id": {
-                            self._USER_FIELD: f"${self._USER_FIELD}",
-                            self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
-                        },
-                        "count": {"$sum": 1}
-                    }}
-                ]
+                "user_status": self._user_status_facet(),
+                "user_blueprint": self._user_blueprint_facet(),
+                "blueprint_stats": self._blueprint_stats_facet(),
             }}
         ]
 
@@ -244,15 +231,103 @@ class MongoSessionRepository(SessionRepository):
                 return SystemAnalyticsData()
 
             facet = results[0]
-            user_blueprint = self._to_grouped_counts(facet.get("user_blueprint", []))
 
             return SystemAnalyticsData(
                 user_status_counts=self._to_grouped_counts(facet.get("user_status", [])),
-                user_blueprint_counts=user_blueprint,
+                user_blueprint_counts=self._to_grouped_counts(facet.get("user_blueprint", [])),
+                blueprint_stats=self._to_blueprint_stats(facet.get("blueprint_stats", [])),
             )
         except Exception as e:
             logger.warning(f"Failed to get system analytics: {e}")
             return SystemAnalyticsData()
+
+    # ---------- Facet Definitions ----------
+
+    def _user_status_facet(self) -> list:
+        """Group sessions by user and status."""
+        return [
+            {"$group": {
+                "_id": {
+                    self._USER_FIELD: f"${self._USER_FIELD}",
+                    self._STATUS_FIELD: f"${self._STATUS_FIELD}"
+                },
+                "count": {"$sum": 1}
+            }}
+        ]
+
+    def _user_blueprint_facet(self) -> list:
+        """Group sessions by user and blueprint."""
+        return [
+            {"$group": {
+                "_id": {
+                    self._USER_FIELD: f"${self._USER_FIELD}",
+                    self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
+                },
+                "count": {"$sum": 1}
+            }}
+        ]
+
+    def _blueprint_stats_facet(self) -> list:
+        """Aggregate execution metrics per blueprint."""
+        return [
+            {"$group": {
+                "_id": f"${self._BLUEPRINT_FIELD}",
+                "total_runs": {"$sum": 1},
+                "completed_runs": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": [f"${self._STATUS_FIELD}", SessionStatus.COMPLETED.value]},
+                            1,
+                            0
+                        ]
+                    }
+                },
+                "failed_runs": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": [f"${self._STATUS_FIELD}", SessionStatus.FAILED.value]},
+                            1,
+                            0
+                        ]
+                    }
+                },
+                "last_run": {"$max": f"${self._TIME_FIELD}"},
+                "avg_duration_ms": {
+                    "$avg": {
+                        "$cond": [
+                            {"$and": [
+                                {"$ne": ["$run_context.finished_at", None]},
+                                {"$ne": ["$run_context.finished_at", ""]},
+                                {"$ne": [f"${self._TIME_FIELD}", None]},
+                                {"$ne": [f"${self._TIME_FIELD}", ""]},
+                            ]},
+                            {"$subtract": [
+                                {"$dateFromString": {"dateString": "$run_context.finished_at"}},
+                                {"$dateFromString": {"dateString": f"${self._TIME_FIELD}"}}
+                            ]},
+                            None
+                        ]
+                    }
+                },
+                "users": {"$addToSet": f"${self._USER_FIELD}"}
+            }}
+        ]
+
+    @staticmethod
+    def _to_blueprint_stats(docs: List[Dict]) -> List[BlueprintExecutionStats]:
+        """Transform blueprint_stats facet results to typed domain models."""
+        return [
+            BlueprintExecutionStats(
+                blueprint_id=doc["_id"],
+                total_runs=doc.get("total_runs", 0),
+                completed_runs=doc.get("completed_runs", 0),
+                failed_runs=doc.get("failed_runs", 0),
+                last_run=doc.get("last_run"),
+                avg_duration_ms=doc.get("avg_duration_ms"),
+                users=doc.get("users", [])
+            )
+            for doc in docs
+        ]
 
     # ---------- Private Helpers ----------
 
