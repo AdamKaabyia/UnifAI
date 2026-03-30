@@ -47,13 +47,9 @@ class CloneContext:
 
     Attributes:
         sender_user_id:    Original owner; used for ownership validation and logging.
-        sender_display:    A sanitized, human-readable label for the sender,
-                           used in naming cloned items (e.g. "from alice").
-                           Must already be sanitized before passing in.
         recipient_user_id: The user who will own all cloned resources/blueprints.
     """
     sender_user_id: str
-    sender_display: str
     recipient_user_id: str
 
 
@@ -284,7 +280,7 @@ class ShareCloner:
                                preferred_name: str,
                                ctx: CloneContext) -> str:
         """Resolve name conflicts by adding '(from sender)' suffix."""
-        base_name = f"{preferred_name} (from {ctx.sender_display})"
+        base_name = f"{preferred_name} (from {ctx.sender_user_id})"
         current_name = base_name
 
         for counter in range(2, 101):
@@ -312,7 +308,7 @@ class ShareCloner:
 
         return BlueprintDraft(
             plan=self._clone_plan(draft.plan, rid_mapping),
-            name=f"{draft.name} (from {ctx.sender_display})",
+            name=f"{draft.name} (from {ctx.sender_user_id})",
             description=draft.description,
             **resource_fields
         )
