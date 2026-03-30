@@ -16,6 +16,26 @@ export function truncateUserId(userId: string, maxLength: number = 12): string {
 }
 
 /**
+ * Format duration in seconds to human-readable string (e.g., "45s", "2m 30s")
+ */
+export function formatDuration(seconds?: number): string {
+  if (seconds === undefined || seconds === null) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+/**
+ * Get CSS class for success rate color coding
+ */
+export function getSuccessRateColor(rate: number): string {
+  if (rate >= 90) return "text-green-500";
+  if (rate >= 70) return "text-yellow-500";
+  return "text-red-500";
+}
+
+/**
  * Shared Recharts tooltip styles for all analytics charts.
  * Keeps chart styling consistent across StatusBreakdown, TopUsers, and WorkflowExecution charts.
  */
