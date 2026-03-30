@@ -29,6 +29,7 @@ from mas.sharing.service import ShareService
 from mas.statistics.service import StatisticsService
 from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
+from mas.collaboration.service import CollaborationService
 from config.app_config import AppConfig
 
 from outbound.mongo import (
@@ -176,6 +177,10 @@ class AppContainer(metaclass=SingletonMeta):
             resources_service=self.resources_service,
         )
 
+        self.collaboration_service = self._create_collaboration_service(
+            cfg, self.session_repo
+        )
+
         self._initialized = True
 
     @staticmethod
@@ -191,6 +196,19 @@ class AppContainer(metaclass=SingletonMeta):
             )
         from outbound.channels import LocalChannelFactory
         return LocalChannelFactory()
+
+    @staticmethod
+    def _create_collaboration_service(cfg: AppConfig, session_repo):
+        redis_url = get_redis_url()
+        if redis_url:
+            from outbound.redis import RedisCollaborationStore
+            store = RedisCollaborationStore(redis_url=redis_url)
+            return CollaborationService(
+                store=store,
+                session_repo=session_repo,
+                presence_ttl=cfg.collaboration_presence_ttl,
+            )
+        return None
 
     @staticmethod
     def _create_background_submitter(engine_name: str):

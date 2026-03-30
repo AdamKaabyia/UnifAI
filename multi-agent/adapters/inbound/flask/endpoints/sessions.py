@@ -5,6 +5,7 @@ import json
 from pydantic.json import pydantic_encoder
 from mas.core.channels import with_heartbeats
 from mas.session.domain.exceptions import BlueprintNotFoundError
+from inbound.flask.identity_helpers import resolve_identity
 
 sessions_bp = Blueprint("sessions", __name__)
 
@@ -13,12 +14,15 @@ sessions_bp = Blueprint("sessions", __name__)
 @from_body({
     "blueprint_id": fields.Str(data_key="blueprintId", required=True),
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
+    "display_name": fields.Str(data_key="displayName", load_default=""),
     "metadata": fields.Dict(data_key="metadata", required=False, load_default=lambda: {}, dump_default=lambda: {})
 })
-def create_user_session(blueprint_id, user_id, metadata):
+def create_user_session(blueprint_id, user_id, identity_type, display_name, metadata):
     try:
+        identity = resolve_identity(user_id, identity_type, display_name)
         session_svc = current_app.container.session_service
-        run_id = session_svc.create(user_id=user_id,
+        run_id = session_svc.create(identity=identity,
                                     blueprint_id=blueprint_id,
                                     metadata=metadata)
         return jsonify(run_id), 200
@@ -73,16 +77,6 @@ def execute_user_session(session_id, inputs, stream_mode, stream, scope, logged_
     )
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
-
-    # except BlueprintNotFoundError as e:
-    #     return jsonify({
-    #         "error": str(e),
-    #         "error_type": "BLUEPRINT_DELETED",
-    #         "blueprint_id": e.blueprint_id,
-    #         "session_id": e.session_id
-    #     }), 410  # Gone
-    # except Exception as e:
-    #     return jsonify({"error": str(e)}), 500
 
 
 @sessions_bp.route("/user.session.submit", methods=["POST"])
@@ -156,11 +150,13 @@ def get_session_status(session_id):
 @sessions_bp.route("/session.user.list", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def list_user_sessions(user_id):
+def list_user_sessions(user_id, identity_type):
     try:
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.session_service
-        return jsonify(svc.list_user_sessions(user_id)), 200
+        return jsonify(svc.list_user_sessions(identity)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -168,11 +164,13 @@ def list_user_sessions(user_id):
 @sessions_bp.route("/session.user.blueprints.get", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def get_user_blueprints(user_id):
+def get_user_blueprints(user_id, identity_type):
     try:
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.session_service
-        return jsonify(svc.get_user_blueprints(user_id)), 200
+        return jsonify(svc.get_user_blueprints(identity)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -194,6 +192,8 @@ def delete_session(session_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ---------- Stream monitoring ----------
 
 @sessions_bp.route("/session.stream.status", methods=["GET"])
 @from_query({

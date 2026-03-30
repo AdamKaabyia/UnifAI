@@ -9,6 +9,7 @@ from mas.session.domain.session_record import SessionRecord
 from mas.session.domain.dto import SessionListItem
 from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint, SystemAnalyticsData
 from mas.session.domain.exceptions import BlueprintNotFoundError
+from mas.core.identity import Identity
 from mas.core.dto import GroupedCount
 
 class SessionService:
@@ -32,13 +33,18 @@ class SessionService:
         self._projector = input_projector
         self._submitter = background_submitter
 
-    def create(self, user_id: str, blueprint_id: str, metadata: Dict[str, Any] | SessionMeta | None = None) -> str:
+    def create(
+        self,
+        identity: Identity,
+        blueprint_id: str,
+        metadata: Dict[str, Any] | SessionMeta | None = None,
+    ) -> str:
         """
         Create a new session record and return its run_id.
         Lightweight — no graph compilation or blueprint resolution.
         """
         return self._manager.create_session(
-            user_id=user_id,
+            identity=identity,
             blueprint_id=blueprint_id,
             metadata=SessionMeta.model_validate(metadata or {}),
         )
@@ -94,11 +100,11 @@ class SessionService:
         record = self._manager.get_record(session_id)
         self._projector.apply(record, inputs or {})
 
-    def list_for_user(self, user_id: str) -> list:
+    def list_for_user(self, identity: Identity) -> list:
         """
         List all sessions created by a user.
         """
-        return self._manager.list_sessions_ids(user_id)
+        return self._manager.list_sessions_ids(identity)
 
     def get(self, run_id: str) -> WorkflowSession:
         """
@@ -132,11 +138,11 @@ class SessionService:
         """
         return self._manager.get_chat(run_id)
 
-    def list_user_sessions(self, user_id: str) -> list:
+    def list_user_sessions(self, identity: Identity) -> list:
         """
         List all sessions created by a user (metadata only, no messages).
         """
-        docs = self._manager.list_docs(user_id)
+        docs = self._manager.list_docs(identity)
         items = []
 
         for doc in docs:
@@ -155,16 +161,16 @@ class SessionService:
 
         return items
 
-    def get_user_blueprints(self, user_id) -> List[str]:
+    def get_user_blueprints(self, identity: Identity) -> List[str]:
         """
         Get all blueprints created by a user.
         """
-        docs = self._manager.list_docs(user_id)
+        docs = self._manager.list_docs(identity)
         return list({d.get("blueprint_id") for d in docs})
 
     def group_count(
         self,
-        user_id: str,
+        identity: Identity,
         group_by: List[str],
         filter: Dict[str, Any] = None
     ) -> List[GroupedCount]:
@@ -172,11 +178,11 @@ class SessionService:
         Group sessions by specified fields and return counts.
         Performs efficient server-side grouping via the session manager.
         """
-        return self._manager.group_count(user_id, group_by, filter)
+        return self._manager.group_count(identity, group_by, filter)
 
-    def count(self, user_id: str, filter: Dict[str, Any] = None) -> int:
+    def count(self, identity: Identity, filter: Dict[str, Any] = None) -> int:
         """Count sessions matching filter criteria for a user."""
-        return self._manager.count(user_id, filter)
+        return self._manager.count(identity, filter)
 
     def delete(self, run_id: str) -> bool:
         """
