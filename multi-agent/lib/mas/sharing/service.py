@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, UTC
 
 from .models import ShareInvite, ShareResult, ShareStatus, ShareItemKind, ShareCleanupConfig, ShareCleanupResult
 from .repository.base import ShareRepository
-from .cloner import ShareCloner
+from .cloner import ShareCloner, CloneContext
 
 
 class ShareService:
@@ -59,14 +59,16 @@ class ShareService:
 
         # Perform cloning
         try:
-            sender_display = self._sanitize_sender_display(invite.sender_user_id)
+            ctx = CloneContext(
+                sender_user_id=invite.sender_user_id,
+                sender_display=self._sanitize_sender_display(invite.sender_user_id),
+                recipient_user_id=recipient_user_id,
+            )
 
             if invite.item_kind == ShareItemKind.RESOURCE:
                 rid_mapping, name_conflicts = self._cloner.clone_resource_graph(
                     root_rid=invite.item_id,
-                    sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id,
-                    sender_display=sender_display
+                    ctx=ctx,
                 )
                 new_item_id = rid_mapping[invite.item_id]
                 result_mapping = rid_mapping
@@ -74,9 +76,7 @@ class ShareService:
             elif invite.item_kind == ShareItemKind.BLUEPRINT:
                 new_blueprint_id, rid_mapping, name_conflicts = self._cloner.clone_blueprint(
                     blueprint_id=invite.item_id,
-                    sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id,
-                    sender_display=sender_display
+                    ctx=ctx,
                 )
                 new_item_id = new_blueprint_id
                 result_mapping = {**rid_mapping, "blueprint_id": new_blueprint_id}
