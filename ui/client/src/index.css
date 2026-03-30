@@ -121,7 +121,7 @@
 
   .dark-mode input,
   .dark-mode textarea {
-    color: #111827 !important;
+    color: #ffffff !important;
     border-color: var(--border) !important;
   }
 
@@ -218,8 +218,13 @@
     inset: 0;
     pointer-events: none;
     border-radius: inherit;
+    z-index: 0; /* Ensure overlay stays behind content */
     /* Darken surfaces slightly with a neutral black overlay instead of white */
     background: rgba(0, 0, 0, var(--overlay-opacity, 0));
+  }
+  .overlay-elevation > * {
+    position: relative;
+    z-index: 1; /* All direct children above the overlay */
   }
   .overlay-0  { --overlay-opacity: 0; }
   .overlay-02 { --overlay-opacity: 0.02; }

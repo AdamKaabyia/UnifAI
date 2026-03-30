@@ -1,4 +1,5 @@
 import { Route, Switch, useLocation, useRoute } from "wouter";
+import React, { useEffect } from "react";
 import RagOverview from "@/pages/RagOverview";
 import AgenticOverview from "@/pages/AgenticOverview";
 import Configuration from "@/pages/Configuration";
@@ -10,13 +11,15 @@ import AgenticTemplates from "@/pages/AgenticTemplates";
 import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import Settings from "@/pages/Settings";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SharedProvider } from '@/contexts/SharedContext';
 import DocumentsPage from "./features/docs/DocumentsPage";
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AgenticAIProvider } from '@/contexts/AgenticAIContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import TermsApproval from '@/components/auth/TermsApproval';
@@ -64,8 +67,63 @@ function AppRoutes() {
       <Route path="/configuration" component={Configuration} />
       <Route path="/guides" component={GuidesPage} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+const AuthRoute: React.FC<{ component: React.ComponentType }> = ({ component: Component }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      setLocation('/');
+    }
+  }, [isAuthenticated, isLoading, setLocation]);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+    </div>;
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
+
+  return <Component />;
+};
+
+// Public auth paths that don't need ProtectedRoute
+const PUBLIC_AUTH_PATHS = ['/login', '/signup'];
+
+function AppContent() {
+  const [location] = useLocation();
+  
+  // Check if current path is a public auth route
+  const isPublicAuthRoute = PUBLIC_AUTH_PATHS.includes(location);
+  
+  if (isPublicAuthRoute) {
+    return (
+      <Switch>
+        <Route path="/login">
+          <AuthRoute component={Login} />
+        </Route>
+        <Route path="/signup">
+          <AuthRoute component={Signup} />
+        </Route>
+      </Switch>
+    );
+  }
+  
+  return (
+    <ProtectedRoute>
+      <TermsApproval>
+        <AppRoutes />
+      </TermsApproval>
+    </ProtectedRoute>
   );
 }
 
@@ -81,11 +139,7 @@ function App() {
         <SharedProvider>
           <ProjectProvider>
             <NotificationProvider>
-              <ProtectedRoute>
-                <TermsApproval>
-                  <AppRoutes />
-                </TermsApproval>
-              </ProtectedRoute>
+              <AppContent />
             </NotificationProvider>
           </ProjectProvider>
         </SharedProvider>
@@ -95,4 +149,4 @@ function App() {
 }
 
 export default App;
-              
+

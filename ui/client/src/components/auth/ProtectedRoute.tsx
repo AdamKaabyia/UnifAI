@@ -1,21 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/auth/LoadingSpinner';
-import LoginPage from '@/components/auth/LoginPage';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading, isLoggedOut, login } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setLocation('/login');
+    }
+  }, [isLoading, isAuthenticated, setLocation]);
 
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={login} showSessionEnded={isLoggedOut} />;
+    return <LoadingSpinner message="Redirecting to login..." />;
   }
 
   return <>{children}</>;

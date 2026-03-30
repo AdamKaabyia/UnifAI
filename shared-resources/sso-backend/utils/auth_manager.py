@@ -199,7 +199,20 @@ class AuthManager:
         
         @self.app.route('/api/auth/refresh', methods=['POST'])
         def refresh_token():
-            """Refresh access token"""
+            """Refresh access token - handles both Keycloak and local auth"""
+            # Check if this is a local auth session
+            if session.get('auth_provider') == 'local':
+                # Delegate to local auth service
+                auth_service = current_app.extensions.get('auth_service')
+                if auth_service:
+                    result = auth_service.refresh_session()
+                    if result.success:
+                        return jsonify({'message': result.message})
+                    else:
+                        return jsonify({'error': result.message}), 401
+                return jsonify({'error': 'Auth service unavailable'}), 503
+            
+            # Keycloak refresh flow
             if not session.get('refresh_token'):
                 return jsonify({'error': 'No refresh token available'}), 401
             
