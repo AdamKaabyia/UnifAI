@@ -10,7 +10,7 @@ export type TimeRange = 'today' | '7days' | '30days' | 'all';
 export interface TotalStats {
   total_runs: number;
   unique_users: number;
-  avg_runs_per_user: number;
+  blueprints_used: number;
 }
 
 export interface StatusBreakdown {
@@ -20,7 +20,7 @@ export interface StatusBreakdown {
 export interface UserActivity {
   user_id: string;
   run_count: number;
-  unique_blueprints: number;
+  blueprints_used: number;
   status_breakdown: StatusBreakdown;
 }
 
@@ -29,6 +29,13 @@ export interface BlueprintUsage {
   blueprint_name: string;
   run_count: number;
   unique_users: number;
+  avg_duration_seconds?: number;
+  last_run_at?: string;
+  success_rate: number;
+  completed_runs: number;
+  failed_runs: number;
+  in_progress_runs: number;
+  user_list: string[];
 }
 
 export interface TimeSeriesData {

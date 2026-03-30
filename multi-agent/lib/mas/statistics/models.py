@@ -60,7 +60,7 @@ class TotalStats(BaseModel):
     """Total statistics for system-wide overview."""
     total_runs: int = Field(..., description="Total number of workflow runs")
     unique_users: int = Field(..., description="Number of unique users")
-    avg_runs_per_user: float = Field(..., description="Average runs per user (can be fractional)")
+    blueprints_used: int = Field(..., description="Number of distinct blueprints executed")
 
 
 class UserActivity(BaseModel):
@@ -73,7 +73,7 @@ class UserActivity(BaseModel):
     user_id: str = Field(..., description="User identifier")
     run_count: int = Field(0, description="Number of session runs in the time period")
     status_breakdown: Dict[str, int] = Field(default_factory=dict, description="Run counts broken down by session status")
-    unique_blueprints: int = Field(0, description="Number of distinct blueprints used")
+    blueprints_used: int = Field(0, description="Number of distinct blueprints used")
 
 
 class BlueprintUsage(BaseModel):
@@ -81,12 +81,31 @@ class BlueprintUsage(BaseModel):
     Blueprint usage statistics for admin dashboard.
 
     Represents how a single blueprint has been used across the system,
-    including total runs and number of distinct users.
+    including total runs, number of distinct users, and execution metrics.
     """
     blueprint_id: str = Field(..., description="Blueprint identifier")
     blueprint_name: str = Field(..., description="Blueprint display name")
     run_count: int = Field(0, description="Total number of session runs")
     unique_users: int = Field(0, description="Number of distinct users who ran this blueprint")
+    avg_duration_seconds: Optional[float] = Field(
+        None,
+        description="Average execution duration in seconds (null if no completed runs with timing data)"
+    )
+    last_run_at: Optional[str] = Field(
+        None,
+        description="ISO timestamp of most recent execution"
+    )
+    success_rate: float = Field(
+        0.0,
+        description="Percentage of COMPLETED runs out of terminal runs (0.0 - 100.0)"
+    )
+    completed_runs: int = Field(0, description="Number of COMPLETED executions")
+    failed_runs: int = Field(0, description="Number of FAILED executions")
+    in_progress_runs: int = Field(0, description="Number of non-terminal executions (PENDING, QUEUED, RUNNING)")
+    user_list: List[str] = Field(
+        default_factory=list,
+        description="List of user IDs who executed this blueprint"
+    )
 
 
 class SystemStatsResponse(BaseModel):
@@ -97,7 +116,7 @@ class SystemStatsResponse(BaseModel):
     call the endpoint with different time_range values to get
     different views (e.g., today, last 7 days, last 30 days).
     """
-    total_stats: TotalStats = Field(..., description="Total statistics: total_runs, unique_users, avg_runs_per_user")
+    total_stats: TotalStats = Field(..., description="Total statistics: total_runs, unique_users, blueprints_used")
     status_breakdown: Dict[str, int] = Field(default_factory=dict, description="Breakdown of session runs by status")
     active_users: List[UserActivity] = Field(default_factory=list, description="Users active in the selected time range, sorted by run count")
     top_blueprints: List[BlueprintUsage] = Field(default_factory=list, description="Most used blueprints in the selected time range")
