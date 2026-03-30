@@ -1,15 +1,24 @@
 import os
 import sys
 
-# Add the parent directory of 'backend' (the root of the project) to the Python path
+# Add the parent directory of 'sso-backend' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from pymongo import MongoClient
 
 from endpoints import register_all_endpoints
 from flask import Flask
 from flask_cors import CORS
 from global_utils.flask.request_rules import RequestRules
+from global_utils.utils.util import get_mongo_url
 from utils.auth_manager import AuthManager
 from config.app_config import AppConfig
+from directory.factory import build_directory_provider
+from teams.repository.mongo_repository import MongoTeamRepository
+from teams.service import TeamService
 
 # Init FLASK
 app = Flask(__name__)
@@ -22,9 +31,15 @@ CORS(app, supports_credentials=True, origins=os.environ.get("FRONTEND_URL", "htt
 
 # Initialize Authentication Manager
 auth_manager = AuthManager(app)
-
-# Store auth_manager in app extensions for easy access
 app.extensions['auth_manager'] = auth_manager
+
+# ── Directory + Team wiring ───────────────────────────────────────────
+mongo_client = MongoClient(get_mongo_url())
+teams_db = mongo_client[config.mongo_db]
+team_repo = MongoTeamRepository(db=teams_db, coll_name=config.teams_coll)
+directory_provider = build_directory_provider(config)
+team_service = TeamService(repository=team_repo, directory_provider=directory_provider)
+app.extensions['team_service'] = team_service
 
 register_all_endpoints(app)
 

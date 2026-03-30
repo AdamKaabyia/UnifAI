@@ -12,8 +12,26 @@ class AppConfig(SharedConfig):
     client_secret: str = "a0a82b17-e7e7-49c6-ad1c-3d03c79ff4fd"
     keycloak_realm: str = "EmployeeIDP"
     version: str = "1.0.0"
-    admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
+    admin_allowed_users: list = []
 
-    frontend_url: str = "http://localhost:5000"    # session_cookie_secure=True
+    frontend_url: str = "http://localhost:5000"
     backend_env: str = "development"
+
+    # MongoDB — teams collection
+    mongo_db: str = "UnifAI"
+    teams_coll: str = "teams"
+
+    # Directory provider (e.g. "ldap" or "" to disable)
+    directory_provider: str = ""
+    directory_url: str = ""
+    directory_timeout: int = 10
+    directory_verify_ssl: bool = True
+
+    # LDAP-specific settings (used when directory_provider="ldap")
+    directory_ldap_user_base_dn: str = "ou=users,dc=redhat,dc=com"
+    directory_ldap_group_base_dn: str = "ou=adhoc,ou=managedGroups,dc=redhat,dc=com"
+    directory_ldap_group_object_class: str = "groupOfUniqueNames,rhatRoverGroup"
+    directory_ldap_group_member_attr: str = "uniqueMember"
+    directory_ldap_bind_dn: str = ""
+    directory_ldap_bind_password: str = ""
 
