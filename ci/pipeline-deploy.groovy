@@ -243,7 +243,7 @@ pipeline {
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredentialsId}",
-                            url: "git@github.com:${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
+                            url: "git@${buildParams.MainRepoURL}:${buildParams.MainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -256,7 +256,7 @@ pipeline {
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
-                            url: "git@github.com:${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
+                            url: "git@${buildParams.CredMainRepoURL}:${buildParams.CredMainRepoProject}.git"
                         ]]
                     ])
                 }
