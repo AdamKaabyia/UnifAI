@@ -123,14 +123,15 @@ def updateValuesYaml(String filePath , String version) {
 
 def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
+    def sso_env_file = null
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
-        def sso_env_file = "./UnifAI-secrets/production/.env_sso"
-    } else if(params.deploy_location == 'STAGING') {
+        sso_env_file = "./UnifAI-secrets/production/.env_sso"
+    } else if (params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
-        def sso_env_file = "./UnifAI-secrets/staging/.env_sso"
+        sso_env_file = "./UnifAI-secrets/staging/.env_sso"
     }
-+   echo("sso env file: ${sso_env_file}")
+    echo("sso env file: ${sso_env_file}")
     echo("✅ Deployer env updated successfully")
     return sso_env_file
 }
