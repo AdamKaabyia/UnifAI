@@ -3,6 +3,26 @@ from uuid import uuid4
 from datetime import datetime
 from pydantic import BaseModel, Field, Extra
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Blueprint execution statistics (aggregated across all sessions)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class BlueprintExecutionStats(BaseModel):
+    """
+    Pre-aggregated execution statistics for a single blueprint.
+
+    Returned by the repository layer with raw metrics computed via
+    database aggregation. The service layer transforms these into
+    BlueprintUsage models with additional fields (name lookup, success rate %).
+    """
+    blueprint_id: str = Field(..., description="Blueprint identifier")
+    total_runs: int = Field(0, description="Total number of executions")
+    completed_runs: int = Field(0, description="Number of COMPLETED executions")
+    failed_runs: int = Field(0, description="Number of FAILED executions")
+    last_run: Optional[str] = Field(None, description="ISO timestamp of most recent execution")
+    avg_duration_ms: Optional[float] = Field(None, description="Average duration in milliseconds")
+    users: List[str] = Field(default_factory=list, description="List of user IDs who ran this blueprint")
+
 # -----------------------------------------------------------------------------
 # Import the *catalog* specs (single source of truth for field validation)
 # -----------------------------------------------------------------------------

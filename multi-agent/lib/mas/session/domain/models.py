@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from mas.core.dto import GroupedCount
+from mas.blueprints.models.blueprint import BlueprintExecutionStats
 
 
 class TimeSeriesPoint(BaseModel):
@@ -36,6 +37,9 @@ class SystemAnalyticsData(BaseModel):
     - Blueprint perspective: which users ran each blueprint?
     Both views are derived from the same (user_id, blueprint_id) grouping.
 
+    The blueprint_stats field provides pre-aggregated execution metrics
+    per blueprint (duration, success rate, last run, users list).
+
     Implementations should optimize for efficiency (e.g., batching
     multiple aggregations into a single database operation).
     """
@@ -46,6 +50,10 @@ class SystemAnalyticsData(BaseModel):
     user_blueprint_counts: List[GroupedCount] = Field(
         default_factory=list,
         description="Sessions grouped by user_id and blueprint_id (used for both user and blueprint views)"
+    )
+    blueprint_stats: List[BlueprintExecutionStats] = Field(
+        default_factory=list,
+        description="Per-blueprint aggregated execution metrics"
     )
 
 

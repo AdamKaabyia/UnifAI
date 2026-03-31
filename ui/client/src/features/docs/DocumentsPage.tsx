@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { FaTh, FaList } from "react-icons/fa";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Document } from "@/types";
 import { UploadTab } from "./UploadTab";
 import Sidebar from "@/components/layout/Sidebar";
@@ -61,7 +61,7 @@ export default function Documents() {
       return `Embedding service is currently unavailable.${suffix}`;
     }
     return `Required services are currently unavailable.${suffix}`;
-  }, [docling, embedding]);
+  }, [docling?.status, embedding?.status]);
 
   // Track previous uploadEnabled state to detect changes
   const prevUploadEnabled = useRef<boolean | null>(null);
@@ -129,11 +129,14 @@ export default function Documents() {
     }
   }, [showUploadModal]);
 
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesType = fileTypeFilter === "all" || doc.type_data.file_type === fileTypeFilter;
-    const matchesSearch = doc.source_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesSearch;
-  });
+  const filteredDocuments = useMemo(
+    () => documents.filter((doc) => {
+      const matchesType = fileTypeFilter === "all" || doc.type_data.file_type === fileTypeFilter;
+      const matchesSearch = doc.source_name?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesType && matchesSearch;
+    }),
+    [documents, fileTypeFilter, searchQuery]
+  );
 
   // Reset grid page when filters change
   useEffect(() => {

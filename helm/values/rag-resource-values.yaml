@@ -16,6 +16,7 @@ unifai_rag_server:
   env:
     ROLE: "flask"
     SHARED_STORAGE: "/app/shared"
+    BACKEND_URL: "http://unifai-backend:8005"
     VERSION: ""
     DOCLING_SERVICE_URL: "https://docling-service-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
     DOCLING_PDF_BACKEND: "dlparse_v4"
@@ -42,6 +43,7 @@ unifai_rag_celery:
   env:
     ROLE: "celery"
     SHARED_STORAGE: "/app/shared"
+    BACKEND_URL: "http://unifai-backend:8005"
     CELERY_QUEUES: "slack_queue,document_queue,slack_events_queue"
     CELERY_WORKER: 8
     CELERY_POOL: "prefork"
@@ -61,6 +63,24 @@ unifai_rag_celery:
   tolerations: []
 
 
+unifai_rag_celery_beat:
+  debug: false
+  replicaCount: 1
+  image:
+    repository: images.paas.redhat.com/unifai/rag
+    tag: "latest"
+    pullPolicy: Always
+  env:
+    ROLE: "celery-beat"
+    SHARED_STORAGE: "/app/shared"
+    VERSION: ""
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
 storage:
   volumeName: unifai-rag-shared-storage
   requestedSize: 100Gi

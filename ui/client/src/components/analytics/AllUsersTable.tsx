@@ -6,7 +6,7 @@ interface AllUsersTableProps {
   users: Array<{
     user_id: string;
     run_count: number;
-    unique_blueprints: number;
+    blueprints_used: number;
   }>;
   page: number;
   setPage: (updater: (page: number) => number) => void;
@@ -35,7 +35,7 @@ export function AllUsersTable({ users, page, setPage, itemsPerPage }: AllUsersTa
                     {user.user_id}
                   </TableCell>
                   <TableCell className="text-right text-sm">{user.run_count}</TableCell>
-                  <TableCell className="text-right text-sm">{user.unique_blueprints}</TableCell>
+                  <TableCell className="text-right text-sm">{user.blueprints_used}</TableCell>
                 </TableRow>
               ))
             ) : (

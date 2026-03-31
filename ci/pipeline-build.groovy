@@ -10,6 +10,7 @@ properties([
         booleanParam(name: 'build_gui', defaultValue: false, description: 'Create image for UI'),
         booleanParam(name: 'build_rag_backend', defaultValue: false, description: 'Create image for rag backend'),
         booleanParam(name: 'build_multiagent_backend', defaultValue: false, description: 'Create image for multiagent backend'),
+        booleanParam(name: 'build_backend', defaultValue: false, description: 'Create image for platform backend'),
         booleanParam(name: 'set_image_candidate', defaultValue: false, description: 'Set images with latest tag'),
         
         // 🚀 Deployment Parameters
@@ -217,6 +218,23 @@ pipeline {
                         }
                     }
                 }
+                stage('build_backend_image') {
+                    when { expression { params.build_backend } }
+                    steps {
+                        script {
+                            def component = "backend"
+                            dir("${buildParams.DevRoot}/${params.BRANCH}/") {
+                                cleanWorkspace(component)
+                                if (buildDockerImage(component)) {
+                                    tagAndPushImageToRegistry(buildParams, component)
+                                    cleanWorkspace(component)
+                                } else {
+                                    error("Terminating process for ${component}: Build failed")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -230,6 +248,7 @@ pipeline {
                     if (params.build_sso_image) modules << 'sso'
                     if (params.build_rag_backend) modules << 'rag'
                     if (params.build_multiagent_backend) modules << 'multiagent'
+                    if (params.build_backend) modules << 'backend'
                     if (params.build_gui) modules << 'ui'
                     def modulesToDeploy = modules.join(',')
 
