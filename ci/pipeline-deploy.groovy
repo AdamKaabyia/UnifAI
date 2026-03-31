@@ -27,7 +27,7 @@ def buildParams = [
     CredMainRepoURL    : "github.com",
     CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "github-unifai-token",
+    CredCredentialsId  : "tag-github-creds",
     // CredMainRepoURL    : "gitlab.cee.redhat.com",
     // CredMainRepoProject: "ai_tools/genie-cred-data", 
     // CredMainRepoBranch : "main",
