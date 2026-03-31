@@ -27,7 +27,7 @@ def buildParams = [
     CredMainRepoURL    : "github.com",
     CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "tag-github-creds",
+    CredCredentialsId  : "jenkins_agent_deploy_key",
     // CredMainRepoURL    : "gitlab.cee.redhat.com",
     // CredMainRepoProject: "ai_tools/genie-cred-data", 
     // CredMainRepoBranch : "main",
@@ -243,7 +243,7 @@ pipeline {
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredentialsId}",
-                            url: "https://${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
+                            url: "git@github.com:${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -256,7 +256,7 @@ pipeline {
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
-                            url: "https://${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
+                            url: "git@github.com:${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
                         ]]
                     ])
                 }
