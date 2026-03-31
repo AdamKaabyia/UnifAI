@@ -125,10 +125,10 @@ def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
-        sso_env_file = "./UnifAI-secrets/production/.env_sso"
+        def sso_env_file = "./UnifAI-secrets/production/.env_sso"
     } else if(params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
-        sso_env_file = "./UnifAI-secrets/staging/.env_sso"
+        def sso_env_file = "./UnifAI-secrets/staging/.env_sso"
     }
 +   echo("sso env file: ${sso_env_file}")
     echo("✅ Deployer env updated successfully")
