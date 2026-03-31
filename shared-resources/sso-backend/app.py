@@ -13,6 +13,7 @@ from models.user import UserRepository
 from services.auth_service import AuthService
 from services.profile_service import ProfileService
 from config.app_config import AppConfig
+from directory.factory import build_directory_provider
 
 # Init FLASK
 app = Flask(__name__)
@@ -35,8 +36,12 @@ user_repo = UserRepository(
     collection_name="local_users"
 )
 
+# Initialize directory provider (LDAP/Rover) — None when disabled
+directory_provider = build_directory_provider(config)
+app.extensions['directory_provider'] = directory_provider
+
 # Initialize Services for local auth (SOLID pattern)
-auth_service = AuthService(user_repo)
+auth_service = AuthService(user_repo, directory_provider=directory_provider)
 profile_service = ProfileService(user_repo)
 
 # Register services in app extensions for endpoint access

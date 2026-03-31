@@ -58,12 +58,15 @@ class AuthManager:
         # Register auth routes
         self._register_auth_routes()
         
-        # Set up session configuration
+        # Set up session configuration (Secure + SameSite=None only works over
+        # HTTPS; in development we fall back to Lax so the browser actually
+        # persists the session cookie over plain HTTP).
+        is_production = self.backend_env == 'production'
         app.config.update({
-            'SESSION_COOKIE_SECURE': True,  # Required for SameSite=None
+            'SESSION_COOKIE_SECURE': is_production,
             'SESSION_COOKIE_HTTPONLY': True,
-            'SESSION_COOKIE_SAMESITE': 'None',  # Must be 'None' for cross-origin
-            'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
+            'SESSION_COOKIE_SAMESITE': 'None' if is_production else 'Lax',
+            'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)
         })
     
     def _register_auth_routes(self):

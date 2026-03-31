@@ -12,6 +12,7 @@ from flask import session
 from models.user import LocalUser, UserRepository
 from utils.password_utils import hash_password, verify_password, validate_password_strength, validate_email
 from shared.logger import logger
+from directory.provider import DirectoryProvider
 
 
 @dataclass
@@ -48,8 +49,10 @@ class AuthService:
             # User registered successfully
     """
     
-    def __init__(self, user_repo: UserRepository):
+    def __init__(self, user_repo: UserRepository,
+                 directory_provider: Optional[DirectoryProvider] = None):
         self.user_repo = user_repo
+        self._directory = directory_provider
     
     def signup(self, username: str, email: str, password: str, name: str) -> AuthResult:
         """
@@ -81,10 +84,13 @@ class AuthService:
         if not name or len(name) < 2:
             return AuthResult(False, "Name must be at least 2 characters long")
         
-        # Check for existing username/email
+        # Check for existing username/email (local DB + directory/Rover)
         if self.user_repo.username_exists(username):
             return AuthResult(False, "Username already exists")
         
+        if self._username_exists_in_directory(username):
+            return AuthResult(False, "Username already exists in the organization directory")
+
         if self.user_repo.email_exists(email):
             return AuthResult(False, "Email already exists")
         
@@ -206,11 +212,26 @@ class AuthService:
         """Check if current session is a local auth session."""
         return session.get('auth_provider') == 'local'
     
+    def _username_exists_in_directory(self, username: str) -> bool:
+        """Check if username already exists in the external directory (Rover/LDAP)."""
+        if not self._directory:
+            return False
+        try:
+            user = self._directory.get_user(username)
+            return user is not None
+        except Exception as e:
+            logger.warning(f"Directory lookup failed for '{username}': {e}")
+            return False
+
     def check_username_available(self, username: str) -> bool:
-        """Check if a username is available."""
+        """Check if a username is available (local DB + directory/Rover)."""
         if not username or len(username) < 3:
             return False
-        return not self.user_repo.username_exists(username)
+        if self.user_repo.username_exists(username):
+            return False
+        if self._username_exists_in_directory(username):
+            return False
+        return True
     
     def check_email_available(self, email: str) -> bool:
         """Check if an email is available."""

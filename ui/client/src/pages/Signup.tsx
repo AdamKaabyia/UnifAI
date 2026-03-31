@@ -235,7 +235,7 @@ export default function Signup() {
                   )}
                 </div>
                 {usernameAvailable === false && (
-                  <p className="text-red-400 text-xs">Username is already taken</p>
+                  <p className="text-red-400 text-xs">This username is unavailable</p>
                 )}
               </div>
 

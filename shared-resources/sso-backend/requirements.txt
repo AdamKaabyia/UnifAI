@@ -8,3 +8,4 @@ pydantic
 pydantic-settings
 bcrypt
 pymongo
+ldap3
