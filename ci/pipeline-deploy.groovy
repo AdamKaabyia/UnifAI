@@ -125,19 +125,14 @@ def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
-        script {
-                def sso_env_file = "./UnifAI-secrets/production/.env_sso" // Define a local Groovy variable
-                echo("sso env file: ${sso_env_file}")
-        }
+        sso_env_file = "./UnifAI-secrets/production/.env_sso"
     } else if(params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
-        script {
-                def sso_env_file = "./UnifAI-secrets/staging/.env_sso" // Define a local Groovy variable
-                echo("sso env file: ${sso_env_file}")
-        }
+        sso_env_file = "./UnifAI-secrets/staging/.env_sso"
     }
-
-    echo "✅ Deployer env updated successfully"
++   echo("sso env file: ${sso_env_file}")
+    echo("✅ Deployer env updated successfully")
+    return sso_env_file
 }
 
 
@@ -301,7 +296,7 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            updateDeployerEnv()
+                            def sso_env_file = updateDeployerEnv()
                             echo("Deploy Helm container")
                             sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
