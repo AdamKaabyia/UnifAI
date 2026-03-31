@@ -1,0 +1,29 @@
+environments:
+  default:
+    values:
+      - ./values/backend-resource-values.yaml
+---
+
+helmDefaults:
+  createNamespace: false
+  wait: false
+
+releases:
+
+  - name: unifai-backend
+    chart: ./backend/unifai-backend
+    wait: true
+    values:
+      - {{- toYaml .Values.unifai_backend | nindent 8 }}
+      - ./values/global-config.yaml
+    hooks:
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+          - "./scripts/backend-presync.sh"
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - "./scripts/backend-postsync.sh"

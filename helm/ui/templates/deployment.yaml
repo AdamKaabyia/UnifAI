@@ -57,6 +57,7 @@ spec:
           {{- range $value := .Values.globalConfigMapNames }}
           - configMapRef:
               name: {{ $value }}
+              optional: true
           {{- end }}
           {{- if not .Values.debug  }}
           {{- with .Values.livenessProbe }}

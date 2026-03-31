@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useProject } from "@/contexts/ProjectContext";
 import { 
   FaTachometerAlt, FaCogs, FaFileAlt, 
-  FaChartLine, FaUserShield, FaCog,
+  FaChartLine, FaUserShield, FaCog, FaSignOutAlt,
   FaRobot, FaFile, FaChevronLeft, FaChevronRight,
   FaInfoCircle, FaBook, FaComment, FaPuzzlePiece
 } from "react-icons/fa";
@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { useAuth, User } from '@/contexts/AuthContext';
+import { useAdminAccess } from '@/hooks/use-admin-access';
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -24,7 +25,8 @@ export default function Sidebar() {
     setIsCollapsed(!isCollapsed);
   };
 
-    const { user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { isAdmin } = useAdminAccess();
 
   const getInitials = (name: string): string => {
     return name
@@ -225,7 +227,7 @@ export default function Sidebar() {
             isActive={location === '/configuration'}
             status={null}
             isCollapsed={isCollapsed}
-            disabled={true}
+            disabled={!isAdmin}
           />
           {user?.is_admin && (
           <NavItem 

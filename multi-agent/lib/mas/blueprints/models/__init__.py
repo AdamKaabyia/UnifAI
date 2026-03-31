@@ -12,6 +12,9 @@ from mas.blueprints.models.blueprint import (
     # Blueprint types
     BlueprintDraft,
     BlueprintSpec,
+
+    # Analytics
+    BlueprintExecutionStats,
 )
 
 __all__ = [
@@ -26,4 +29,7 @@ __all__ = [
     # Blueprint types
     "BlueprintDraft",
     "BlueprintSpec",
+
+    # Analytics
+    "BlueprintExecutionStats",
 ]
