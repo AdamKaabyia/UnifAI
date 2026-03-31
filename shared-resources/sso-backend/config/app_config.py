@@ -8,7 +8,7 @@ class AppConfig(SharedConfig):
 
     # Keycloak Configuration
     keycloak_base_url: str = "0.0.0.0"
-    client_id: str = "TAG-001"
+    client_id: str = ""
     client_secret: str = ""
     keycloak_realm: str = ""
     version: str = "1.0.0"
