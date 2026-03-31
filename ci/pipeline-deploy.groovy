@@ -24,10 +24,14 @@ def buildParams = [
     MainRepoProject    : "redhat-community-ai-tools/UnifAI",
     MainRepoBranch     : "${params.BRANCH}",
     CredentialsId      : "github-unifai-token",
-    CredMainRepoURL    : "gitlab.cee.redhat.com",
-    CredMainRepoProject: "ai_tools/genie-cred-data", 
+    CredMainRepoURL    : "github.com",
+    CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "gitlab-genie",
+    CredCredentialsId  : "github-unifai-token",
+    // CredMainRepoURL    : "gitlab.cee.redhat.com",
+    // CredMainRepoProject: "ai_tools/genie-cred-data", 
+    // CredMainRepoBranch : "main",
+    // CredCredentialsId  : "gitlab-genie",
 
     NodeToRun          : "tag-slave",
     DevRoot            : "/root/workspace/${env.JOB_NAME}",
@@ -120,9 +124,17 @@ def updateValuesYaml(String filePath , String version) {
 def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
     if (params.deploy_location == 'PRODUCTION') {
-        updateEnvFile("./genie-cred-data/.env", "umami_website_name", "unifai-production")
+        updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
+        script {
+                def sso_env_file = "./UnifAI-secrets/production/.env_sso" // Define a local Groovy variable
+                echo("sso env file: ${sso_env_file}")
+        }
     } else if(params.deploy_location == 'STAGING') {
-        updateEnvFile("./genie-cred-data/.env", "umami_website_name", "unifai-staging")
+        updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
+        script {
+                def sso_env_file = "./UnifAI-secrets/staging/.env_sso" // Define a local Groovy variable
+                echo("sso env file: ${sso_env_file}")
+        }
     }
 
     echo "✅ Deployer env updated successfully"
@@ -245,7 +257,7 @@ pipeline {
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
                         //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/genie-cred-data/"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/UnifAI-secrets/"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
@@ -291,7 +303,7 @@ pipeline {
                             sh("oc project ${NameSpace}")
                             updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {
