@@ -25,7 +25,6 @@ import WorkflowsPanel from "./WorkflowsPanel";
 import axios from "@/http/axiosAgentConfig";
 import { fetchResolvedBlueprint } from "@/api/blueprints";
 import { useStreamingData } from "./StreamingDataContext";
-import { EnhancedStreamReader } from "@/components/shared/stream/StreamJsonParser";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
 import { ChatSession, ChatMessage, ChatSessionData } from "@/types/session";
@@ -33,6 +32,7 @@ import { transformSessionData, sortSessionsByTimestamp } from "@/utils/sessionHe
 import { useSessionManagement } from "@/hooks/use-session-management";
 import { SessionPayload } from "./ExecutionTab";
 import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
+import { useSessionStream } from "@/hooks/use-session-stream";
 import { FlowObject } from "./graphs/interfaces";
 
 const COLLAB_POLL_INTERVAL = 3000;
@@ -113,8 +113,12 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
 
   // Per-session participant tracking from backend (sessionId -> usernames)
   const [sessionParticipants, setSessionParticipants] = useState<Record<string, string[]>>({});
+  // Whether a remote user is executing (detected via session status poll)
+  const [isSessionBusy, setIsSessionBusy] = useState(false);
+  // Typing indicators from other users
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
-  const { nodeListRef } = useStreamingData();
+  const { nodeListRef, clearStream } = useStreamingData();
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const contextUserId =
@@ -128,6 +132,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const joinedSessionRef = useRef<string | null>(null);
   const selectedSessionRef = useRef<ChatSession | null>(null);
   const isLiveRequestRef = useRef(false);
+  const wasSessionBusyRef = useRef(false);
+  const streamCompleteResolverRef = useRef<(() => void) | null>(null);
 
   const {
     isValidating: isValidatingBlueprint,
@@ -137,6 +143,39 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   } = useBlueprintValidation({ showToastOnFailure: true });
 
   const { loadSessionMessages } = useSessionManagement();
+
+  // Ref for updateNodeList so the session stream hook can use it before it's defined
+  const updateNodeListRef = useRef<((chunkData: any) => void) | null>(null);
+
+  // Remote streaming: subscribe to Redis stream when another user is executing
+  const {
+    isStreaming: isRemoteStreaming,
+    subscribeToStream: subscribeRemoteStream,
+    cancelStream: cancelRemoteStream,
+  } = useSessionStream({
+    onChunk: useCallback((chunkData: any) => {
+      updateNodeListRef.current?.(chunkData);
+    }, []),
+    onStreamEnd: useCallback(() => {
+      setIsSessionBusy(false);
+      streamCompleteResolverRef.current?.();
+      const session = selectedSessionRef.current;
+      if (session) {
+        loadSessionMessages(session).then((updated) => {
+          if (updated) {
+            setCurrentSessionMessages(updated.messages);
+            setChatSessions(prev =>
+              prev.map(s => (s.id === session.id ? { ...s, ...updated } : s)),
+            );
+          }
+        });
+      }
+    }, [loadSessionMessages]),
+    onError: useCallback((error: string) => {
+      console.error('Session stream error:', error);
+      streamCompleteResolverRef.current?.();
+    }, []),
+  });
 
   // ─── Session management ──────────────────────────────────────────────────
 
@@ -374,35 +413,50 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     },
     [nodeListRef],
   );
+  updateNodeListRef.current = updateNodeList;
 
   const triggerExecution = useCallback(
     async (sessionPayload: SessionPayload) => {
-      let streamReader: EnhancedStreamReader | null = null;
       try {
         setIsLiveRequest(true);
-        const payload = {
-          ...sessionPayload,
+
+        await axios.post("/sessions/user.session.submit", {
+          sessionId: sessionPayload.sessionId,
+          inputs: sessionPayload.inputs,
           scope: globalScope,
           loggedInUser: user?.username || "default",
-        };
-        const response = await fetch("/api2/sessions/user.session.execute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
         });
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-        if (!response.body) throw new Error("ReadableStream not supported!");
 
-        streamReader = new EnhancedStreamReader((chunkData: any) => {
-          updateNodeList(chunkData);
+        subscribeRemoteStream(sessionPayload.sessionId);
+
+        await new Promise<void>((resolve) => {
+          let resolved = false;
+          const done = () => {
+            if (resolved) return;
+            resolved = true;
+            clearInterval(statusPoll);
+            resolve();
+          };
+
+          streamCompleteResolverRef.current = done;
+
+          const statusPoll = setInterval(async () => {
+            try {
+              const statusRes = await axios.get(
+                `/sessions/session.status.get?sessionId=${sessionPayload.sessionId}`,
+              );
+              const status = statusRes.data;
+              if (status !== "RUNNING" && status !== "QUEUED") {
+                done();
+              }
+            } catch { /* ignore polling errors */ }
+          }, 2000);
         });
-        await streamReader.readStream(response);
       } catch (err) {
         console.error("Error communicating with chat API", err);
-        if (streamReader) await streamReader.cancel();
       } finally {
         setIsLiveRequest(false);
+        streamCompleteResolverRef.current = null;
         try {
           const res = await axios.get(
             `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`,
@@ -414,7 +468,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
         }
       }
     },
-    [globalScope, user?.username, updateNodeList],
+    [globalScope, user?.username, subscribeRemoteStream],
   );
 
   // ─── Collaboration: join / leave / heartbeat / poll ──────────────────────
@@ -488,20 +542,47 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     const session = selectedSessionRef.current;
     if (!session) return;
 
-    // Skip message poll while local user is executing to avoid conflicts
+    // Check session status to detect remote execution
     if (!isLiveRequestRef.current) {
-      const updated = await loadSessionMessages(session);
-      if (updated) {
-        setCurrentSessionMessages(updated.messages);
-        setChatSessions(prev =>
-          prev.map(s => (s.id === session.id ? { ...s, ...updated } : s)),
+      try {
+        const statusRes = await axios.get(
+          `/sessions/session.status.get?sessionId=${session.id}`,
         );
+        const status = statusRes.data;
+        const busy = status === "RUNNING" || status === "QUEUED";
+        setIsSessionBusy(busy);
+      } catch {
+        setIsSessionBusy(false);
       }
+    }
+
+    // Always poll messages — stable IDs prevent glitching, and
+    // the ChatInterface skips the sync while actively streaming.
+    const updated = await loadSessionMessages(session);
+    if (updated) {
+      setCurrentSessionMessages(updated.messages);
+      setChatSessions(prev =>
+        prev.map(s => (s.id === session.id ? { ...s, ...updated } : s)),
+      );
     }
 
     // Always poll participants
     await fetchParticipants(session.id);
-  }, [loadSessionMessages, fetchParticipants]);
+
+    // Poll typing indicators
+    try {
+      const typingRes = await axios.get(
+        `/collaboration/session.typing?sessionId=${session.id}`,
+      );
+      const currentUser = user?.username || "default";
+      const others = (typingRes.data?.typingUsers || []).filter(
+        (u: string) => u !== currentUser,
+      );
+      setTypingUsers(others);
+    } catch {
+      // typing poll failed — ignore
+    }
+  }, [loadSessionMessages, fetchParticipants, user?.username]);
 
   const getSessionParticipantMembers = useCallback((sessionId: string): MemberDisplay[] => {
     const participants = sessionParticipants[sessionId];
@@ -515,6 +596,22 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   // Keep refs in sync for stable interval callbacks
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { isLiveRequestRef.current = isLiveRequest; }, [isLiveRequest]);
+
+  // Subscribe to remote stream when session becomes busy from another user
+  useEffect(() => {
+    const justBecameBusy = isSessionBusy && !wasSessionBusyRef.current;
+    wasSessionBusyRef.current = isSessionBusy;
+
+    if (justBecameBusy && !isLiveRequest && selectedSession) {
+      // Subscribe directly — the Redis reader will block-wait if the
+      // stream hasn't been created yet, then replay all events once
+      // the foreground runner starts writing.
+      subscribeRemoteStream(selectedSession.id);
+    }
+    if (!isSessionBusy && !isLiveRequest) {
+      cancelRemoteStream();
+    }
+  }, [isSessionBusy, isLiveRequest, selectedSession?.id]);
 
   // ─── Effects ───────────────────────────────────────────────────────────
 
@@ -532,6 +629,13 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       leaveSession(previousSession);
     }
 
+    // Reset transient state for new session
+    setIsSessionBusy(false);
+    setTypingUsers([]);
+    wasSessionBusyRef.current = false;
+    cancelRemoteStream();
+    clearStream();
+
     // Clear previous timers
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
@@ -541,6 +645,9 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     // Join new session
     joinSession(selectedSession.id);
     fetchParticipants(selectedSession.id);
+
+    // Immediate poll to detect remote execution + load latest messages
+    pollSessionUpdates();
 
     // Poll for messages + participants
     pollTimerRef.current = setInterval(pollSessionUpdates, COLLAB_POLL_INTERVAL);
@@ -557,6 +664,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   // Leave session on unmount
   useEffect(() => {
     return () => {
+      cancelRemoteStream();
       if (joinedSessionRef.current) {
         leaveSession(joinedSessionRef.current);
       }
@@ -689,8 +797,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
             {selectedSession ? (
               <>
                 <motion.div
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${isLiveRequest ? "bg-emerald-400" : "bg-gray-500"}`}
-                  animate={isLiveRequest ? { opacity: [1, 0.4, 1] } : {}}
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${(isLiveRequest || isSessionBusy) ? "bg-emerald-400" : "bg-gray-500"}`}
+                  animate={(isLiveRequest || isSessionBusy) ? { opacity: [1, 0.4, 1] } : {}}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 />
                 <span className="font-bold text-sm text-white flex-1 truncate">
@@ -728,6 +836,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           <div className="flex-1 min-h-0">
             {selectedSession ? (
               <ChatInterface
+                key={selectedSession.id}
                 runId={selectedSession.id}
                 triggerExecution={triggerExecution}
                 initialMessages={currentSessionMessages}
@@ -735,9 +844,10 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
                 isSharingDisabled={isSharingDisabled}
                 blueprintValid={isBlueprintValid}
                 isValidatingBlueprint={isValidatingBlueprint}
-                isLiveRequest={isLiveRequest}
+                isLiveRequest={isLiveRequest || isSessionBusy}
                 collaborationMode={true}
                 teamMembers={teamMembers}
+                typingUsers={typingUsers}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -764,7 +874,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
                   Live Workflow
                 </span>
               </div>
-              {isLiveRequest && (
+              {(isLiveRequest || isSessionBusy) && (
                 <div className="flex items-center gap-1.5">
                   <motion.div
                     className="w-1.5 h-1.5 rounded-full bg-emerald-400"
@@ -852,8 +962,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
               </div>
               <div className="flex justify-between">
                 <dt className="font-medium text-gray-400">Status</dt>
-                <dd className={isLiveRequest ? "text-emerald-400 font-semibold" : "text-gray-500"}>
-                  {isLiveRequest ? "Running" : selectedSession ? "Idle" : "—"}
+                <dd className={(isLiveRequest || isSessionBusy) ? "text-emerald-400 font-semibold" : "text-gray-500"}>
+                  {(isLiveRequest || isSessionBusy) ? "Running" : selectedSession ? "Idle" : "—"}
                 </dd>
               </div>
               <div className="flex justify-between">

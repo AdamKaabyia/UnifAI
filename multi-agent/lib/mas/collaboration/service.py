@@ -99,5 +99,16 @@ class CollaborationService:
         """Sessions the user is currently participating in (across all teams)."""
         return self._store.get_user_sessions(user_id)
 
+    # ── Typing ──────────────────────────────────────────────────────
+
+    def set_typing(self, session_id: str, user_id: str) -> None:
+        self._store.set_typing(session_id, user_id, ttl=5)
+
+    def clear_typing(self, session_id: str, user_id: str) -> None:
+        self._store.clear_typing(session_id, user_id)
+
+    def get_typing_users(self, session_id: str) -> list[str]:
+        return self._store.get_typing_users(session_id)
+
     def is_available(self) -> bool:
         return self._store.is_available()

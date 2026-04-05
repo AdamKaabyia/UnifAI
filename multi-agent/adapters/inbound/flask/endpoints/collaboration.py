@@ -137,6 +137,43 @@ def get_user_active_sessions(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ── Typing indicators ────────────────────────────────────────────
+
+@collaboration_bp.route("/session.typing", methods=["POST"])
+@from_body({
+    "session_id": fields.Str(data_key="sessionId", required=True),
+    "user_id": fields.Str(data_key="userId", required=True),
+    "is_typing": fields.Bool(data_key="isTyping", load_default=True),
+})
+def set_typing(session_id, user_id, is_typing):
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        if is_typing:
+            svc.set_typing(session_id=session_id, user_id=user_id)
+        else:
+            svc.clear_typing(session_id=session_id, user_id=user_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@collaboration_bp.route("/session.typing", methods=["GET"])
+@from_query({
+    "session_id": fields.Str(data_key="sessionId", required=True),
+})
+def get_typing(session_id):
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        users = svc.get_typing_users(session_id)
+        return jsonify({"sessionId": session_id, "typingUsers": users}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @collaboration_bp.route("/health", methods=["GET"])
 def collaboration_health():
     svc = _collab_svc()

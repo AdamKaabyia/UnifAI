@@ -144,6 +144,32 @@ class RedisCollaborationStore(CollaborationStore):
         members = self._client().smembers(_user_sessions_key(user_id))
         return [m.decode() if isinstance(m, bytes) else m for m in members]
 
+    # ── Typing indicators ────────────────────────────────────────────
+
+    @staticmethod
+    def _typing_key(session_id: str, user_id: str) -> str:
+        return f"{_PREFIX}session:{session_id}:typing:{user_id}"
+
+    @staticmethod
+    def _typing_pattern(session_id: str) -> str:
+        return f"{_PREFIX}session:{session_id}:typing:*"
+
+    def set_typing(self, session_id: str, user_id: str, ttl: int = 5) -> None:
+        self._client().set(self._typing_key(session_id, user_id), "1", ex=ttl)
+
+    def clear_typing(self, session_id: str, user_id: str) -> None:
+        self._client().delete(self._typing_key(session_id, user_id))
+
+    def get_typing_users(self, session_id: str) -> list[str]:
+        r = self._client()
+        keys = r.keys(self._typing_pattern(session_id))
+        prefix = f"{_PREFIX}session:{session_id}:typing:"
+        users: list[str] = []
+        for k in keys:
+            key_str = k.decode() if isinstance(k, bytes) else k
+            users.append(key_str[len(prefix):])
+        return users
+
     # ── Health ──────────────────────────────────────────────────────
 
     def is_available(self) -> bool:

@@ -50,6 +50,7 @@ interface ChatInterfaceProps {
   isLiveRequest?: boolean;
   collaborationMode?: boolean;
   teamMembers?: MemberDisplay[];
+  typingUsers?: string[];
 }
 
 export default function ChatInterface({
@@ -70,6 +71,7 @@ export default function ChatInterface({
   isLiveRequest = false,
   collaborationMode = false,
   teamMembers = [],
+  typingUsers = [],
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -80,6 +82,7 @@ export default function ChatInterface({
   const [workPlanData, setWorkPlanData] = useState<Record<string, WorkPlanSnapshot[]>>({});
   const [streamLogData, setStreamLogData] = useState<Record<string, StreamLogEntry[]>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const workplanStreamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -90,6 +93,38 @@ export default function ChatInterface({
   const { user: authUser } = useAuth();
   const [userPromptsMap, setUserPromptsMap] = useState<Record<string, string>>({});
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  // Typing indicator: debounced POST to collaboration endpoint
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sendTypingSignal = useCallback(() => {
+    if (!collaborationMode || !runId) return;
+    const username = authUser?.username || "default";
+    axios.post("/collaboration/session.typing", {
+      sessionId: runId,
+      userId: username,
+      isTyping: true,
+    }).catch(() => {});
+    // Auto-clear after 4s if no new keystroke
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      axios.post("/collaboration/session.typing", {
+        sessionId: runId,
+        userId: username,
+        isTyping: false,
+      }).catch(() => {});
+    }, 4000);
+  }, [collaborationMode, runId, authUser?.username]);
+
+  const clearTypingSignal = useCallback(() => {
+    if (!collaborationMode || !runId) return;
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    const username = authUser?.username || "default";
+    axios.post("/collaboration/session.typing", {
+      sessionId: runId,
+      userId: username,
+      isTyping: false,
+    }).catch(() => {});
+  }, [collaborationMode, runId, authUser?.username]);
 
   const memberCache = useRef<Map<string, MemberDisplay>>(new Map());
   const resolveMember = useCallback((senderName: string): MemberDisplay => {
@@ -198,11 +233,11 @@ export default function ChatInterface({
     return "Ask a question about your data...";
   }, [blueprintExists, isSharingDisabled, isValidatingBlueprint, blueprintValid, isLiveRequest]);
 
-  // Transform backend messages to frontend format (streamLogs/workPlans, managed separately)
+  // Transform backend messages to frontend format with stable IDs
   const transformBackendMessagesToFrontend = useCallback(
     (backendMessages: BackendMessage[]): Message[] => {
       return backendMessages.map((msg, index) => ({
-        id: `${Date.now()}-${index}`,
+        id: `msg-${index}`,
         content: msg.content,
         sender: msg.role === "user" ? "user" : "ai",
         senderName: msg.sender_id || undefined,
@@ -214,15 +249,26 @@ export default function ChatInterface({
     [],
   );
 
+  // Track the last synced message count so polls with no new messages are a no-op
+  const lastSyncedCountRef = useRef(0);
+  const lastRunIdRef = useRef(runId);
+  if (runId !== lastRunIdRef.current) {
+    lastRunIdRef.current = runId;
+    lastSyncedCountRef.current = 0;
+  }
+
   // Initialize / sync messages from props.
   // Skip while actively streaming to avoid clobbering in-flight state.
   useEffect(() => {
     if (isTyping || currentStreamingMessageId) return;
     if (initialMessages && initialMessages.length > 0) {
+      if (initialMessages.length === lastSyncedCountRef.current) return;
+      lastSyncedCountRef.current = initialMessages.length;
       const transformedMessages =
         transformBackendMessagesToFrontend(initialMessages);
       setMessages(transformedMessages);
-    } else {
+    } else if (lastSyncedCountRef.current !== 0 || messages.length === 0) {
+      lastSyncedCountRef.current = 0;
       setMessages([
         {
           id: "welcome",
@@ -234,18 +280,26 @@ export default function ChatInterface({
     }
   }, [initialMessages, transformBackendMessagesToFrontend]);
 
-  // useEffect(() => {
-  //   scrollToBottom();
-  // }, [messages]);
+  // Auto-scroll when new messages are added
+  const prevMessageCountRef = useRef(0);
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current) {
+      scrollToBottom();
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   // Adjust textarea height when input or expanded state changes
   useEffect(() => {
     adjustTextareaHeight();
   }, [inputMessage, isExpanded, adjustTextareaHeight]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  }, []);
 
   // Map stream type to status
   const mapStreamToStatus = (
@@ -670,6 +724,7 @@ export default function ChatInterface({
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
     setIsTyping(true);
+    clearTypingSignal();
 
     // Reset textarea to compact state and focus
     setTimeout(() => {
@@ -775,10 +830,11 @@ export default function ChatInterface({
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  // Clean up interval on unmount
+  // Clean up intervals on unmount
   useEffect(() => {
     return () => {
       stopStreamingLogs();
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, []);
 
@@ -1046,7 +1102,7 @@ export default function ChatInterface({
   };
 
   return (
-    <Card className="bg-background-card shadow-card border-gray-800 flex flex-col h-full max-h-[82.5vh]">
+    <Card className={`bg-background-card shadow-card border-gray-800 flex flex-col h-full ${collaborationMode ? "" : "max-h-[82.5vh]"}`}>
       <CardHeader className="py-4 px-6 flex flex-row justify-between items-center flex-shrink-0">
         <CardTitle className="text-lg font-heading">AI Assistant</CardTitle>
         <div className="flex space-x-1 items-center">
@@ -1107,7 +1163,7 @@ export default function ChatInterface({
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0 flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           <AnimatePresence>
             {messages.map((message) => {
               const member = collaborationMode && message.sender === "user" && message.senderName
@@ -1175,6 +1231,21 @@ export default function ChatInterface({
             {(isTyping || (isLiveRequest && currentStreamingMessageId && !isTyping)) && 
               (isChatOnlyMode ? ChatOnlyLoader : TypingIndicator)}
           </AnimatePresence>
+          {collaborationMode && typingUsers.length > 0 && (
+            <div className="flex items-center gap-2 px-1 py-1">
+              <div className="flex -space-x-1">
+                {typingUsers.slice(0, 3).map((u) => {
+                  const m = resolveMember(u);
+                  return <CollabAvatar key={m.id} member={m} size="xs" />;
+                })}
+              </div>
+              <span className="text-xs text-gray-400 italic">
+                {typingUsers.length === 1
+                  ? `${typingUsers[0]} is typing...`
+                  : `${typingUsers.slice(0, 2).join(", ")}${typingUsers.length > 2 ? ` +${typingUsers.length - 2}` : ""} are typing...`}
+              </span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
         <div className="p-4 border-t border-gray-800 flex-shrink-0">
@@ -1199,7 +1270,10 @@ export default function ChatInterface({
               <Textarea
                 ref={textareaRef}
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                onChange={(e) => {
+                  setInputMessage(e.target.value);
+                  if (collaborationMode && e.target.value.trim()) sendTypingSignal();
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={getInputPlaceholder()}
                 className={`bg-background-dark resize-none transition-[height] duration-200 ease-out w-full ${

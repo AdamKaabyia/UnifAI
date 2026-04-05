@@ -66,6 +66,23 @@ class CollaborationStore(ABC):
         """List session IDs a user is currently participating in."""
         ...
 
+    # ── Typing indicators ────────────────────────────────────────────
+
+    @abstractmethod
+    def set_typing(self, session_id: str, user_id: str, ttl: int = 5) -> None:
+        """Mark a user as currently typing (auto-expires after *ttl* seconds)."""
+        ...
+
+    @abstractmethod
+    def clear_typing(self, session_id: str, user_id: str) -> None:
+        """Explicitly clear the typing indicator for a user."""
+        ...
+
+    @abstractmethod
+    def get_typing_users(self, session_id: str) -> list[str]:
+        """Return user IDs that currently have an active typing indicator."""
+        ...
+
     # ── Health ──────────────────────────────────────────────────────
 
     @abstractmethod
