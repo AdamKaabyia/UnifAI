@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2 } from "lucide-react";
+import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2, Download, FileText, FileJson } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import axios from "../../../http/axiosAgentConfig";
@@ -22,6 +22,18 @@ import { useToast } from "@/hooks/use-toast";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 import WorkflowStatusBanner, { WorkflowBannerMessages } from '@/components/shared/WorkflowStatusBanner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  exportSessionAsMarkdown,
+  exportSessionAsJSON,
+  downloadFile,
+  buildExportFilename,
+} from "./exportSession";
 
 
 // Backend message format
@@ -1000,6 +1012,39 @@ export default function ChatInterface({
       <CardHeader className="py-4 px-6 flex flex-row justify-between items-center flex-shrink-0">
         <CardTitle className="text-lg font-heading">AI Assistant</CardTitle>
         <div className="flex space-x-1 items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-gray-100"
+                title="Export chat"
+                disabled={messages.length === 0}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-background-card border-gray-700">
+              <DropdownMenuItem
+                onClick={() => {
+                  const md = exportSessionAsMarkdown(messages);
+                  downloadFile(md, buildExportFilename(undefined, "md"), "text/markdown");
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Export as Markdown (.md)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const json = exportSessionAsJSON(messages);
+                  downloadFile(json, buildExportFilename(undefined, "json"), "application/json");
+                }}
+              >
+                <FileJson className="h-4 w-4 mr-2" />
+                Export as JSON (.json)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!isChatOnlyMode && (
             <>
               <Button
