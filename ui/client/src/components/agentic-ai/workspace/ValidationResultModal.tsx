@@ -197,8 +197,8 @@ export const ValidationResultModal: React.FC<ValidationResultModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-background-card border-gray-800 text-foreground max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="bg-background-card border-gray-800 text-foreground max-w-2xl max-h-[80vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-800">
           <DialogTitle className="flex items-center gap-3">
             {validationResult.is_valid ? (
               <CheckCircle2 className="h-6 w-6 text-green-500" />
@@ -209,101 +209,103 @@ export const ValidationResultModal: React.FC<ValidationResultModalProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Summary Section */}
-          <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-900/50 border border-gray-800">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium text-gray-400">Status:</span>
-                {validationResult.is_valid ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    Valid
-                  </Badge>
-                ) : (
-                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                    Invalid
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span>Type: {validationResult.element_type}</span>
-                <span>•</span>
-                <span className="font-mono">{validationResult.element_rid.slice(0, 12)}...</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex gap-3">
-                {errorCount > 0 && (
-                  <div className="flex items-center gap-1">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm text-red-400">{errorCount}</span>
-                  </div>
-                )}
-                {warningCount > 0 && (
-                  <div className="flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-yellow-400">{warningCount}</span>
-                  </div>
-                )}
-                {infoCount > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Info className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm text-blue-400">{infoCount}</span>
-                  </div>
-                )}
+        <div className="flex-1 overflow-y-auto px-6 py-6 min-h-0">
+          <div className="space-y-6">
+            {/* Summary Section */}
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-900/50 border border-gray-800">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-400">Status:</span>
+                  {validationResult.is_valid ? (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                      Valid
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                      Invalid
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>Type: {validationResult.element_type}</span>
+                  <span>•</span>
+                  <span className="font-mono">{validationResult.element_rid.slice(0, 12)}...</span>
+                </div>
               </div>
               
-              {showRefreshButton && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshValidation}
-                  className="h-8 px-3 hover:bg-gray-700 border-gray-700"
-                  title="Re-validate resource"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Messages Section */}
-          {validationResult.messages.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-400 mb-3">Messages</h3>
-              <div className="space-y-2">
-                {validationResult.messages.map((message, idx) => (
-                  <ValidationMessageItem key={idx} message={message} />
-                ))}
+              <div className="flex items-center gap-4">
+                <div className="flex gap-3">
+                  {errorCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      <span className="text-sm text-red-400">{errorCount}</span>
+                    </div>
+                  )}
+                  {warningCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm text-yellow-400">{warningCount}</span>
+                    </div>
+                  )}
+                  {infoCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Info className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm text-blue-400">{infoCount}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {showRefreshButton && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshValidation}
+                    className="h-8 px-3 hover:bg-gray-700 border-gray-700"
+                    title="Re-validate resource"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Dependencies Section */}
-          {hasDependencies && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-400 mb-3">
-                Dependencies ({Object.keys(validationResult.dependency_results).length})
-              </h3>
-              <div className="border border-gray-800 rounded-lg p-4 bg-gray-900/30">
-                <div className="space-y-1">
-                  {Object.entries(validationResult.dependency_results).map(([rid, depResult]) => (
-                    <DependencyResultItem key={rid} result={depResult} />
+            {/* Messages Section */}
+            {validationResult.messages.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Messages</h3>
+                <div className="space-y-2">
+                  {validationResult.messages.map((message, idx) => (
+                    <ValidationMessageItem key={idx} message={message} />
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Empty state for no messages */}
-          {validationResult.messages.length === 0 && !hasDependencies && (
-            <div className="text-center py-8 text-gray-500">
-              <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No validation messages or dependencies to display.</p>
-            </div>
-          )}
+            {/* Dependencies Section */}
+            {hasDependencies && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-3">
+                  Dependencies ({Object.keys(validationResult.dependency_results).length})
+                </h3>
+                <div className="border border-gray-800 rounded-lg p-4 bg-gray-900/30">
+                  <div className="space-y-1">
+                    {Object.entries(validationResult.dependency_results).map(([rid, depResult]) => (
+                      <DependencyResultItem key={rid} result={depResult} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Empty state for no messages */}
+            {validationResult.messages.length === 0 && !hasDependencies && (
+              <div className="text-center py-8 text-gray-500">
+                <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No validation messages or dependencies to display.</p>
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
