@@ -28,3 +28,10 @@ RH-sso->User: redirect to sso-be/api/callback
 sso-be->User: redirect to frontend_url?auth=success
 User->Nginx: browse pages (frontend_url/api1 | frontend_url/api2)
 ```
+
+logout action:
+
+curl ${KEYCLOACK_BASE_URL}/realms/${KEYCLOACK_REALM}/protocol/openid-connect/logout \
+-d client_id=$CLIENT_ID \
+-d client_secret=$CLIENT_SECRET \
+-d refresh_token=$REFRESH_TOKEN

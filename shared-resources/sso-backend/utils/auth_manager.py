@@ -148,7 +148,7 @@ class AuthManager:
                 logger.info(f"#########################")
                 logger.info(f"session: {session}")
                 logger.info(f"#########################")
-                self.redis_store.set(session_id, json.dumps(session_data), ttl_seconds=3600)
+                self.redis_store.hset(request.cookies.get("session"), session_data, ttl_seconds=3600)
                 logger.info(f"saved session {session_id} to redis")
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
