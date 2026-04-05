@@ -9,7 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2, Download, FileText, FileJson } from "lucide-react";
+import {
+  Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw,
+  ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network,
+  Maximize2, Minimize2, Download, FileText, FileJson,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import axios from "../../../http/axiosAgentConfig";
@@ -34,7 +38,6 @@ import {
   downloadFile,
   buildExportFilename,
 } from "./exportSession";
-
 
 // Backend message format
 interface BackendMessage {
@@ -744,6 +747,16 @@ export default function ChatInterface({
     stopStreamingLogs();
   };
 
+  const handleExportMarkdown = useCallback(() => {
+    const md = exportSessionAsMarkdown(messages);
+    downloadFile(md, buildExportFilename(undefined, "md"), "text/markdown");
+  }, [messages]);
+
+  const handleExportJSON = useCallback(() => {
+    const json = exportSessionAsJSON(messages);
+    downloadFile(json, buildExportFilename(undefined, "json"), "application/json");
+  }, [messages]);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
@@ -1024,22 +1037,12 @@ export default function ChatInterface({
                 <Download className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background-card border-gray-700">
-              <DropdownMenuItem
-                onClick={() => {
-                  const md = exportSessionAsMarkdown(messages);
-                  downloadFile(md, buildExportFilename(undefined, "md"), "text/markdown");
-                }}
-              >
+            <DropdownMenuContent align="end" className="bg-popover border-gray-700">
+              <DropdownMenuItem onClick={handleExportMarkdown}>
                 <FileText className="h-4 w-4 mr-2" />
                 Export as Markdown (.md)
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  const json = exportSessionAsJSON(messages);
-                  downloadFile(json, buildExportFilename(undefined, "json"), "application/json");
-                }}
-              >
+              <DropdownMenuItem onClick={handleExportJSON}>
                 <FileJson className="h-4 w-4 mr-2" />
                 Export as JSON (.json)
               </DropdownMenuItem>

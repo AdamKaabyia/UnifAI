@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// Download helper
+// Blob download
 // ---------------------------------------------------------------------------
 
 export function downloadFile(
@@ -17,27 +17,52 @@ export function downloadFile(
 ): void {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
   setTimeout(() => {
-    document.body.removeChild(link);
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, 100);
 }
 
 // ---------------------------------------------------------------------------
-// Markdown export
+// Filename helper
 // ---------------------------------------------------------------------------
+
+export function buildExportFilename(
+  sessionTitle: string | undefined,
+  extension: "md" | "json",
+): string {
+  const datePart = new Date().toISOString().slice(0, 10);
+  const slug = sessionTitle
+    ? sessionTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40)
+    : "chat";
+  return `${slug}-export-${datePart}.${extension}`;
+}
+
+// ---------------------------------------------------------------------------
+// Markdown export — private helpers
+// ---------------------------------------------------------------------------
+
+function escapeTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\n/g, " ");
+}
 
 function formatToolEntry(tool: ToolEntry): string {
   const parts: string[] = [`**${tool.name}**`];
 
   if (tool.args && Object.keys(tool.args).length > 0) {
-    parts.push(`Arguments:\n\`\`\`json\n${JSON.stringify(tool.args, null, 2)}\n\`\`\``);
+    parts.push(
+      `Arguments:\n\`\`\`json\n${JSON.stringify(tool.args, null, 2)}\n\`\`\``,
+    );
   }
 
   if (tool.output) {
@@ -52,6 +77,7 @@ function formatStreamLogs(logs: StreamLogEntry[]): string {
 
   for (const log of logs) {
     lines.push(`**${log.nodeName}** — ${log.status}`);
+
     if (log.message) {
       lines.push(`> ${log.message.replace(/\n/g, "\n> ")}\n`);
     }
@@ -73,33 +99,33 @@ function formatWorkPlans(snapshots: WorkPlanSnapshot[]): string {
 
   for (const snapshot of snapshots) {
     const plan = snapshot.workplan;
+    if (!plan) continue;
+
     const planTitle = snapshot.display_name || plan.summary || "Work Plan";
     lines.push(`### Work Plan: ${planTitle}\n`);
 
-    const items = Object.values(plan.items);
-    if (items.length > 0) {
-      lines.push("| Item | Status | Assigned To | Description |");
-      lines.push("|------|--------|-------------|-------------|");
-      for (const item of items) {
-        const assignee = item.assigned_uid || "—";
-        const desc = item.description
-          ? item.description.replace(/\|/g, "\\|").replace(/\n/g, " ")
-          : "—";
-        lines.push(
-          `| ${item.title.replace(/\|/g, "\\|")} | ${item.status} | ${assignee} | ${desc} |`,
-        );
-      }
-      lines.push("");
+    const items: WorkItem[] = plan.items ? Object.values(plan.items) : [];
+    if (items.length === 0) continue;
 
-      const completedWithResults = items.filter(
-        (i: WorkItem) => i.result?.final_summary,
-      );
-      if (completedWithResults.length > 0) {
-        lines.push("#### Work Item Results\n");
-        for (const item of completedWithResults) {
-          lines.push(`**${item.title}**`);
-          lines.push(`> ${item.result!.final_summary!.replace(/\n/g, "\n> ")}\n`);
-        }
+    lines.push("| Item | Status | Assigned To | Description |");
+    lines.push("|------|--------|-------------|-------------|");
+
+    for (const item of items) {
+      const title = escapeTableCell(item.title);
+      const assignee = item.assigned_uid || "—";
+      const desc = item.description ? escapeTableCell(item.description) : "—";
+      lines.push(`| ${title} | ${item.status} | ${assignee} | ${desc} |`);
+    }
+    lines.push("");
+
+    const withResults = items.filter((i) => i.result?.final_summary);
+    if (withResults.length > 0) {
+      lines.push("#### Work Item Results\n");
+      for (const item of withResults) {
+        lines.push(`**${item.title}**`);
+        lines.push(
+          `> ${item.result!.final_summary!.replace(/\n/g, "\n> ")}\n`,
+        );
       }
     }
   }
@@ -107,15 +133,18 @@ function formatWorkPlans(snapshots: WorkPlanSnapshot[]): string {
   return lines.join("\n");
 }
 
+// ---------------------------------------------------------------------------
+// Markdown export — public
+// ---------------------------------------------------------------------------
+
 export function exportSessionAsMarkdown(
   messages: Message[],
   sessionTitle?: string,
 ): string {
   const lines: string[] = [];
-  const timestamp = new Date().toLocaleString();
 
   lines.push("# Chat Export");
-  lines.push(`**Exported:** ${timestamp}`);
+  lines.push(`**Exported:** ${new Date().toLocaleString()}`);
   if (sessionTitle) {
     lines.push(`**Session:** ${sessionTitle}`);
   }
@@ -136,10 +165,10 @@ export function exportSessionAsMarkdown(
         lines.push(formatWorkPlans(msg.workPlans));
       }
 
-      const responseText = msg.finalAnswer || msg.content;
-      if (responseText) {
+      const response = msg.finalAnswer || msg.content;
+      if (response) {
         lines.push("### Response\n");
-        lines.push(responseText);
+        lines.push(response);
       }
     }
 
@@ -153,9 +182,24 @@ export function exportSessionAsMarkdown(
 // JSON export
 // ---------------------------------------------------------------------------
 
-function stripUiFields(messages: Message[]): any[] {
+interface CleanedMessage {
+  id: string;
+  sender: "user" | "ai";
+  content: string;
+  finalAnswer?: string;
+  streamLogs?: Omit<StreamLogEntry, "isExpanded">[];
+  workPlans?: Omit<WorkPlanSnapshot, "isExpanded">[];
+}
+
+interface ExportPayload {
+  exportedAt: string;
+  sessionTitle: string | null;
+  messages: CleanedMessage[];
+}
+
+function stripUiFields(messages: Message[]): CleanedMessage[] {
   return messages.map((msg) => {
-    const cleaned: any = {
+    const cleaned: CleanedMessage = {
       id: msg.id,
       sender: msg.sender,
       content: msg.content,
@@ -185,30 +229,11 @@ export function exportSessionAsJSON(
   messages: Message[],
   sessionTitle?: string,
 ): string {
-  const payload = {
+  const payload: ExportPayload = {
     exportedAt: new Date().toISOString(),
-    sessionTitle: sessionTitle || null,
+    sessionTitle: sessionTitle ?? null,
     messages: stripUiFields(messages),
   };
 
   return JSON.stringify(payload, null, 2);
-}
-
-// ---------------------------------------------------------------------------
-// Filename helper
-// ---------------------------------------------------------------------------
-
-export function buildExportFilename(
-  sessionTitle: string | undefined,
-  extension: "md" | "json",
-): string {
-  const datePart = new Date().toISOString().slice(0, 10);
-  const slug = sessionTitle
-    ? sessionTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 40)
-    : "chat";
-  return `${slug}-export-${datePart}.${extension}`;
 }
