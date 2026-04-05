@@ -26,7 +26,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5173, // Or whatever port Vite is running on by default
+    port: 5000, // Or whatever port Vite is running on by default
     proxy: {
       // Proxy for api1
       '/api1': {
@@ -41,6 +41,19 @@ export default defineConfig({
         target: process.env.MULTIAGENT_HOST,//'http://127.0.0.1:13457', // Your second backend
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api2/, '/api'), // This rewrites /api2 to nothing
+        // secure: false, // Only needed if this target is HTTPS and you have SSL issues
+      },
+      // Proxy for api2 (assuming this is still local or another service)
+      '/api3': {
+        target: process.env.SSO_HOST,//'http://127.0.0.1:13457', // Your second backend
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api3/, '/api'), // This rewrites /api2 to nothing
+        // secure: false, // Only needed if this target is HTTPS and you have SSL issues
+      },
+      '/api4': {
+        target: process.env.BACKEND_HOST,//'http://127.0.0.1:13457', // Your second backend
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api4/, '/api'), // This rewrites /api2 to nothing
         // secure: false, // Only needed if this target is HTTPS and you have SSL issues
       },
       // You can add more proxies here if needed

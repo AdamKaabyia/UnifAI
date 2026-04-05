@@ -120,7 +120,8 @@ class AuthManager:
                 session['access_token'] = token.get('access_token')
                 session['refresh_token'] = token.get('refresh_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
-                
+                logger.info(f"user: {session['user'].get('username')}")
+                logger.info(f"refresh_token: {session['refresh_token']}")
                 logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
                 
                 # Redirect to frontend with auth status and state parameter
