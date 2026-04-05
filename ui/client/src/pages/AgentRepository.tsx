@@ -127,7 +127,7 @@ export default function UserWorkspace() {
               <div className="flex flex-col h-full">
                 {/* Header with Create Button */}
                 {selectedElementType && (
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex justify-between items-center mb-6 sticky top-0 z-10 pb-4 pt-px -mt-px bg-[hsl(var(--background-dark))] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.4)]">
                     <div>
                       <h2 className="text-2xl font-heading font-bold">
                         {selectedElementType.name} Instances
