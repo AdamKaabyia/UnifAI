@@ -43,6 +43,9 @@ export default function UserDirectorySearch({
   const searchIdRef = useRef(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const excludeUserIdsRef = useRef(excludeUserIds);
+  excludeUserIdsRef.current = excludeUserIds;
+  const searchCacheRef = useRef<Map<string, { users: DirectoryUser[]; groups: DirectoryGroup[] }>>(new Map());
 
   useEffect(() => {
     getDirectoryStatus()
@@ -78,10 +81,21 @@ export default function UserDirectorySearch({
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
 
-      if (!directoryEnabled || value.trim().length < 2) {
+      const trimmed = value.trim().toLowerCase();
+      if (!directoryEnabled || trimmed.length < 2) {
         setUserResults([]);
         setGroupResults([]);
         setDropdownOpen(false);
+        setIsSearching(false);
+        return;
+      }
+
+      const cached = searchCacheRef.current.get(trimmed);
+      if (cached) {
+        const filteredUsers = cached.users.filter((u) => !excludeUserIdsRef.current.includes(u.user_id));
+        setUserResults(filteredUsers);
+        setGroupResults(cached.groups);
+        setDropdownOpen(true);
         setIsSearching(false);
         return;
       }
@@ -94,7 +108,8 @@ export default function UserDirectorySearch({
         try {
           const result = await searchDirectory(value.trim(), 10, accessToken);
           if (id !== searchIdRef.current) return;
-          const filteredUsers = result.users.filter((u) => !excludeUserIds.includes(u.user_id));
+          searchCacheRef.current.set(trimmed, result);
+          const filteredUsers = result.users.filter((u) => !excludeUserIdsRef.current.includes(u.user_id));
           setUserResults(filteredUsers);
           setGroupResults(result.groups);
         } catch (err: unknown) {
@@ -110,9 +125,9 @@ export default function UserDirectorySearch({
         } finally {
           if (id === searchIdRef.current) setIsSearching(false);
         }
-      }, 300);
+      }, 400);
     },
-    [directoryEnabled, excludeUserIds, accessToken, onInputChange],
+    [directoryEnabled, accessToken, onInputChange],
   );
 
   const handleSelectUser = (user: DirectoryUser) => {

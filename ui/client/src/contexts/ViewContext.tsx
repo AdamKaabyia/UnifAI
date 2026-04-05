@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from "react";
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { listUserTeams, Team } from "@/api/teams";
 
@@ -15,7 +15,7 @@ export interface ViewContextType {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   selectedTeam: TeamInfo | null;
-  setSelectedTeam: (team: TeamInfo) => void;
+  setSelectedTeam: (team: TeamInfo | null) => void;
   teams: TeamInfo[];
   refreshTeams: () => Promise<void>;
   teamsLoading: boolean;
@@ -49,6 +49,9 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
 
+  const selectedTeamRef = useRef(selectedTeam);
+  selectedTeamRef.current = selectedTeam;
+
   const refreshTeams = useCallback(async () => {
     if (!user?.username) return;
     setTeamsLoading(true);
@@ -56,8 +59,9 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
       const fetched = await listUserTeams(user.username);
       const mapped = fetched.map(toTeamInfo);
       setTeams(mapped);
-      if (selectedTeam) {
-        const updated = mapped.find((t) => t.id === selectedTeam.id);
+      const current = selectedTeamRef.current;
+      if (current) {
+        const updated = mapped.find((t) => t.id === current.id);
         if (updated) {
           setSelectedTeam(updated);
         } else if (mapped.length > 0) {

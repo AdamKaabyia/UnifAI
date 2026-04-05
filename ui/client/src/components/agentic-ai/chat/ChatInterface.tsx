@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2, Clock } from "lucide-react";
+import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import axios from "../../../http/axiosAgentConfig";
@@ -174,8 +174,11 @@ export default function ChatInterface({
     if (!blueprintValid) {
       return "This chat cannot be continued - workflow validation failed";
     }
+    if (isLiveRequest) {
+      return "AI is processing — please wait...";
+    }
     return "Ask a question about your data...";
-  }, [blueprintExists, isSharingDisabled, isValidatingBlueprint, blueprintValid]);
+  }, [blueprintExists, isSharingDisabled, isValidatingBlueprint, blueprintValid, isLiveRequest]);
 
   // Transform backend messages to frontend format (streamLogs/workPlans, managed separately)
   const transformBackendMessagesToFrontend = useCallback(
@@ -1162,13 +1165,13 @@ export default function ChatInterface({
                 onKeyDown={handleKeyDown}
                 placeholder={getInputPlaceholder()}
                 className={`bg-background-dark resize-none transition-[height] duration-200 ease-out w-full ${
-                  (!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint) 
+                  (!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest) 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
                 } ${(isAtMaxHeight || isExpanded) ? 'pr-10' : ''}`}
                 style={{ height: `${TEXTAREA_MIN_HEIGHT}px` }}
                 rows={1}
-                disabled={!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
+                disabled={!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest}
               />
               {/* Expand/Collapse icon - shows when textarea is at max height or expanded */}
               <AnimatePresence>
@@ -1201,15 +1204,11 @@ export default function ChatInterface({
             >
               <Button
                 onClick={() => handleSendMessage()}
-                disabled={inputMessage.trim() === "" || (isTyping && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
+                disabled={inputMessage.trim() === "" || (isTyping && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest}
                 className="bg-primary hover:bg-[#7525c9] mb-0"
-                title={isTyping && onQueueMessage ? "Add to message queue" : "Send message"}
+                title="Send message"
               >
-                {isTyping && onQueueMessage ? (
-                  <Clock className="h-4 w-4" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+                <Send className="h-4 w-4" />
               </Button>
             </UmamiTrack>
           </div>

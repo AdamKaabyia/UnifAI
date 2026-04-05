@@ -125,6 +125,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       setDeleteConfirmOpen(false);
       onOpenChange(false);
     } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || "Failed to delete team");
       console.error("Failed to delete team:", err);
     }
   };
