@@ -57,6 +57,7 @@ class SessionService:
         inputs: Dict[str, Any],
         scope: str = "public",
         stream: bool = False,
+        logged_in_user: str = "",
     ) -> Any:
         """
         Execute the session graph.
@@ -68,7 +69,7 @@ class SessionService:
         The execution runs on a background thread; lifecycle transitions
         are handled internally by the runner.
         """
-        self._stage(session_id, inputs)
+        self._stage(session_id, inputs, logged_in_user=logged_in_user)
         session = self._manager.get_session(session_id)
         return self._foreground.run(
             session=session,
@@ -77,7 +78,7 @@ class SessionService:
         )
 
     def submit(self, session_id: str, inputs: Dict[str, Any],
-               scope: str = "public") -> str:
+               scope: str = "public", logged_in_user: str = "") -> str:
         """
         Non-blocking submit: stage inputs, then start a background workflow
         and return its handle/ID immediately (HTTP 202 pattern).
@@ -87,7 +88,7 @@ class SessionService:
                 "No BackgroundSessionSubmitter configured — "
                 "submit() is not available for this engine."
             )
-        self._stage(session_id, inputs)
+        self._stage(session_id, inputs, logged_in_user=logged_in_user)
         session = self._manager.get_session(session_id)
         execution_ctx = session.run_context.with_scope(scope)
         request = SubmitSessionRequest(execution_context=execution_ctx)
@@ -95,10 +96,15 @@ class SessionService:
 
     # ---- Private staging ----
 
-    def _stage(self, session_id: str, inputs: Dict[str, Any]) -> None:
+    def _stage(
+        self,
+        session_id: str,
+        inputs: Dict[str, Any],
+        logged_in_user: str = "",
+    ) -> None:
         """Project raw inputs onto the record and persist (QUEUED)."""
         record = self._manager.get_record(session_id)
-        self._projector.apply(record, inputs or {})
+        self._projector.apply(record, inputs or {}, logged_in_user=logged_in_user)
 
     def list_for_user(self, identity: Identity) -> list:
         """

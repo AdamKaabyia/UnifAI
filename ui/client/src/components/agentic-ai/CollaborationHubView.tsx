@@ -35,6 +35,9 @@ import { SessionPayload } from "./ExecutionTab";
 import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
 import { FlowObject } from "./graphs/interfaces";
 
+const COLLAB_POLL_INTERVAL = 3000;
+const COLLAB_HEARTBEAT_INTERVAL = 30000;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 const MEMBER_COLORS = [
@@ -69,7 +72,7 @@ export function buildMemberDisplay(username: string, index: number): MemberDispl
   };
 }
 
-function CollabAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
+export function CollabAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
   const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
   return (
     <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
@@ -108,7 +111,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const [selectedFlowForModal, setSelectedFlowForModal] = useState<FlowObject | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
 
-  // Per-session participant tracking: sessionId -> Set of usernames who sent messages
+  // Per-session participant tracking from backend (sessionId -> usernames)
   const [sessionParticipants, setSessionParticipants] = useState<Record<string, string[]>>({});
 
   const { nodeListRef } = useStreamingData();
@@ -120,6 +123,11 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       : user?.username || "default";
 
   const sessionSelectRequestId = useRef(0);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const joinedSessionRef = useRef<string | null>(null);
+  const selectedSessionRef = useRef<ChatSession | null>(null);
+  const isLiveRequestRef = useRef(false);
 
   const {
     isValidating: isValidatingBlueprint,
@@ -409,24 +417,104 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     [globalScope, user?.username, updateNodeList],
   );
 
-  // ─── Participant tracking ───────────────────────────────────────────────
+  // ─── Collaboration: join / leave / heartbeat / poll ──────────────────────
 
-  const recordParticipant = useCallback((sessionId: string) => {
+  const joinSession = useCallback(async (sessionId: string) => {
     const username = user?.username || "default";
-    setSessionParticipants(prev => {
-      const existing = prev[sessionId] || [];
-      if (existing.includes(username)) return prev;
-      return { ...prev, [sessionId]: [...existing, username] };
-    });
-  }, [user?.username]);
+    try {
+      await axios.post("/collaboration/session.join", {
+        sessionId,
+        userId: username,
+        displayName: user?.name || username,
+        role: "collaborator",
+      });
+      joinedSessionRef.current = sessionId;
+    } catch {
+      // collaboration service may be unavailable — degrade gracefully
+    }
+  }, [user]);
+
+  const leaveSession = useCallback(async (sessionId: string) => {
+    const username = user?.username || "default";
+    try {
+      await axios.post("/collaboration/session.leave", {
+        sessionId,
+        userId: username,
+      });
+    } catch {
+      // best-effort
+    }
+    if (joinedSessionRef.current === sessionId) {
+      joinedSessionRef.current = null;
+    }
+  }, [user]);
+
+  const sendHeartbeat = useCallback(async () => {
+    const sid = joinedSessionRef.current;
+    if (!sid) return;
+    const username = user?.username || "default";
+    try {
+      await axios.post("/collaboration/session.heartbeat", {
+        sessionId: sid,
+        userId: username,
+      });
+    } catch {
+      // best-effort
+    }
+  }, [user]);
+
+  const fetchParticipants = useCallback(async (sessionId: string) => {
+    try {
+      const res = await axios.get(
+        `/collaboration/session.participants?sessionId=${sessionId}`,
+      );
+      const participants: string[] =
+        (res.data?.participants || []).map((p: any) => p.user_id);
+      setSessionParticipants(prev => {
+        const existing = prev[sessionId];
+        if (
+          existing &&
+          existing.length === participants.length &&
+          existing.every((u, i) => u === participants[i])
+        ) return prev;
+        return { ...prev, [sessionId]: participants };
+      });
+    } catch {
+      // collaboration service unavailable
+    }
+  }, []);
+
+  const pollSessionUpdates = useCallback(async () => {
+    const session = selectedSessionRef.current;
+    if (!session) return;
+
+    // Skip message poll while local user is executing to avoid conflicts
+    if (!isLiveRequestRef.current) {
+      const updated = await loadSessionMessages(session);
+      if (updated) {
+        setCurrentSessionMessages(updated.messages);
+        setChatSessions(prev =>
+          prev.map(s => (s.id === session.id ? { ...s, ...updated } : s)),
+        );
+      }
+    }
+
+    // Always poll participants
+    await fetchParticipants(session.id);
+  }, [loadSessionMessages, fetchParticipants]);
 
   const getSessionParticipantMembers = useCallback((sessionId: string): MemberDisplay[] => {
     const participants = sessionParticipants[sessionId];
     if (!participants || participants.length === 0) return [];
-    return participants
-      .map(username => teamMembers.find(m => m.id === username))
-      .filter((m): m is MemberDisplay => !!m);
+    return participants.map((username, idx) => {
+      const existing = teamMembers.find(m => m.id === username);
+      return existing || buildMemberDisplay(username, teamMembers.length + idx);
+    });
   }, [sessionParticipants, teamMembers]);
+
+  // Keep refs in sync for stable interval callbacks
+  useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
+  useEffect(() => { isLiveRequestRef.current = isLiveRequest; }, [isLiveRequest]);
 
   // ─── Effects ───────────────────────────────────────────────────────────
 
@@ -435,6 +523,47 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     setCurrentSessionMessages([]);
     fetchChatSessions();
   }, [contextUserId]);
+
+  // Join/leave session + polling when selected session changes
+  useEffect(() => {
+    // Leave previous session
+    const previousSession = joinedSessionRef.current;
+    if (previousSession && previousSession !== selectedSession?.id) {
+      leaveSession(previousSession);
+    }
+
+    // Clear previous timers
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+
+    if (!selectedSession) return;
+
+    // Join new session
+    joinSession(selectedSession.id);
+    fetchParticipants(selectedSession.id);
+
+    // Poll for messages + participants
+    pollTimerRef.current = setInterval(pollSessionUpdates, COLLAB_POLL_INTERVAL);
+
+    // Heartbeat to keep presence alive
+    heartbeatTimerRef.current = setInterval(sendHeartbeat, COLLAB_HEARTBEAT_INTERVAL);
+
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    };
+  }, [selectedSession?.id]);
+
+  // Leave session on unmount
+  useEffect(() => {
+    return () => {
+      if (joinedSessionRef.current) {
+        leaveSession(joinedSessionRef.current);
+      }
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    };
+  }, []);
 
   // ─── Loading / Error states ────────────────────────────────────────────
 
@@ -600,16 +729,15 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
             {selectedSession ? (
               <ChatInterface
                 runId={selectedSession.id}
-                triggerExecution={(payload) => {
-                  recordParticipant(selectedSession.id);
-                  return triggerExecution(payload);
-                }}
+                triggerExecution={triggerExecution}
                 initialMessages={currentSessionMessages}
                 blueprintExists={selectedSession.blueprintExists}
                 isSharingDisabled={isSharingDisabled}
                 blueprintValid={isBlueprintValid}
                 isValidatingBlueprint={isValidatingBlueprint}
                 isLiveRequest={isLiveRequest}
+                collaborationMode={true}
+                teamMembers={teamMembers}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500 text-sm">

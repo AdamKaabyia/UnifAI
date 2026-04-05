@@ -2,9 +2,10 @@ export interface Message {
   id: string;
   content: string;
   sender: 'user' | 'ai';
+  senderName?: string;
   finalAnswer?: string;
   streamLogs?: StreamLogEntry[];
-  workPlans?: WorkPlanSnapshot[]; // Add support for workplans
+  workPlans?: WorkPlanSnapshot[];
 }
 
 export interface StreamLogEntry {

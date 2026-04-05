@@ -31,7 +31,12 @@ class SessionInputProjector:
     def __init__(self, repository: SessionRepository) -> None:
         self._repo = repository
 
-    def apply(self, record: SessionRecord, inputs: Dict[str, Any]) -> None:
+    def apply(
+        self,
+        record: SessionRecord,
+        inputs: Dict[str, Any],
+        logged_in_user: str = "",
+    ) -> None:
         """
         Project raw inputs onto the record's graph state, making the
         user turn immediately durable.
@@ -47,7 +52,11 @@ class SessionInputProjector:
         prompt = (inputs.get("user_prompt") or "").strip()
         if prompt:
             record.graph_state.messages.append(
-                ChatMessage(role=Role.USER, content=prompt)
+                ChatMessage(
+                    role=Role.USER,
+                    content=prompt,
+                    sender_id=logged_in_user or None,
+                )
             )
 
         record.status = SessionStatus.QUEUED

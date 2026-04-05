@@ -22,12 +22,14 @@ import { useToast } from "@/hooks/use-toast";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 import WorkflowStatusBanner, { WorkflowBannerMessages } from '@/components/shared/WorkflowStatusBanner';
-
+import { useAuth } from "@/contexts/AuthContext";
+import { MemberDisplay, buildMemberDisplay, CollabAvatar } from "../CollaborationHubView";
 
 // Backend message format
 interface BackendMessage {
   content: string;
   role: "user" | "assistant";
+  sender_id?: string;
 }
 
 interface ChatInterfaceProps {
@@ -45,7 +47,9 @@ interface ChatInterfaceProps {
   onQueueMessage?: (message: string) => void;
   queuedMessageToProcess?: string | null;
   onQueuedMessageProcessed?: () => void;
-  isLiveRequest?: boolean; // True when session is actively streaming (including reconnection)
+  isLiveRequest?: boolean;
+  collaborationMode?: boolean;
+  teamMembers?: MemberDisplay[];
 }
 
 export default function ChatInterface({
@@ -64,6 +68,8 @@ export default function ChatInterface({
   queuedMessageToProcess,
   onQueuedMessageProcessed,
   isLiveRequest = false,
+  collaborationMode = false,
+  teamMembers = [],
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -81,8 +87,20 @@ export default function ChatInterface({
   const streamLogDataRef = useRef<Record<string, StreamLogEntry[]>>({});
   const { nodeListRef, clearStream } = useStreamingData();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
   const [userPromptsMap, setUserPromptsMap] = useState<Record<string, string>>({});
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const memberCache = useRef<Map<string, MemberDisplay>>(new Map());
+  const resolveMember = useCallback((senderName: string): MemberDisplay => {
+    const cached = memberCache.current.get(senderName);
+    if (cached) return cached;
+    const found = teamMembers.find(m => m.id === senderName);
+    if (found) { memberCache.current.set(senderName, found); return found; }
+    const built = buildMemberDisplay(senderName, memberCache.current.size + teamMembers.length);
+    memberCache.current.set(senderName, built);
+    return built;
+  }, [teamMembers]);
 
   // ────────────────────────────────────────────────────────────────────────────────
   // Auto-expanding textarea configuration
@@ -187,7 +205,7 @@ export default function ChatInterface({
         id: `${Date.now()}-${index}`,
         content: msg.content,
         sender: msg.role === "user" ? "user" : "ai",
-        // For AI messages, we might want to add finalAnswer if it's the last assistant message
+        senderName: msg.sender_id || undefined,
         ...(msg.role === "assistant" && {
           finalAnswer: msg.content,
         }),
@@ -196,14 +214,15 @@ export default function ChatInterface({
     [],
   );
 
-  // Initialize messages from props or default
+  // Initialize / sync messages from props.
+  // Skip while actively streaming to avoid clobbering in-flight state.
   useEffect(() => {
+    if (isTyping || currentStreamingMessageId) return;
     if (initialMessages && initialMessages.length > 0) {
       const transformedMessages =
         transformBackendMessagesToFrontend(initialMessages);
       setMessages(transformedMessages);
     } else {
-      // Default welcome message when no initial messages
       setMessages([
         {
           id: "welcome",
@@ -645,6 +664,7 @@ export default function ChatInterface({
       id: Date.now().toString(),
       content: messageContent,
       sender: "user",
+      senderName: collaborationMode ? (authUser?.username || "default") : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -1089,48 +1109,66 @@ export default function ChatInterface({
       <CardContent className="flex-1 overflow-hidden p-0 flex flex-col min-h-0">
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[90%] rounded-2xl p-3 ${
-                    message.sender === "user"
-                      ? "bg-primary text-white rounded-tr-none"
-                      : "bg-background-dark border border-gray-800 rounded-tl-none"
-                  }`}
+            {messages.map((message) => {
+              const member = collaborationMode && message.sender === "user" && message.senderName
+                ? resolveMember(message.senderName)
+                : null;
+              return (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  {/* AI-generated indicator inside message bubble */}
-                  {message.sender === "ai" && (
-                    <div 
-                      className="mb-2.5 pb-2 border-b border-gray-700/30"
-                      role="status"
-                      aria-label="AI-generated content"
-                    >
-                      <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border" style={{ borderColor: `hsl(var(--primary) / 0.3)` }}>
-                        <Sparkles 
-                          className="h-3.5 w-3.5" 
-                          style={{ color: `hsl(var(--primary) / 0.85)` }}
-                          aria-hidden="true" 
-                        />
-                        <span className="text-xs font-medium text-gray-300/90 tracking-wide">
-                          AI Generated
-                        </span>
+                  {/* User avatar + bubble in collab mode */}
+                  {collaborationMode && message.sender === "user" && member ? (
+                    <div className="flex items-end gap-2 max-w-[90%]">
+                      <div className="flex flex-col items-end flex-1 min-w-0">
+                        <span className="text-[10px] text-gray-400 mb-1 mr-1">{member.name}</span>
+                        <div className="bg-primary text-white rounded-2xl rounded-tr-none p-3 w-full">
+                          <MessageContent message={message} />
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 mb-1">
+                        <CollabAvatar member={member} size="sm" />
                       </div>
                     </div>
+                  ) : (
+                    <div
+                      className={`max-w-[90%] rounded-2xl p-3 ${
+                        message.sender === "user"
+                          ? "bg-primary text-white rounded-tr-none"
+                          : "bg-background-dark border border-gray-800 rounded-tl-none"
+                      }`}
+                    >
+                      {message.sender === "ai" && (
+                        <div 
+                          className="mb-2.5 pb-2 border-b border-gray-700/30"
+                          role="status"
+                          aria-label="AI-generated content"
+                        >
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border" style={{ borderColor: `hsl(var(--primary) / 0.3)` }}>
+                            <Sparkles 
+                              className="h-3.5 w-3.5" 
+                              style={{ color: `hsl(var(--primary) / 0.85)` }}
+                              aria-hidden="true" 
+                            />
+                            <span className="text-xs font-medium text-gray-300/90 tracking-wide">
+                              AI Generated
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <MessageContent message={message} />
+                      {message.sender === "ai" && message.finalAnswer && (
+                        <MessageActions message={message} />
+                      )}
+                    </div>
                   )}
-                  <MessageContent message={message} />
-                  {/* Action buttons for AI messages */}
-                  {message.sender === "ai" && message.finalAnswer && (
-                    <MessageActions message={message} />
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
             {/* Show loading indicator when:
                 1. isTyping - user just sent a message
                 2. isLiveRequest && currentStreamingMessageId && !isTyping - reconnection to active stream */}
