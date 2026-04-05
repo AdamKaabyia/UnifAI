@@ -4,7 +4,7 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-import os
+import os, uuid, json
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
@@ -15,15 +15,16 @@ from urllib.parse import quote
 config = AppConfig.get_instance()
 
 class AuthManager:
-    def __init__(self, app=None):
+    def __init__(self, app=None, redis_store=None):
         self.app = app
         self.oauth = None
         self.keycloak_client = None
+        self.redis_store = redis_store
         self.backend_env = config.get('backend_env', 'development')
         if app is not None:
-            self.init_app(app)
+            self.init_app(app, redis_store)
     
-    def init_app(self, app):
+    def init_app(self, app, redis_store):
         """Initialize the auth manager with Flask app"""
         self.app = app
         
@@ -54,6 +55,11 @@ class AuthManager:
             }
         )
         
+        self.redis_store = redis_store
+        if not self.redis_store.ping():
+            raise ValueError("Failed to connect to Redis")
+        if self.redis_store.ping():
+            logger.info("Connected to Redis")
         # Register auth routes
         self._register_auth_routes()
         
@@ -107,6 +113,7 @@ class AuthManager:
                 session_expires_at = session_created_at + timedelta(hours=10)
                 
                 # Store user info in session
+                session_id = str(uuid.uuid4())
                 session.permanent = True
                 session['user'] = {
                     'username': userinfo.get('preferred_username'),
@@ -120,10 +127,29 @@ class AuthManager:
                 session['access_token'] = token.get('access_token')
                 session['refresh_token'] = token.get('refresh_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
-                logger.info(f"user: {session['user'].get('username')}")
+                session_data = {
+                    'cookie': request.cookies.get("session"),
+                    'username': userinfo.get('preferred_username'),
+                    'email': userinfo.get('email'),
+                    'name': userinfo.get('name'),
+                    'sub': userinfo.get('sub'),
+                    'session_created_at': session_created_at.timestamp(),
+                    'session_expires_at': session_expires_at.timestamp(),
+                    'token_expires_at': token.get('expires_at', 0),
+                    'access_token': token.get('access_token'),
+                    'refresh_token': token.get('refresh_token')
+                }
+                # logger.info(f"user: {session['user'].get('username')}")
                 logger.info(f"refresh_token: {session['refresh_token']}")
                 logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
-                
+
+                logger.info(f"session_id: {session_id}")
+                logger.info(f"saving session {session_id} to redis")
+                logger.info(f"#########################")
+                logger.info(f"session: {session}")
+                logger.info(f"#########################")
+                self.redis_store.set(session_id, json.dumps(session_data), ttl_seconds=3600)
+                logger.info(f"saved session {session_id} to redis")
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""

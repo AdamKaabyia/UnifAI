@@ -17,3 +17,10 @@ class AppConfig(SharedConfig):
     frontend_url: str = "http://127.0.0.1:5000"    # session_cookie_secure=True
     backend_env: str = "development"
 
+    # Redis Configuration
+    redis_host: str = "127.0.0.1"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str = ""
+    redis_decode_responses: bool = True
+    redis_session_ttl: int = 3600

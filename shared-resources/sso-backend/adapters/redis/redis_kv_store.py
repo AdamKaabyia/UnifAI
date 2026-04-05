@@ -35,7 +35,7 @@ class RedisKVStore(KVStore):
             return raw.decode("utf-8")
         return str(raw)
 
-    def set(self, key: str, value: str, ttl_seconds: Optional[int] = None) -> None:
+    def set(self, key: str, value: any, ttl_seconds: Optional[int] = None) -> None:
         if ttl_seconds is not None:
             self._client.set(key, value, ex=ttl_seconds)
         else:
@@ -43,3 +43,6 @@ class RedisKVStore(KVStore):
 
     def delete(self, key: str) -> None:
         self._client.delete(key)
+
+    def ping(self) -> bool:
+        return self._client.ping()
