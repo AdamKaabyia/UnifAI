@@ -269,7 +269,7 @@ class ShareCloner:
 
         new_name = self._resolve_name_conflict(
             recipient, original_doc.category,
-            original_doc.type, original_doc.name
+            original_doc.type, original_doc.name, ctx
         )
 
         # Use typed model for clean remapping (Ref objects), then dump to dict
@@ -300,12 +300,21 @@ class ShareCloner:
             self.resources.create(doc)
 
     def _resolve_name_conflict(self, identity: Identity, category: str,
-                               type_: str, preferred_name: str) -> str:
-        """Resolve name conflicts by adding copy suffix."""
-        base_name = preferred_name
+                               type_: str, preferred_name: str,
+                               ctx: CloneContext) -> str:
+        """Resolve name conflicts.
+
+        Team contributions keep the original name; user-to-user shares get a
+        "(from <sender>)" suffix so the recipient can tell where it came from.
+        """
+        if ctx.is_team_contribution:
+            base_name = preferred_name
+        else:
+            base_name = f"{preferred_name} (from {ctx.sender_user_id})"
+
         current_name = base_name
 
-        for counter in range(1, 101):  # Limit to 100 attempts
+        for counter in range(2, 101):
             existing = self.resources._repo.find_by_name(identity, category, type_, current_name)
             if not existing:
                 return current_name
