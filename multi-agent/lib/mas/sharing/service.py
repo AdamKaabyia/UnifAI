@@ -1,10 +1,11 @@
+import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, UTC
 
 from mas.core.identity import Identity
 from .models import ShareInvite, ShareResult, ShareStatus, ShareItemKind, ShareCleanupConfig, ShareCleanupResult
 from .repository.base import ShareRepository
-from .cloner import ShareCloner
+from .cloner import ShareCloner, CloneContext
 
 
 class ShareService:
@@ -59,11 +60,15 @@ class ShareService:
 
         # Perform cloning
         try:
+            ctx = CloneContext(
+                sender_user_id=invite.sender_user_id,
+                recipient_user_id=recipient_user_id,
+            )
+
             if invite.item_kind == ShareItemKind.RESOURCE:
                 rid_mapping, name_conflicts = self._cloner.clone_resource_graph(
                     root_rid=invite.item_id,
-                    sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id
+                    ctx=ctx,
                 )
                 new_item_id = rid_mapping[invite.item_id]
                 result_mapping = rid_mapping
@@ -71,8 +76,7 @@ class ShareService:
             elif invite.item_kind == ShareItemKind.BLUEPRINT:
                 new_blueprint_id, rid_mapping, name_conflicts = self._cloner.clone_blueprint(
                     blueprint_id=invite.item_id,
-                    sender_user_id=invite.sender_user_id,
-                    recipient_user_id=recipient_user_id
+                    ctx=ctx,
                 )
                 new_item_id = new_blueprint_id
                 result_mapping = {**rid_mapping, "blueprint_id": new_blueprint_id}
@@ -100,20 +104,20 @@ class ShareService:
         item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
 
         try:
+            ctx = CloneContext(
+                sender_user_id=sender_user_id,
+                recipient_user_id=team_name,
+                is_team_contribution=True,
+            )
+
             if item_kind == ShareItemKind.RESOURCE:
                 rid_mapping, name_conflicts = self._cloner.clone_resource_graph(
-                    root_rid=item_id,
-                    sender_user_id=sender_user_id,
-                    recipient_user_id=team_name,
-                    contributed_by=sender_user_id
+                    root_rid=item_id, ctx=ctx,
                 )
                 new_item_id = rid_mapping[item_id]
             elif item_kind == ShareItemKind.BLUEPRINT:
                 new_item_id, rid_mapping, name_conflicts = self._cloner.clone_blueprint(
-                    blueprint_id=item_id,
-                    sender_user_id=sender_user_id,
-                    recipient_user_id=team_name,
-                    contributed_by=sender_user_id
+                    blueprint_id=item_id, ctx=ctx,
                 )
             else:
                 raise ValueError(f"Unknown item kind: {item_kind}")

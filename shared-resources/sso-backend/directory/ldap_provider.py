@@ -5,7 +5,9 @@ Queries the corporate LDAP directory for user and group information.
 Requires the ``ldap3`` package.
 """
 import logging
-from typing import List, Optional
+import threading
+import time
+from typing import List, Optional, Tuple
 
 import ldap3
 from ldap3 import Server, ServerPool, Connection, SUBTREE, ROUND_ROBIN
@@ -16,6 +18,41 @@ from directory.provider import DirectoryProvider
 from directory.config import LdapConfig
 
 logger = logging.getLogger(__name__)
+
+_CACHE_TTL = 30  # seconds
+
+
+class _ResultCache:
+    """Thread-safe TTL cache for LDAP search results."""
+
+    def __init__(self, ttl: int = _CACHE_TTL):
+        self._ttl = ttl
+        self._store: dict[str, Tuple[float, list]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[list]:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            ts, value = entry
+            if time.monotonic() - ts > self._ttl:
+                del self._store[key]
+                return None
+            return value
+
+    def put(self, key: str, value: list) -> None:
+        now = time.monotonic()
+        with self._lock:
+            self._store[key] = (now, value)
+            if len(self._store) > 500:
+                self._evict(now)
+
+    def _evict(self, now: float) -> None:
+        expired = [k for k, (ts, _) in self._store.items()
+                   if now - ts > self._ttl]
+        for k in expired:
+            del self._store[k]
 
 
 class LdapDirectoryProvider(DirectoryProvider):
@@ -49,6 +86,10 @@ class LdapDirectoryProvider(DirectoryProvider):
         self._bind_pw = config.bind_password or None
         self._timeout = config.timeout_seconds
 
+        self._conn: Optional[Connection] = None
+        self._conn_lock = threading.Lock()
+        self._cache = _ResultCache()
+
         logger.info(
             "LDAP provider: %s, user_base=%s, group_base=%s, bind=%s",
             config.url, self._user_base,
@@ -56,43 +97,70 @@ class LdapDirectoryProvider(DirectoryProvider):
             self._bind_dn or "anonymous",
         )
 
-    def _connect(self) -> Connection:
-        return Connection(
-            self._pool,
-            user=self._bind_dn,
-            password=self._bind_pw,
-            auto_bind=True,
-            read_only=True,
-            receive_timeout=self._timeout,
-        )
+    def _get_connection(self) -> Connection:
+        """Return a reusable connection, reconnecting only when necessary."""
+        with self._conn_lock:
+            if self._conn is not None:
+                try:
+                    if self._conn.bound:
+                        return self._conn
+                except Exception:
+                    pass
+                try:
+                    self._conn.unbind()
+                except Exception:
+                    pass
+
+            conn = Connection(
+                self._pool,
+                user=self._bind_dn,
+                password=self._bind_pw,
+                auto_bind=True,
+                read_only=True,
+                receive_timeout=self._timeout,
+            )
+            self._conn = conn
+            return conn
 
     def _search(self, base_dn: str, search_filter: str,
                 attributes: list, limit: int = 0) -> list:
+        cache_key = f"{base_dn}|{search_filter}|{limit}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            logger.debug("LDAP cache hit: %s", cache_key)
+            return cached
+
         try:
-            conn = self._connect()
-            try:
-                conn.search(
-                    search_base=base_dn,
-                    search_filter=search_filter,
-                    search_scope=SUBTREE,
-                    attributes=attributes,
-                    size_limit=limit,
-                )
-                results = [
-                    entry for entry in conn.entries
-                    if str(entry.entry_dn) != base_dn
-                ]
-                logger.debug(
-                    "LDAP search base=%s filter=%s → %d result(s)",
-                    base_dn, search_filter, len(results),
-                )
-                return results
-            finally:
-                conn.unbind()
+            conn = self._get_connection()
+            conn.search(
+                search_base=base_dn,
+                search_filter=search_filter,
+                search_scope=SUBTREE,
+                attributes=attributes,
+                size_limit=limit,
+            )
+            results = [
+                entry for entry in conn.entries
+                if str(entry.entry_dn) != base_dn
+            ]
+            logger.debug(
+                "LDAP search base=%s filter=%s → %d result(s)",
+                base_dn, search_filter, len(results),
+            )
+            self._cache.put(cache_key, results)
+            return results
         except LDAPException:
             logger.exception(
                 "LDAP search failed: base=%s filter=%s", base_dn, search_filter,
             )
+            # Connection may be broken; discard it so next call reconnects
+            with self._conn_lock:
+                try:
+                    if self._conn is not None:
+                        self._conn.unbind()
+                except Exception:
+                    pass
+                self._conn = None
             return []
 
     @staticmethod

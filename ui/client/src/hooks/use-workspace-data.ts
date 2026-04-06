@@ -23,6 +23,7 @@ interface ResourceInstance {
   version: number;
   cfg_dict: any;
   nested_refs: string[];
+  contributed_by?: string;
   created: string;
   updated: string;
 }
@@ -119,6 +120,7 @@ export const useWorkspaceData = () => {
             created: resource.created,
             updated: resource.updated,
             nested_refs: resource.nested_refs,
+            contributed_by: resource.contributed_by,
           }),
         );
 

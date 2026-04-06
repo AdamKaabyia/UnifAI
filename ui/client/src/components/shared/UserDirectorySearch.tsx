@@ -125,7 +125,7 @@ export default function UserDirectorySearch({
         } finally {
           if (id === searchIdRef.current) setIsSearching(false);
         }
-      }, 400);
+      }, 250);
     },
     [directoryEnabled, accessToken, onInputChange],
   );
