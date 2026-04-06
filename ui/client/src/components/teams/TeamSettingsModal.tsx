@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView, TeamInfo } from "@/contexts/ViewContext";
-import { createTeam, updateTeam, deleteTeam } from "@/api/teams";
+import { createTeam, updateTeam, deleteTeam, TeamMember, getEffectiveMemberCount } from "@/api/teams";
+import { getDirectoryGroup } from "@/api/directory";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { X, Crown, Trash2, Users, Loader2 } from "lucide-react";
+import { X, Crown, Trash2, Users, User, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,12 +36,16 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   const { user, accessToken } = useAuth();
   const { refreshTeams } = useView();
   const [teamName, setTeamName] = useState("");
-  const [members, setMembers] = useState<string[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [expandingGroup, setExpandingGroup] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [searchResetKey, setSearchResetKey] = useState(0);
+
+  // Track which groups are expanded to show their members
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [groupMembersCache, setGroupMembersCache] = useState<Record<string, string[]>>({});
+  const [loadingGroupMembers, setLoadingGroupMembers] = useState<Set<string>>(new Set());
 
   const isEditing = !!team;
 
@@ -51,43 +56,97 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
         setMembers([...team.members]);
       } else {
         setTeamName("");
-        setMembers(user?.username ? [user.username] : []);
+        setMembers(user?.username
+          ? [{ type: "user" as const, id: user.username, display_name: user.username }]
+          : []);
       }
       setError("");
+      setExpandedGroups(new Set());
       setSearchResetKey((k) => k + 1);
     }
   }, [open, team, user?.username]);
 
   const addMemberFromDirectory = (dirUser: DirectoryUser) => {
-    if (!members.includes(dirUser.user_id)) {
-      setMembers((prev) => [...prev, dirUser.user_id]);
+    const alreadyExists = members.some((m) => m.type === "user" && m.id === dirUser.user_id);
+    if (!alreadyExists) {
+      setMembers((prev) => [...prev, {
+        type: "user" as const,
+        id: dirUser.user_id,
+        display_name: dirUser.display_name || dirUser.username,
+      }]);
     }
     setError("");
     setSearchResetKey((k) => k + 1);
   };
 
-  const addGroupMembers = async (group: DirectoryGroup) => {
-    setExpandingGroup(true);
-    setError("");
+  const addGroupAsReference = (group: DirectoryGroup) => {
+    const alreadyExists = members.some((m) => m.type === "group" && m.id === group.group_id);
+    if (alreadyExists) {
+      setError(`Group "${group.name}" is already in this team`);
+    } else {
+      setMembers((prev) => [...prev, {
+        type: "group" as const,
+        id: group.group_id,
+        display_name: group.name,
+        group_members: group.members,
+      }]);
+    }
+    setSearchResetKey((k) => k + 1);
+  };
+
+  const getGroupMembers = (groupId: string): string[] | undefined => {
+    if (groupMembersCache[groupId]) return groupMembersCache[groupId];
+    const member = members.find((m) => m.type === "group" && m.id === groupId);
+    if (member?.group_members && member.group_members.length > 0) return member.group_members;
+    return undefined;
+  };
+
+  const toggleGroupExpand = async (groupId: string) => {
+    if (expandedGroups.has(groupId)) {
+      setExpandedGroups((prev) => {
+        const next = new Set(prev);
+        next.delete(groupId);
+        return next;
+      });
+      return;
+    }
+
+    setLoadingGroupMembers((prev) => new Set(prev).add(groupId));
     try {
-      const newMembers = group.members.filter((uid) => !members.includes(uid));
-      if (newMembers.length === 0) {
-        setError(`All members of "${group.name}" are already in this team`);
+      const group = await getDirectoryGroup(groupId, accessToken);
+      setGroupMembersCache((prev) => ({ ...prev, [groupId]: group.members }));
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.type === "group" && m.id === groupId
+            ? { ...m, group_members: group.members }
+            : m,
+        ),
+      );
+      setExpandedGroups((prev) => new Set(prev).add(groupId));
+    } catch {
+      // LDAP unavailable — fall back to stored group_members
+      const stored = getGroupMembers(groupId);
+      if (stored) {
+        setGroupMembersCache((prev) => ({ ...prev, [groupId]: stored }));
+        setExpandedGroups((prev) => new Set(prev).add(groupId));
       } else {
-        setMembers((prev) => [...prev, ...newMembers]);
+        setError("Failed to load members for group");
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to expand group");
     } finally {
-      setExpandingGroup(false);
-      setSearchResetKey((k) => k + 1);
+      setLoadingGroupMembers((prev) => {
+        const next = new Set(prev);
+        next.delete(groupId);
+        return next;
+      });
     }
   };
 
-  const removeMember = (username: string) => {
-    if (isEditing && username === team.created_by) return;
-    if (!isEditing && username === user?.username) return;
-    setMembers(members.filter((m) => m !== username));
+  const removeMember = (member: TeamMember) => {
+    if (member.type === "user") {
+      if (isEditing && member.id === team.created_by) return;
+      if (!isEditing && member.id === user?.username) return;
+    }
+    setMembers(members.filter((m) => !(m.type === member.type && m.id === member.id)));
   };
 
   const handleSubmit = async () => {
@@ -130,6 +189,8 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
     }
   };
 
+  const userMemberIds = members.filter((m) => m.type === "user").map((m) => m.id);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,37 +220,91 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
                 <UserDirectorySearch
                   key={searchResetKey}
                   onSelect={addMemberFromDirectory}
-                  onSelectGroup={addGroupMembers}
-                  excludeUserIds={members}
+                  onSelectGroup={addGroupAsReference}
+                  excludeUserIds={userMemberIds}
                   accessToken={accessToken}
                   inputClassName="bg-background-dark border-gray-700 text-gray-100 placeholder:text-gray-500"
                 />
               </div>
 
-              {expandingGroup && (
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Adding group members…
-                </div>
-              )}
-
+              {/* Unified member list — groups and users together */}
               {members.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
+                <div className="mt-3 rounded-lg border border-gray-800 bg-white/[.02] overflow-hidden divide-y divide-gray-800/60">
                   {members.map((m) => {
-                    const isCreator = isEditing ? m === team.created_by : m === user?.username;
+                    if (m.type === "group") {
+                      const isExpanded = expandedGroups.has(m.id);
+                      const isLoadingMembers = loadingGroupMembers.has(m.id);
+                      const cachedMembers = groupMembersCache[m.id] || m.group_members;
+                      const memberCount = cachedMembers?.length ?? 0;
+                      return (
+                        <div key={`group-${m.id}`}>
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleGroupExpand(m.id)}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left group"
+                            >
+                              {isLoadingMembers ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500 flex-shrink-0" />
+                              ) : isExpanded ? (
+                                <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                              )}
+                              <Users className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                              <span className="text-xs text-gray-200 truncate group-hover:text-white transition-colors">
+                                {m.display_name || m.id}
+                              </span>
+                              {memberCount > 0 && (
+                                <span className="text-[10px] text-gray-600 flex-shrink-0">
+                                  {memberCount} member{memberCount !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => removeMember(m)}
+                              className="p-0.5 text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          {isExpanded && cachedMembers && (
+                            <div className="px-3 pb-2 ml-[22px] border-l border-gray-800">
+                              <div className="flex flex-wrap gap-1 pl-2">
+                                {cachedMembers.map((uid) => (
+                                  <span
+                                    key={uid}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-gray-400 bg-white/5"
+                                  >
+                                    <User className="w-2.5 h-2.5" />
+                                    {uid}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // User member
+                    const isCreator = isEditing ? m.id === team.created_by : m.id === user?.username;
                     return (
-                      <span
-                        key={m}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-white/5 text-gray-300 border border-gray-800"
-                      >
-                        {isCreator && <Crown className="w-3 h-3 text-amber-400" />}
-                        {m}
+                      <div key={`user-${m.id}`} className="flex items-center gap-2 px-3 py-2">
+                        <User className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 ml-[18px]" />
+                        <span className="text-xs text-gray-200 truncate flex-1">
+                          {m.display_name || m.id}
+                        </span>
+                        {isCreator && <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />}
                         {!isCreator && (
-                          <button onClick={() => removeMember(m)} className="ml-0.5 hover:text-red-400 transition-colors">
+                          <button
+                            onClick={() => removeMember(m)}
+                            className="p-0.5 text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
+                          >
                             <X className="w-3 h-3" />
                           </button>
                         )}
-                      </span>
+                      </div>
                     );
                   })}
                 </div>
@@ -218,7 +333,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
                 <Button variant="outline" onClick={() => onOpenChange(false)} className="border-gray-700">
                   Cancel
                 </Button>
-                <Button className="bg-primary" onClick={handleSubmit} disabled={saving || expandingGroup}>
+                <Button className="bg-primary" onClick={handleSubmit} disabled={saving}>
                   {saving ? "Saving..." : isEditing ? "Save Changes" : "Create Team"}
                 </Button>
               </div>

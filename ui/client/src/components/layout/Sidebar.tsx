@@ -13,8 +13,9 @@ import { useState } from "react";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import { useAuth, User } from '@/contexts/AuthContext';
 import { useView, TeamInfo } from '@/contexts/ViewContext';
+import { getEffectiveMemberCount } from '@/api/teams';
 import { useAdminAccess } from '@/hooks/use-admin-access';
-import { Users, ChevronDown, User as UserIcon, Settings, Plus } from "lucide-react";
+import { Users, ChevronDown, User as UserIcon, Settings, Plus, Loader2 } from "lucide-react";
 import TeamSettingsModal from "@/components/teams/TeamSettingsModal";
 
 export default function Sidebar() {
@@ -29,7 +30,7 @@ export default function Sidebar() {
   };
 
   const { user, logout } = useAuth();
-  const { viewMode, setViewMode, selectedTeam, setSelectedTeam, teams } = useView();
+  const { viewMode, setViewMode, selectedTeam, setSelectedTeam, teams, teamsLoading } = useView();
   const { isAdmin } = useAdminAccess();
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [teamModalTarget, setTeamModalTarget] = useState<TeamInfo | null>(null);
@@ -155,7 +156,9 @@ export default function Sidebar() {
                     onClick={() => setTeamDropdownOpen(!teamDropdownOpen)}
                     className="w-full mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-gray-800 bg-background-card hover:border-gray-700 transition-colors"
                   >
-                    <span className="text-xs font-medium text-white truncate">{selectedTeam?.name ?? 'Select team'}</span>
+                    <span className="text-xs font-medium text-white truncate">
+                      {teamsLoading && !selectedTeam ? 'Loading teams…' : (selectedTeam?.name ?? 'Select team')}
+                    </span>
                     <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform flex-shrink-0 ${teamDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -171,31 +174,45 @@ export default function Sidebar() {
                           className="absolute left-0 right-0 mt-1 bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden"
                         >
                           <div className="p-1.5">
-                            {teams.map((team) => (
-                              <div
-                                key={team.id}
-                                className={`flex items-center gap-1 rounded-lg transition-colors ${
-                                  selectedTeam?.id === team.id ? 'bg-primary/10' : 'hover:bg-white/[.03]'
-                                }`}
-                              >
-                                <button
-                                  onClick={() => { setSelectedTeam(team); setTeamDropdownOpen(false); }}
-                                  className="flex-1 flex items-center gap-2 px-2 py-1.5 text-left min-w-0"
-                                >
-                                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedTeam?.id === team.id ? 'bg-primary' : 'bg-gray-700'}`} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className={`text-xs font-semibold truncate ${selectedTeam?.id === team.id ? 'text-primary' : 'text-gray-300'}`}>{team.name}</div>
-                                    <div className="text-[10px] text-gray-600">{team.members.length} member{team.members.length !== 1 ? 's' : ''}</div>
-                                  </div>
-                                </button>
-                                <button
-                                  onClick={(e) => openTeamSettings(team, e)}
-                                  className="p-1 rounded-md text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors flex-shrink-0 mr-1"
-                                >
-                                  <Settings className="w-3 h-3" />
-                                </button>
+                            {teamsLoading ? (
+                              <div className="flex items-center gap-2 px-3 py-3 text-xs text-gray-500">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Loading teams…
                               </div>
-                            ))}
+                            ) : teams.length === 0 ? (
+                              <div className="px-3 py-3 text-xs text-gray-600 text-center">
+                                No teams yet
+                              </div>
+                            ) : (
+                              teams.map((team) => {
+                                const count = getEffectiveMemberCount(team.members, team.effective_member_count);
+                                return (
+                                  <div
+                                    key={team.id}
+                                    className={`flex items-center gap-1 rounded-lg transition-colors ${
+                                      selectedTeam?.id === team.id ? 'bg-primary/10' : 'hover:bg-white/[.03]'
+                                    }`}
+                                  >
+                                    <button
+                                      onClick={() => { setSelectedTeam(team); setTeamDropdownOpen(false); }}
+                                      className="flex-1 flex items-center gap-2 px-2 py-1.5 text-left min-w-0"
+                                    >
+                                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedTeam?.id === team.id ? 'bg-primary' : 'bg-gray-700'}`} />
+                                      <div className="flex-1 min-w-0">
+                                        <div className={`text-xs font-semibold truncate ${selectedTeam?.id === team.id ? 'text-primary' : 'text-gray-300'}`}>{team.name}</div>
+                                        <div className="text-[10px] text-gray-600">{count} member{count !== 1 ? 's' : ''}</div>
+                                      </div>
+                                    </button>
+                                    <button
+                                      onClick={(e) => openTeamSettings(team, e)}
+                                      className="p-1 rounded-md text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors flex-shrink-0 mr-1"
+                                    >
+                                      <Settings className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                           <div className="border-t border-gray-700/50">
                             <button

@@ -22,8 +22,9 @@ class TeamRepository(ABC):
         """Retrieve a team by ID. Raises KeyError if not found."""
 
     @abstractmethod
-    def find_by_member(self, user_id: str) -> List[Team]:
-        """Return all teams that include user_id in their members list."""
+    def find_by_member(self, user_id: str,
+                       group_ids: Optional[List[str]] = None) -> List[Team]:
+        """Return all teams that include user_id or any of group_ids."""
 
     @abstractmethod
     def find_by_name(self, name: str) -> Optional[Team]:
@@ -36,3 +37,10 @@ class TeamRepository(ABC):
     @abstractmethod
     def delete(self, team_id: str) -> None:
         """Delete a team by ID. Raises KeyError if not found."""
+
+    def update_group_members(self, group_id: str,
+                             member_ids: List[str]) -> int:
+        """Refresh the stored *group_members* list for every team that
+        contains a group entry with the given *group_id*.
+        Returns the number of modified documents."""
+        return 0

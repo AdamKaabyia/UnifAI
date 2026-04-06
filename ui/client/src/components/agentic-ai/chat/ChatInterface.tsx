@@ -266,6 +266,37 @@ export default function ChatInterface({
       lastSyncedCountRef.current = initialMessages.length;
       const transformedMessages =
         transformBackendMessagesToFrontend(initialMessages);
+
+      // Preserve stream log / workplan data across message ID changes.
+      // During collaboration polling, messages are re-synced with stable IDs
+      // (msg-0, msg-1, …) that differ from the transient streaming IDs.
+      // Match AI messages from the end so the welcome message is skipped.
+      const oldAiMsgs = messages.filter(m => m.sender === 'ai');
+      const newAiMsgs = transformedMessages.filter(m => m.sender === 'ai');
+      let streamDataChanged = false;
+
+      for (let i = 0; i < Math.min(oldAiMsgs.length, newAiMsgs.length); i++) {
+        const oldMsg = oldAiMsgs[oldAiMsgs.length - 1 - i];
+        const newMsg = newAiMsgs[newAiMsgs.length - 1 - i];
+        if (oldMsg.id === newMsg.id) continue;
+
+        if (streamLogDataRef.current[oldMsg.id]) {
+          streamLogDataRef.current[newMsg.id] = streamLogDataRef.current[oldMsg.id];
+          delete streamLogDataRef.current[oldMsg.id];
+          streamDataChanged = true;
+        }
+        if (workPlanDataRef.current[oldMsg.id]) {
+          workPlanDataRef.current[newMsg.id] = workPlanDataRef.current[oldMsg.id];
+          delete workPlanDataRef.current[oldMsg.id];
+          streamDataChanged = true;
+        }
+      }
+
+      if (streamDataChanged) {
+        setStreamLogData({ ...streamLogDataRef.current });
+        setWorkPlanData({ ...workPlanDataRef.current });
+      }
+
       setMessages(transformedMessages);
     } else if (lastSyncedCountRef.current !== 0 || messages.length === 0) {
       lastSyncedCountRef.current = 0;

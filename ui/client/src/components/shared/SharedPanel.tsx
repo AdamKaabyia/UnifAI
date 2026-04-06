@@ -13,6 +13,7 @@ import { useShared, SharedPanelView } from '@/contexts/SharedContext';
 import { useView } from '@/contexts/ViewContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShareInvite, shareToTeam } from '@/api/shares';
+import { getEffectiveMemberCount } from '@/api/teams';
 import UserDirectorySearch from '@/components/shared/UserDirectorySearch';
 import type { DirectoryUser } from '@/api/directory';
 
@@ -147,7 +148,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
       });
       setSharedPanelView('list');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to share to team';
+      const msg = err instanceof Error ? err.message : 'Failed to share with team';
       setTeamShareError(msg);
     } finally {
       setIsSending(false);
@@ -184,8 +185,8 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
     switch (view) {
       case 'list': return 'Shared System';
       case 'send-choice': return 'Share Item';
-      case 'send-user': return 'Share to User';
-      case 'send-team': return 'Share to Team';
+      case 'send-user': return 'Share with User';
+      case 'send-team': return 'Share with Team';
     }
   };
 
@@ -235,7 +236,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
               <FaUser className="w-4 h-4 text-blue-400" />
             </div>
             <div>
-              <div className="text-sm font-medium text-white">Share to User</div>
+              <div className="text-sm font-medium text-white">Share with User</div>
               <div className="text-xs text-gray-400">Send to a specific user by username</div>
             </div>
           </div>
@@ -250,7 +251,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
               <FaUsers className="w-4 h-4 text-purple-400" />
             </div>
             <div>
-              <div className="text-sm font-medium text-white">Share to Team</div>
+              <div className="text-sm font-medium text-white">Share with Team</div>
               <div className="text-xs text-gray-400">Clone directly into a team workspace</div>
             </div>
           </div>
@@ -371,29 +372,32 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
               You are not a member of any team yet.
             </div>
           ) : (
-            teams.map((team) => (
-              <button
-                key={team.id}
-                onClick={() => handleShareToTeam(team.name)}
-                disabled={isSending}
-                className="w-full p-3 bg-background-card border border-gray-700 rounded-lg hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left disabled:opacity-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                      <FaUsers className="w-3.5 h-3.5 text-purple-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{team.name}</div>
-                      <div className="text-xs text-gray-400">
-                        {team.members.length} member{team.members.length !== 1 ? 's' : ''}
+            teams.map((team) => {
+              const count = getEffectiveMemberCount(team.members, team.effective_member_count);
+              return (
+                <button
+                  key={team.id}
+                  onClick={() => handleShareToTeam(team.name)}
+                  disabled={isSending}
+                  className="w-full p-3 bg-background-card border border-gray-700 rounded-lg hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                        <FaUsers className="w-3.5 h-3.5 text-purple-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{team.name}</div>
+                        <div className="text-xs text-gray-400">
+                          {count} member{count !== 1 ? 's' : ''}
+                        </div>
                       </div>
                     </div>
+                    <FaPaperPlane className="w-3 h-3 text-gray-500 flex-shrink-0" />
                   </div>
-                  <FaPaperPlane className="w-3 h-3 text-gray-500 flex-shrink-0" />
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       </div>
@@ -461,7 +465,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
                   <div className="flex items-center gap-4 text-xs text-gray-400 mb-2">
                     <span className="flex items-center gap-1">
                       <FaUser className="w-3 h-3" />
-                      to {notification.recipient_user_id}
+                      with {notification.recipient_user_id}
                     </span>
                     <span className="flex items-center gap-1">
                       <FaCube className="w-3 h-3" />

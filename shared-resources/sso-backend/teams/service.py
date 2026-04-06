@@ -41,8 +41,9 @@ class TeamService:
     def get(self, team_id: str) -> Team:
         return self._repo.get(team_id)
 
-    def list_user_teams(self, user_id: str) -> List[Team]:
-        return self._repo.find_by_member(user_id)
+    def list_user_teams(self, user_id: str,
+                        group_ids: Optional[List[str]] = None) -> List[Team]:
+        return self._repo.find_by_member(user_id, group_ids=group_ids)
 
     def update(self, team_id: str, name: Optional[str] = None,
                members: Optional[List[dict]] = None) -> Team:
@@ -110,6 +111,25 @@ class TeamService:
             return None
         self._apply_user_token(user_token)
         return self._directory.get_group(group_id)
+
+    def get_user_groups(self, user_id: str,
+                        user_token: Optional[str] = None) -> List[DirectoryGroup]:
+        if not self._directory:
+            return []
+        self._apply_user_token(user_token)
+        return self._directory.get_user_groups(user_id)
+
+    # ── group-member sync ────────────────────────────────────────────
+
+    def refresh_group_members(self, groups: List[dict]) -> None:
+        """Update ``group_members`` on every team that references any of
+        the given groups.  *groups* is a list of directory-group dicts,
+        each containing at least ``group_id`` and ``members``."""
+        for g in groups:
+            group_id = g.get("group_id")
+            members = g.get("members")
+            if group_id and members is not None:
+                self._repo.update_group_members(group_id, members)
 
     # ── helpers ────────────────────────────────────────────────────────
 

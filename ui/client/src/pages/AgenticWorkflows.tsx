@@ -75,9 +75,11 @@ export default function AgenticWorkflows() {
       const contextUserId = isTeam && selectedTeam
         ? selectedTeam.name
         : (user?.username || "default");
+      const identityType = isTeam ? "team" : "user";
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,
+        identityType,
       };
 
       const response = await axios.post(

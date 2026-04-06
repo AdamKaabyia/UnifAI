@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useView } from "@/contexts/ViewContext";
+import { getEffectiveMemberCount } from "@/api/teams";
 import {
   Workflow, Database, Zap, TrendingUp, Users, Share2, Radio,
   Activity, Crown, Medal, Award, CircleDot,
@@ -167,9 +168,31 @@ export default function AgenticOverview() {
 
   // ── Real-data computations (used when isTeam && !isDemo) ──
 
+  const effectiveMemberCount = useMemo(() => {
+    if (!selectedTeam?.members) return 0;
+    return getEffectiveMemberCount(selectedTeam.members, selectedTeam.effective_member_count);
+  }, [selectedTeam?.members, selectedTeam?.effective_member_count]);
+
   const teamMembers = useMemo<MemberDisplay[]>(() => {
     if (!selectedTeam?.members) return [];
-    return selectedTeam.members.map((m, i) => buildMemberDisplay(m, i));
+    const seen = new Set<string>();
+    const result: MemberDisplay[] = [];
+    for (const m of selectedTeam.members) {
+      if (m.type === "user") {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          result.push(buildMemberDisplay(m.id, result.length));
+        }
+      } else if (m.type === "group" && m.group_members) {
+        for (const uid of m.group_members) {
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            result.push(buildMemberDisplay(uid, result.length));
+          }
+        }
+      }
+    }
+    return result;
   }, [selectedTeam?.members]);
 
   const activeBlueprints = useMemo(() => {
@@ -359,7 +382,7 @@ export default function AgenticOverview() {
                     <div className="flex-1">
                       <h3 className="font-bold text-white text-base">{selectedTeam?.name ?? "Team"} Overview</h3>
                       <p className="text-xs text-gray-400">
-                        {teamMembers.length} member{teamMembers.length !== 1 ? "s" : ""} · {agenticStats.data?.totalWorkflows ?? 0} workflows · {agenticStats.data?.totalResources ?? 0} resources
+                        {effectiveMemberCount} member{effectiveMemberCount !== 1 ? "s" : ""} · {agenticStats.data?.totalWorkflows ?? 0} workflows · {agenticStats.data?.totalResources ?? 0} resources
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -376,7 +399,7 @@ export default function AgenticOverview() {
                   <StatCard icon={<Share2 className="w-4 h-4" />} title={<span className="flex items-center"><FaProjectDiagram className="text-primary mr-3 h-5 w-5" />Workflows</span>} value={agenticStats.data?.totalWorkflows ?? 0} subtext="Team workflows" isLoading={agenticStats.isLoading} error={agenticStats.error} />
                 </GlassPanel>
                 <GlassPanel className="h-full">
-                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={teamMembers.length} subtext={`In ${selectedTeam?.name ?? "team"}`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
+                  <StatCard icon={<Users className="w-4 h-4" />} title={<span className="flex items-center"><Users className="text-blue-400 mr-3 h-5 w-5" />Team Members</span>} value={effectiveMemberCount} subtext={`In ${selectedTeam?.name ?? "team"}`} iconColor="#60a5fa" iconBgColor="rgba(96,165,250,.15)" />
                 </GlassPanel>
                 <GlassPanel className="h-full">
                   <StatCard icon={<Zap className="w-4 h-4" />} title={<span className="flex items-center"><Zap className="text-emerald-400 mr-3 h-5 w-5" />Active Sessions</span>} value={agenticStats.data?.activeSessions ?? 0} subtext="Currently running" isLoading={agenticStats.isLoading} error={agenticStats.error} iconColor="#34d399" iconBgColor="rgba(52,211,153,.15)" />
@@ -462,7 +485,7 @@ export default function AgenticOverview() {
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="w-[280px] border-l border-gray-800 bg-background-card flex-col flex-shrink-0 hidden xl:flex">
               <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
                 <Users className="w-4 h-4 text-gray-400" />
-                <span className="font-semibold text-sm text-white">Team Members ({teamMembers.length})</span>
+                <span className="font-semibold text-sm text-white">Team Members ({effectiveMemberCount})</span>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {teamMembers.map((member) => (

@@ -9,7 +9,8 @@ class MongoTeamRepository(TeamRepository):
     def __init__(self, db: Database, coll_name: str = "teams"):
         self.col = db[coll_name]
         self.col.create_index("name", unique=True)
-        self.col.create_index("members")
+        self.col.create_index("members.id")
+        self.col.create_index("members.group_members")
 
     def create(self, doc: Team) -> str:
         result = self.col.insert_one({"_id": doc.team_id,
@@ -24,8 +25,22 @@ class MongoTeamRepository(TeamRepository):
             raise KeyError(team_id)
         return Team(**raw)
 
-    def find_by_member(self, user_id: str) -> List[Team]:
-        cursor = self.col.find({"members": user_id}).sort("created_at", pymongo.DESCENDING)
+    def find_by_member(self, user_id: str, group_ids: Optional[List[str]] = None) -> List[Team]:
+        """Find teams where the user is a direct member, appears inside a
+        group's stored member list, or belongs to a listed group.
+
+        Supports both the new structured format and legacy flat strings.
+        """
+        conditions = [
+            {"members.id": user_id},
+            {"members": user_id},
+            {"members.group_members": user_id},
+        ]
+        if group_ids:
+            conditions.append({
+                "members": {"$elemMatch": {"type": "group", "id": {"$in": group_ids}}}
+            })
+        cursor = self.col.find({"$or": conditions}).sort("created_at", pymongo.DESCENDING)
         return [Team(**doc) for doc in cursor]
 
     def find_by_name(self, name: str) -> Optional[Team]:
@@ -45,3 +60,12 @@ class MongoTeamRepository(TeamRepository):
         result = self.col.delete_one({"_id": team_id})
         if result.deleted_count == 0:
             raise KeyError(team_id)
+
+    def update_group_members(self, group_id: str,
+                             member_ids: List[str]) -> int:
+        result = self.col.update_many(
+            {"members": {"$elemMatch": {"type": "group", "id": group_id}}},
+            {"$set": {"members.$[elem].group_members": member_ids}},
+            array_filters=[{"elem.type": "group", "elem.id": group_id}],
+        )
+        return result.modified_count

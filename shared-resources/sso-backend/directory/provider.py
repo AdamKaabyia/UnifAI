@@ -41,3 +41,7 @@ class DirectoryProvider(ABC):
     def get_group(self, group_id: str) -> Optional[DirectoryGroup]:
         """Look up a single group by its unique directory identifier."""
         return None
+
+    def get_user_groups(self, user_id: str) -> List[DirectoryGroup]:
+        """Return all groups that contain *user_id* as a member."""
+        return []

@@ -128,6 +128,9 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const sessionSelectRequestId = useRef(0);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionListPollCounterRef = useRef(0);
+  const contextUserIdRef = useRef(contextUserId);
+  const identityTypeRef = useRef(identityType);
   const joinedSessionRef = useRef<string | null>(null);
   const selectedSessionRef = useRef<ChatSession | null>(null);
   const isLiveRequestRef = useRef(false);
@@ -542,6 +545,20 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     const session = selectedSessionRef.current;
     if (!session) return;
 
+    // Refresh session list every ~15s so new sessions from other users appear
+    sessionListPollCounterRef.current += 1;
+    if (sessionListPollCounterRef.current % 5 === 0) {
+      try {
+        const listRes = await axios.get(
+          `/sessions/session.user.list?userId=${contextUserIdRef.current}&identityType=${identityTypeRef.current}`,
+        );
+        const sorted = sortSessionsByTimestamp(
+          transformApiDataToSessions(listRes.data),
+        );
+        setChatSessions(sorted);
+      } catch { /* ignore */ }
+    }
+
     // Check session status to detect remote execution
     if (!isLiveRequestRef.current) {
       try {
@@ -596,6 +613,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   // Keep refs in sync for stable interval callbacks
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { isLiveRequestRef.current = isLiveRequest; }, [isLiveRequest]);
+  useEffect(() => { contextUserIdRef.current = contextUserId; }, [contextUserId]);
+  useEffect(() => { identityTypeRef.current = identityType; }, [identityType]);
 
   // Subscribe to remote stream when session becomes busy from another user
   useEffect(() => {
@@ -603,9 +622,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     wasSessionBusyRef.current = isSessionBusy;
 
     if (justBecameBusy && !isLiveRequest && selectedSession) {
-      // Subscribe directly — the Redis reader will block-wait if the
-      // stream hasn't been created yet, then replay all events once
-      // the foreground runner starts writing.
+      clearStream();
       subscribeRemoteStream(selectedSession.id);
     }
     if (!isSessionBusy && !isLiveRequest) {
@@ -982,7 +999,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
             <DialogTitle className="text-lg">Start New Session</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
-            <div key={`collab-hub-add-${showAddFlowModal}`}>
+            <div key={`collab-hub-add-${showAddFlowModal}`} className="h-full">
               <WorkflowsPanel
                 selectedFlow={selectedFlowForModal}
                 onFlowSelect={(flow: FlowObject | null) => setSelectedFlowForModal(flow)}

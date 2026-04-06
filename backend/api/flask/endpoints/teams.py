@@ -5,6 +5,12 @@ from webargs import fields
 teams_bp = Blueprint("teams", __name__)
 
 
+def _serialize_team(team):
+    d = team.model_dump(mode="json")
+    d["effective_member_count"] = team.effective_member_count()
+    return d
+
+
 # ────────────────────────── local team CRUD ──────────────────────────
 
 
@@ -12,13 +18,13 @@ teams_bp = Blueprint("teams", __name__)
 @from_body({
     "name": fields.Str(required=True),
     "created_by": fields.Str(data_key="createdBy", required=True),
-    "members": fields.List(fields.Str(), required=True),
+    "members": fields.List(fields.Raw(), required=True),
 })
 def create_team(name, created_by, members):
     svc = current_app.container.team_service
     try:
         team = svc.create(name=name, created_by=created_by, members=members)
-        return jsonify(team.model_dump(mode="json")), 201
+        return jsonify(_serialize_team(team)), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -28,13 +34,15 @@ def create_team(name, created_by, members):
 @teams_bp.route("/teams.list", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
+    "group_ids": fields.Str(data_key="groupIds", required=False, load_default=None),
 })
-def list_teams(user_id):
+def list_teams(user_id, group_ids=None):
     svc = current_app.container.team_service
     try:
-        teams = svc.list_user_teams(user_id)
+        parsed_groups = group_ids.split(",") if group_ids else None
+        teams = svc.list_user_teams(user_id, group_ids=parsed_groups)
         return jsonify({
-            "teams": [t.model_dump(mode="json") for t in teams]
+            "teams": [_serialize_team(t) for t in teams]
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -48,7 +56,7 @@ def get_team(team_id):
     svc = current_app.container.team_service
     try:
         team = svc.get(team_id)
-        return jsonify(team.model_dump(mode="json")), 200
+        return jsonify(_serialize_team(team)), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
     except Exception as e:
@@ -59,13 +67,13 @@ def get_team(team_id):
 @from_body({
     "team_id": fields.Str(data_key="teamId", required=True),
     "name": fields.Str(required=False),
-    "members": fields.List(fields.Str(), required=False),
+    "members": fields.List(fields.Raw(), required=False),
 })
 def update_team(team_id, name=None, members=None):
     svc = current_app.container.team_service
     try:
         team = svc.update(team_id=team_id, name=name, members=members)
-        return jsonify(team.model_dump(mode="json")), 200
+        return jsonify(_serialize_team(team)), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
     except ValueError as e:

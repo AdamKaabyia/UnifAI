@@ -257,6 +257,21 @@ class LdapDirectoryProvider(DirectoryProvider):
             return None
         return self._entry_to_group(entries[0])
 
+    def get_user_groups(self, user_id: str) -> List[DirectoryGroup]:
+        """Find all directory groups that contain the given user."""
+        if not self._group_base:
+            return []
+        q = self._escape(user_id)
+        member_attr = self._cfg.attr_group_member
+        oc_filter = self._object_class_filter()
+        # Match the member DN pattern: uid=<user_id>,<user_base_dn>
+        member_dn = f"uid={q},{self._user_base}"
+        search_filter = f"(&{oc_filter}({member_attr}={member_dn}))"
+        logger.info("LDAP user-groups lookup: user=%s filter=%s", user_id, search_filter)
+        entries = self._search(self._group_base, search_filter,
+                               self._group_attrs, limit=0)
+        return [self._entry_to_group(e) for e in entries]
+
 
 def _first(values: list) -> str:
     if values:

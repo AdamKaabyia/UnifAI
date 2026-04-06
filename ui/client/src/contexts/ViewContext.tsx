@@ -1,14 +1,15 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { listUserTeams, Team } from "@/api/teams";
+import { listUserTeams, Team, TeamMember } from "@/api/teams";
 
 export type ViewMode = "private" | "team";
 
 export interface TeamInfo {
   id: string;
   name: string;
-  members: string[];
+  members: TeamMember[];
   created_by: string;
+  effective_member_count?: number;
 }
 
 export interface ViewContextType {
@@ -19,6 +20,7 @@ export interface ViewContextType {
   teams: TeamInfo[];
   refreshTeams: () => Promise<void>;
   teamsLoading: boolean;
+  userGroups: string[];
 }
 
 function toTeamInfo(t: Team): TeamInfo {
@@ -27,6 +29,7 @@ function toTeamInfo(t: Team): TeamInfo {
     name: t.name,
     members: t.members,
     created_by: t.created_by,
+    effective_member_count: t.effective_member_count,
   };
 }
 
@@ -38,6 +41,7 @@ const defaultViewContext: ViewContextType = {
   teams: [],
   refreshTeams: async () => {},
   teamsLoading: false,
+  userGroups: [],
 };
 
 const ViewContext = createContext<ViewContextType>(defaultViewContext);
@@ -48,6 +52,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
   const [selectedTeam, setSelectedTeam] = useState<TeamInfo | null>(null);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
+  const [userGroups, setUserGroups] = useState<string[]>([]);
 
   const selectedTeamRef = useRef(selectedTeam);
   selectedTeamRef.current = selectedTeam;
@@ -56,7 +61,18 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
     if (!user?.username) return;
     setTeamsLoading(true);
     try {
-      const fetched = await listUserTeams(user.username);
+      // Fetch user's ROVER groups for dynamic team membership
+      let groups: string[] = [];
+      try {
+        const { api } = await import('@/http/authClient');
+        const res = await api.get<{ groups: string[] }>('/auth/user/groups');
+        groups = res.data.groups || [];
+        setUserGroups(groups);
+      } catch {
+        // Groups endpoint may not be available; fall back gracefully
+      }
+
+      const fetched = await listUserTeams(user.username, groups.length > 0 ? groups : undefined);
       const mapped = fetched.map(toTeamInfo);
       setTeams(mapped);
       const current = selectedTeamRef.current;
@@ -93,6 +109,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
         teams,
         refreshTeams,
         teamsLoading,
+        userGroups,
       }}
     >
       {children}

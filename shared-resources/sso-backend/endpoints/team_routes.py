@@ -3,6 +3,12 @@ from flask import Blueprint, jsonify, current_app, request
 team_bp = Blueprint("teams", __name__)
 
 
+def _serialize_team(team):
+    d = team.model_dump(mode="json")
+    d["effective_member_count"] = team.effective_member_count()
+    return d
+
+
 @team_bp.route("/team.create", methods=["POST"])
 def create_team():
     svc = current_app.extensions["team_service"]
@@ -17,7 +23,7 @@ def create_team():
 
     try:
         team = svc.create(name=name, created_by=created_by, members=members)
-        return jsonify(team.model_dump(mode="json")), 201
+        return jsonify(_serialize_team(team)), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -31,9 +37,12 @@ def list_teams():
     if not user_id:
         return jsonify({"error": "userId parameter is required"}), 400
 
+    group_ids_str = request.args.get("groupIds", "").strip()
+    group_ids = group_ids_str.split(",") if group_ids_str else None
+
     try:
-        teams = svc.list_user_teams(user_id)
-        return jsonify({"teams": [t.model_dump(mode="json") for t in teams]}), 200
+        teams = svc.list_user_teams(user_id, group_ids=group_ids)
+        return jsonify({"teams": [_serialize_team(t) for t in teams]}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -47,7 +56,7 @@ def get_team():
 
     try:
         team = svc.get(team_id)
-        return jsonify(team.model_dump(mode="json")), 200
+        return jsonify(_serialize_team(team)), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
     except Exception as e:
@@ -69,7 +78,7 @@ def update_team():
             name=body.get("name"),
             members=body.get("members"),
         )
-        return jsonify(team.model_dump(mode="json")), 200
+        return jsonify(_serialize_team(team)), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
     except ValueError as e:

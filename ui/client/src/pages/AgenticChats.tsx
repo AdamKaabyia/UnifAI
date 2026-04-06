@@ -20,7 +20,24 @@ export default function AgenticChats() {
 
   const teamMembers = useMemo(() => {
     if (!selectedTeam?.members) return [];
-    return selectedTeam.members.map((m, i) => buildMemberDisplay(m, i));
+    const seen = new Set<string>();
+    const result: ReturnType<typeof buildMemberDisplay>[] = [];
+    for (const m of selectedTeam.members) {
+      if (m.type === "user") {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          result.push(buildMemberDisplay(m.id, result.length));
+        }
+      } else if (m.type === "group" && m.group_members) {
+        for (const uid of m.group_members) {
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            result.push(buildMemberDisplay(uid, result.length));
+          }
+        }
+      }
+    }
+    return result;
   }, [selectedTeam?.members]);
 
   return (

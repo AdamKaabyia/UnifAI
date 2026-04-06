@@ -16,6 +16,7 @@ class TeamMember(BaseModel):
     type: TeamMemberType
     id: str
     display_name: str = ""
+    group_members: List[str] = Field(default_factory=list)
 
 
 class Team(BaseModel):
@@ -39,3 +40,13 @@ class Team(BaseModel):
                     normalized.append(item)
             data["members"] = normalized
         return data
+
+    def effective_member_count(self) -> int:
+        """Unique individual users: direct users + users inside groups."""
+        ids: set = set()
+        for m in self.members:
+            if m.type == TeamMemberType.USER:
+                ids.add(m.id)
+            elif m.type == TeamMemberType.GROUP and m.group_members:
+                ids.update(m.group_members)
+        return len(ids)

@@ -1,12 +1,45 @@
 import backendApi from '@/http/backendClient';
 
+export type TeamMemberType = 'user' | 'group';
+
+export interface TeamMember {
+  type: TeamMemberType;
+  id: string;
+  display_name: string;
+  group_members?: string[];
+}
+
+/**
+ * Return the effective member count for a team.  Prefers the
+ * backend-computed ``effective_member_count`` when available, otherwise
+ * falls back to a client-side calculation from ``group_members``.
+ */
+export function getEffectiveMemberCount(
+  members: TeamMember[],
+  backendCount?: number,
+): number {
+  if (typeof backendCount === 'number') return backendCount;
+  const userIds = new Set<string>();
+  for (const m of members) {
+    if (m.type === 'user') {
+      userIds.add(m.id);
+    } else if (m.type === 'group' && m.group_members) {
+      for (const uid of m.group_members) {
+        userIds.add(uid);
+      }
+    }
+  }
+  return userIds.size;
+}
+
 export interface Team {
   team_id: string;
   name: string;
   created_by: string;
-  members: string[];
+  members: TeamMember[];
   created_at: string;
   updated_at: string;
+  effective_member_count?: number;
 }
 
 export interface TeamsListResponse {
@@ -16,7 +49,7 @@ export interface TeamsListResponse {
 export async function createTeam(
   name: string,
   createdBy: string,
-  members: string[]
+  members: TeamMember[]
 ): Promise<Team> {
   const { data } = await backendApi.post<Team>('/teams/team.create', {
     name,
@@ -26,9 +59,16 @@ export async function createTeam(
   return data;
 }
 
-export async function listUserTeams(userId: string): Promise<Team[]> {
+export async function listUserTeams(
+  userId: string,
+  groupIds?: string[],
+): Promise<Team[]> {
+  const params: Record<string, string> = { userId };
+  if (groupIds && groupIds.length > 0) {
+    params.groupIds = groupIds.join(',');
+  }
   const { data } = await backendApi.get<TeamsListResponse>('/teams/teams.list', {
-    params: { userId },
+    params,
   });
   return data.teams;
 }
@@ -42,7 +82,7 @@ export async function getTeam(teamId: string): Promise<Team> {
 
 export async function updateTeam(
   teamId: string,
-  updates: { name?: string; members?: string[] }
+  updates: { name?: string; members?: TeamMember[] }
 ): Promise<Team> {
   const { data } = await backendApi.put<Team>('/teams/team.update', {
     teamId,
