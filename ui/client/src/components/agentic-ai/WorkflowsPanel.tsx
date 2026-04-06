@@ -74,9 +74,9 @@ export default function WorkflowsPanel({
   const { viewMode, selectedTeam } = useView();
   const { openShareForItem } = useShared();
   
-  const contextUserId = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
   
   // Blueprint validation hook
   const {
@@ -106,7 +106,7 @@ export default function WorkflowsPanel({
     try {
       // Use summary endpoint - returns name, description, metadata without heavy spec_dict.
       // Full resolved data is fetched on selection for the graph + sharing status.
-      const summaries = await fetchBlueprintSummaries(contextUserId);
+      const summaries = await fetchBlueprintSummaries(contextUserId, identityType);
 
       // Convert summaries to FlowObject format
       const processedFlows = summaries
@@ -142,7 +142,7 @@ export default function WorkflowsPanel({
     if (!showActiveStatus) return;
 
     try {
-      const activeSessions = await fetchActiveSessions(contextUserId);
+      const activeSessions = await fetchActiveSessions(contextUserId, identityType);
       setActiveFlowIds(activeSessions || []);
     } catch (error) {
       console.error("Error fetching active flows:", error);
@@ -151,6 +151,8 @@ export default function WorkflowsPanel({
   };
 
   useEffect(() => {
+    onFlowSelect(null);
+    setSelectedBlueprintData(null);
     setIsLoading(true);
     Promise.all([
       fetchAvailableFlows(),
@@ -158,7 +160,7 @@ export default function WorkflowsPanel({
     ]).finally(() => {
       setIsLoading(false);
     });
-  }, [contextUserId]);
+  }, [contextUserId, identityType]);
 
   // Trigger validation when selected flow changes
   useEffect(() => {

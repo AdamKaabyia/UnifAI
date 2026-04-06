@@ -72,9 +72,9 @@ export default function ExecutionStream({
   const { nodeListRef } = useStreamingData();
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const contextUserId = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
 
   const extractNodeData = (graphFlow: GraphFlow): { id: string; name: string; description: string | null }[] => {
     if (!graphFlow || !graphFlow.plan) {
@@ -95,7 +95,7 @@ export default function ExecutionStream({
   // Create agent nodes from selected graph nodes on component mount
   useEffect(() => {
     const getGraphNodes = async () => {
-      const blueprintObjects = await fetchResolvedBlueprints(contextUserId);
+      const blueprintObjects = await fetchResolvedBlueprints(contextUserId, identityType);
       
       // Find the specific graph flow by blueprint_id
       const targetBlueprintObj = blueprintObjects.find((blueprintObj: any, index: number) => 

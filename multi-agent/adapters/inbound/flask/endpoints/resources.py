@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.resources.errors import ResourceInUseError
+from inbound.flask.identity_helpers import resolve_identity
 
 resources_bp = Blueprint("resources", __name__)
 
@@ -9,21 +10,23 @@ resources_bp = Blueprint("resources", __name__)
 @resources_bp.route("/resource.save", methods=["POST"])
 @from_body({
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
     "category": fields.Str(required=True),
     "type": fields.Str(required=True),
     "name": fields.Str(required=True),
     "config": fields.Dict(required=True),
 })
-def save_resource(user_id, category, type, name, config):
+def save_resource(user_id, identity_type="user", category=None, type=None, name=None, config=None):
     svc = current_app.container.resources_service
     try:
-        doc = svc.create(user_id=user_id,
+        identity = resolve_identity(user_id, identity_type)
+        doc = svc.create(identity=identity,
                          category=category,
                          type=type,
                          name=name,
                          config=config)
         return jsonify(doc.model_dump(mode="json")), 201
-    except ValueError as e:  # duplicate name, bad input, etc.
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -48,12 +51,13 @@ def get_resource(resource_id):
 @resources_bp.route("/resources.list", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
     "category": fields.Str(required=False),
     "type": fields.Str(required=False),
     "limit": fields.Int(required=False, load_default=1000),
     "offset": fields.Int(required=False, load_default=0),
 })
-def list_resources(user_id, category=None, type=None, limit=1000, offset=0):
+def list_resources(user_id, identity_type="user", category=None, type=None, limit=1000, offset=0):
     """
     Get resources with flexible filtering and pagination:
     - Only user_id: returns all resources for that user
@@ -63,12 +67,13 @@ def list_resources(user_id, category=None, type=None, limit=1000, offset=0):
     """
     svc = current_app.container.resources_service
     try:
+        identity = resolve_identity(user_id, identity_type)
         resources, total_count = svc.find_resources(
-            user_id=user_id,
+            identity=identity,
             category=category,
             type=type,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
         return jsonify({
             "resources": [doc.model_dump(mode="json") for doc in resources],

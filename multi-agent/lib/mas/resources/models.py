@@ -32,7 +32,7 @@ class Resource(BaseModel):
 
 class ResourceQuery(BaseModel):
     """Query object for finding resources with pagination and filtering."""
-    user_id: str = Field(..., description="User ID to filter resources")
+    identity: Identity = Field(..., description="Owner identity to filter resources")
     category: Optional[ResourceCategory] = Field(None, description="Resource category filter")
     type: Optional[str] = Field(None, description="Resource type filter")
 

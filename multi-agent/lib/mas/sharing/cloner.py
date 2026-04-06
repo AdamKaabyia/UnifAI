@@ -57,6 +57,13 @@ class ShareCloner:
         self.blueprints = blueprint_service
         self.elements = element_registry
 
+    @staticmethod
+    def _recipient_identity(recipient_user_id: str, contributed_by: Optional[str]) -> Identity:
+        """Build the correct Identity for the recipient of a share."""
+        if contributed_by:
+            return Identity.team(recipient_user_id)
+        return Identity.from_user_id(recipient_user_id)
+
     def clone_resource_graph(self, *, root_rid: str, sender_user_id: str,
                              recipient_user_id: str,
                              contributed_by: Optional[str] = None) -> Tuple[Dict[str, str], Dict[str, str]]:
@@ -65,9 +72,11 @@ class ShareCloner:
 
         # Single pass: Load resources + compute dependencies + cache models
         closure_data = self._compute_closure({root_rid}, sender_user_id)
+        recipient = self._recipient_identity(recipient_user_id, contributed_by)
 
         # Clone using pre-computed data
-        result = self._clone_resource_set(closure_data, recipient_user_id, contributed_by=contributed_by)
+        result = self._clone_resource_set(closure_data, recipient,
+                                          contributed_by=contributed_by)
 
         if not result.success:
             raise ValueError(f"Resource cloning failed: {result.errors}")
@@ -88,13 +97,13 @@ class ShareCloner:
                 raise ValueError(f"Blueprint {blueprint_id} not owned by sender")
 
             draft = BlueprintDraft(**bp_doc.spec_dict)
-
             # Use pre-computed external refs from the blueprint document
             external_rids = set(bp_doc.rid_refs)
+            recipient = self._recipient_identity(recipient_user_id, contributed_by)
 
             # Clone dependencies and build RID mapping
             rid_mapping, name_conflicts, resources_cloned = self._clone_dependencies(
-                external_rids, sender_user_id, recipient_user_id,
+                external_rids, sender_user_id, recipient,
                 contributed_by=contributed_by
             )
 
@@ -109,9 +118,9 @@ class ShareCloner:
 
             # Save blueprint through service
             new_blueprint_id = self.blueprints.save_draft(
-                user_id=recipient_user_id,
+                identity=recipient,
                 draft_dict=new_draft.model_dump(mode="json"),
-                metadata=bp_metadata or None
+                metadata=bp_metadata or None,
             )
 
             logger.info(f"Blueprint clone completed: {new_blueprint_id}, {resources_cloned} resources cloned")
@@ -122,7 +131,7 @@ class ShareCloner:
             raise
 
     def _clone_dependencies(self, external_rids: Set[str], sender_user_id: str,
-                            recipient_user_id: str,
+                            recipient: Identity,
                             contributed_by: Optional[str] = None) -> Tuple[Dict[str, str], Dict[str, str], int]:
         """Clone external dependencies and return mapping info."""
         if not external_rids:
@@ -137,7 +146,8 @@ class ShareCloner:
             return {}, {}, 0
 
         logger.debug(f"Total closure to clone: {set(closure_data.keys())}")
-        clone_result = self._clone_resource_set(closure_data, recipient_user_id, contributed_by=contributed_by)
+        clone_result = self._clone_resource_set(closure_data, recipient,
+                                                contributed_by=contributed_by)
 
         if not clone_result.success:
             raise ValueError(f"Failed to clone resources: {clone_result.errors}")
@@ -146,7 +156,7 @@ class ShareCloner:
         return clone_result.rid_mapping, clone_result.name_conflicts, clone_result.resources_cloned
 
     def _clone_resource_set(self, closure_data: Dict[str, ResourceCacheData],
-                            recipient_user_id: str,
+                            recipient: Identity,
                             contributed_by: Optional[str] = None) -> CloneResult:
         """Clone a set of resources using pre-computed closure data."""
         try:
@@ -160,7 +170,7 @@ class ShareCloner:
             new_docs = []
             for old_rid, cache_data in closure_data.items():
                 try:
-                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient_user_id,
+                    new_doc = self._clone_single_resource(cache_data, rid_mapping, recipient,
                                                           contributed_by=contributed_by)
 
                     # Track name conflicts
@@ -239,7 +249,7 @@ class ShareCloner:
         return closure_cache
 
     def _clone_single_resource(self, cache_data: ResourceCacheData, rid_mapping: Dict[str, str],
-                               recipient_user_id: str,
+                               recipient_identity: Identity,
                                contributed_by: Optional[str] = None) -> Resource:
         """Clone a single resource using pre-computed data."""
         original_doc = cache_data.doc
@@ -247,7 +257,7 @@ class ShareCloner:
 
         # Resolve name conflicts
         new_name = self._resolve_name_conflict(
-            recipient_user_id, original_doc.category,
+            recipient_identity, original_doc.category,
             original_doc.type, original_doc.name
         )
 
@@ -262,7 +272,7 @@ class ShareCloner:
 
         return Resource(
             rid=new_rid,
-            identity=Identity.from_user_id(recipient_user_id),
+            identity=recipient_identity,
             category=original_doc.category,
             type=original_doc.type,
             name=new_name,
@@ -278,14 +288,14 @@ class ShareCloner:
         for doc in docs:
             self.resources.create(doc)
 
-    def _resolve_name_conflict(self, user_id: str, category: str,
+    def _resolve_name_conflict(self, identity: Identity, category: str,
                                type_: str, preferred_name: str) -> str:
         """Resolve name conflicts by adding copy suffix."""
         base_name = preferred_name
         current_name = base_name
 
         for counter in range(1, 101):  # Limit to 100 attempts
-            existing = self.resources._repo.find_by_name(user_id, category, type_, current_name)
+            existing = self.resources._repo.find_by_name(identity, category, type_, current_name)
             if not existing:
                 return current_name
 

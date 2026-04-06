@@ -54,9 +54,9 @@ export const useWorkspaceData = () => {
 
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const USER_ID = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const USER_ID = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
 
   // Fetch all available categories and element types
   const fetchCategories = useCallback(async () => {
@@ -104,7 +104,7 @@ export const useWorkspaceData = () => {
         setElementInstances([]);
 
         const response = await axios.get<ResourcesListResponse>(
-          `/resources/resources.list?userId=${USER_ID}&category=${category}&type=${type}`,
+          `/resources/resources.list?userId=${USER_ID}&identityType=${identityType}&category=${category}&type=${type}`,
         );
 
         // Transform ResourceInstance to ElementInstance format
@@ -140,7 +140,7 @@ export const useWorkspaceData = () => {
         setIsLoadingInstances(false);
       }
     },
-    [toast, USER_ID],
+    [toast, USER_ID, identityType],
   );
 
   // Fetch single resource by ID
@@ -178,7 +178,7 @@ export const useWorkspaceData = () => {
     async (category: string) => {
       try {
         const response = await axios.get<ResourcesListResponse>(
-          `/resources/resources.list?userId=${USER_ID}&category=${category}`,
+          `/resources/resources.list?userId=${USER_ID}&identityType=${identityType}&category=${category}`,
         );
 
         return response.data.resources.map((resource: ResourceInstance) => ({
@@ -199,7 +199,7 @@ export const useWorkspaceData = () => {
         return [];
       }
     },
-    [toast, USER_ID],
+    [toast, USER_ID, identityType],
   );
 
   // Fetch element schema for form generation (combines resource schema + element-specific schema)
@@ -338,6 +338,7 @@ export const useWorkspaceData = () => {
           const { cfg_dict, ...firstLevelFields } = elementData;
           const savePayload = {
             userId: USER_ID,
+            identityType: identityType,
             category,
             type,
             config: cfg_dict,
@@ -382,7 +383,7 @@ export const useWorkspaceData = () => {
         setIsLoading(false);
       }
     },
-    [toast, USER_ID],
+    [toast, USER_ID, identityType],
   );
 
   // Delete element using Resources API

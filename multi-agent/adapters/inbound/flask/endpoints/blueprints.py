@@ -10,6 +10,7 @@ from mas.blueprints.exceptions import (
     BlueprintSaveError,
     BlueprintMetadataError,
 )
+from inbound.flask.identity_helpers import resolve_identity
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +87,14 @@ def _extract_blueprint_data(
 
 @blueprints_bp.route("/available.blueprints.get", methods=["GET"])
 @from_query({
-    "user_id": fields.Str(data_key="userId", required=True)
+    "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def available_doc_list(user_id):
+def available_doc_list(user_id, identity_type="user"):
     try:
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.blueprint_service
-        docs = svc.list_draft_docs(user_id=user_id)
+        docs = svc.list_draft_docs(identity=identity)
         return jsonify([doc.model_dump(mode="json") for doc in docs]), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -99,16 +102,18 @@ def available_doc_list(user_id):
 
 @blueprints_bp.route("/available.blueprints.summary.get", methods=["GET"])
 @from_query({
-    "user_id": fields.Str(data_key="userId", required=True)
+    "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def available_blueprint_summaries(user_id):
+def available_blueprint_summaries(user_id, identity_type="user"):
     """
     Return lightweight blueprint summaries (id, name, description,
     timestamps, metadata) without the full spec.
     """
     try:
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.blueprint_service
-        summaries = svc.list_summaries(user_id=user_id)
+        summaries = svc.list_summaries(identity=identity)
         return jsonify([s.model_dump(mode="json") for s in summaries]), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -117,12 +122,13 @@ def available_blueprint_summaries(user_id):
 @blueprints_bp.route("/available.blueprints.resolved.get", methods=["GET"])
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
     "blueprint_id": fields.Str(data_key="blueprintId", required=False, load_default=None),
     "skip": fields.Int(data_key="skip", required=False, load_default=0),
     "limit": fields.Int(data_key="limit", required=False, load_default=100),
     "sort_desc": fields.Bool(data_key="sortDesc", required=False, load_default=True),
 })
-def available_resolved_doc_list(user_id, blueprint_id=None, skip=0, limit=100, sort_desc=True):
+def available_resolved_doc_list(user_id, identity_type="user", blueprint_id=None, skip=0, limit=100, sort_desc=True):
     try:
         svc = current_app.container.blueprint_service
 
@@ -132,9 +138,10 @@ def available_resolved_doc_list(user_id, blueprint_id=None, skip=0, limit=100, s
             return jsonify(resolved.model_dump(mode="json")), 200
 
         # Paginated list
-        total = svc.count(user_id=user_id)
+        identity = resolve_identity(user_id, identity_type)
+        total = svc.count(identity=identity)
         items = svc.list_resolved_docs(
-            user_id=user_id, skip=skip, limit=limit, sort_desc=sort_desc
+            identity=identity, skip=skip, limit=limit, sort_desc=sort_desc
         )
         return jsonify({
             "items": [item.model_dump(mode="json") for item in items],
@@ -153,9 +160,10 @@ def available_resolved_doc_list(user_id, blueprint_id=None, skip=0, limit=100, s
 @from_body({
     "blueprint_raw": fields.Str(data_key="blueprintRaw", required=False),
     "user_id": fields.Str(data_key="userId", required=False, load_default="alice"),
+    "identity_type": fields.Str(data_key="identityType", required=False, load_default="user"),
     "metadata": fields.Dict(data_key="metadata", required=False, load_default=lambda: {})
 })
-def save_blueprint(blueprint_raw=None, user_id="alice", metadata=None):
+def save_blueprint(blueprint_raw=None, user_id="alice", identity_type="user", metadata=None):
     """
     Save a blueprint draft.
     
@@ -173,8 +181,10 @@ def save_blueprint(blueprint_raw=None, user_id="alice", metadata=None):
             field_name="blueprint_raw"
         )
         
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.blueprint_service
-        blueprint_id = svc.save_draft(user_id=user_id, draft_dict=parsed, metadata=metadata)
+        blueprint_id = svc.save_draft(identity=identity, draft_dict=parsed,
+                                      metadata=metadata)
 
         return jsonify({
             "status": "success",

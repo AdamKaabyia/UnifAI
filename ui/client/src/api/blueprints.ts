@@ -69,9 +69,12 @@ export interface SaveBlueprintResponse {
 /**
  * Fetch available blueprints for a user
  */
-export async function fetchBlueprints(userId?: string): Promise<WorkflowBlueprint[]> {
+export async function fetchBlueprints(userId?: string, identityType?: string): Promise<WorkflowBlueprint[]> {
   const userIdParam = userId || 'default';
-  const response = await axios.get(`/blueprints/available.blueprints.get?userId=${userIdParam}`);
+  const idType = identityType || 'user';
+  const response = await axios.get(
+    `/blueprints/available.blueprints.get?userId=${userIdParam}&identityType=${idType}`
+  );
   return response.data || [];
 }
 
@@ -79,10 +82,11 @@ export async function fetchBlueprints(userId?: string): Promise<WorkflowBlueprin
  * Fetch lightweight blueprint summaries (name, description, metadata only - no spec_dict).
  * Use this for listing blueprints when the full spec is not needed.
  */
-export async function fetchBlueprintSummaries(userId?: string): Promise<BlueprintSummary[]> {
+export async function fetchBlueprintSummaries(userId?: string, identityType?: string): Promise<BlueprintSummary[]> {
   const userIdParam = userId || 'default';
+  const idType = identityType || 'user';
   const response = await axios.get<BlueprintSummary[]>(
-    `/blueprints/available.blueprints.summary.get?userId=${userIdParam}`
+    `/blueprints/available.blueprints.summary.get?userId=${userIdParam}&identityType=${idType}`
   );
   return response.data || [];
 }
@@ -100,12 +104,12 @@ export interface ResolvedBlueprintsResponse {
 /**
  * Fetch resolved blueprints (with all references resolved) - paginated list
  */
-export async function fetchResolvedBlueprints(userId?: string): Promise<WorkflowBlueprint[]> {
+export async function fetchResolvedBlueprints(userId?: string, identityType?: string): Promise<WorkflowBlueprint[]> {
   const userIdParam = userId || 'default';
+  const idType = identityType || 'user';
   const response = await axios.get<ResolvedBlueprintsResponse>(
-    `/blueprints/available.blueprints.resolved.get?userId=${userIdParam}`
+    `/blueprints/available.blueprints.resolved.get?userId=${userIdParam}&identityType=${idType}`
   );
-  // API returns paginated response with items array
   return response.data?.items || [];
 }
 
@@ -146,11 +150,13 @@ export async function deleteBlueprint(blueprintId: string): Promise<DeleteBluepr
  */
 export async function saveBlueprint(
   blueprintRaw: string,
-  userId: string
+  userId: string,
+  identityType?: string,
 ): Promise<SaveBlueprintResponse> {
   const { data } = await axios.post<SaveBlueprintResponse>('/blueprints/blueprint.save', {
     blueprintRaw,
     userId,
+    identityType: identityType || 'user',
   });
   return data;
 }

@@ -38,14 +38,14 @@ class ResourcesService:
         self._validation_service = validation_service
 
     # ---------- CRUD ----------
-    def create(self, *, user_id, category, type, name, config) -> Resource:
+    def create(self, *, identity: Identity, category, type, name, config) -> Resource:
         model_cls = self.element_registry.get_schema(ResourceCategory(category), type)
         cfg_model = model_cls(**config)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
         doc = Resource(
-            identity=Identity.from_user_id(user_id),
+            identity=identity,
             category=category,
             type=type,
             name=name,
@@ -87,18 +87,18 @@ class ResourcesService:
         """Get a single resource by ID."""
         return self._store.get(rid)
 
-    def find_resources(self, user_id: str, category: Optional[str] = None,
+    def find_resources(self, identity: Identity, category: Optional[str] = None,
                        type: Optional[str] = None, limit: int = 50,
                        offset: int = 0) -> Tuple[List[Resource], int]:
         """Find resources with optional filtering and pagination."""
         category_enum = ResourceCategory(category) if category else None
 
         query = ResourceQuery(
-            user_id=user_id,
+            identity=identity,
             category=category_enum,
             type=type,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
         return self._store.find_resources(query)
 
@@ -118,21 +118,20 @@ class ResourcesService:
         return Resource.model_json_schema()
 
     # ---------- Statistics ----------
-    def count(self, user_id: str, filter: Dict[str, Any] = None) -> int:
-        """Count resources matching filter criteria for a user."""
-        return self._store.count(user_id, filter)
+    def count(self, identity: Identity, filter: Dict[str, Any] = None) -> int:
+        return self._store.count(identity, filter)
 
     def group_count(
         self,
-        user_id: str,
+        identity: Identity,
         group_by: List[str],
-        filter: Dict[str, Any] = None
+        filter: Dict[str, Any] = None,
     ) -> List[GroupedCount]:
         """
         Group resources by specified fields and return counts.
         Performs efficient server-side grouping via the registry.
         """
-        return self._store.group_count(user_id, group_by, filter)
+        return self._store.group_count(identity, group_by, filter)
 
     # ---------- Validation ----------
     def validate_resource(

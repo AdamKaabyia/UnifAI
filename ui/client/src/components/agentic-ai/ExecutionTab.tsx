@@ -126,9 +126,9 @@ export default function ExecutionTab({
   const { nodeListRef, forceUpdate, clearStream } = useStreamingData();
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const contextUserId = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
   
   // Ref to hold the updateNodeList callback for use in stream subscription
   const updateNodeListRef = useRef<((chunkData: any) => void) | null>(null);
@@ -290,7 +290,7 @@ export default function ExecutionTab({
       setIsLoading(true);
       setError(null);
 
-      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}`);
+      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}&identityType=${identityType}`);
       const transformedSessions = transformApiDataToSessions(response.data);
 
       // Sort chat sessions based on the latest date
@@ -499,6 +499,7 @@ export default function ExecutionTab({
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,
+        identityType,
       };
 
       await axios.post(
@@ -507,7 +508,7 @@ export default function ExecutionTab({
       );
 
       // Fetch updated sessions
-      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}`);
+      const response = await axios.get(`/sessions/session.user.list?userId=${contextUserId}&identityType=${identityType}`);
       const transformedSessions = transformApiDataToSessions(response.data);
       const sortedSessions = sortSessionsByTimestamp(transformedSessions);
       setChatSessions(sortedSessions);
@@ -537,7 +538,7 @@ export default function ExecutionTab({
     setSelectedSession(null);
     setCurrentSessionMessages([]);
     fetchChatSessions();
-  }, [contextUserId]);
+  }, [contextUserId, identityType]);
 
   // Cleanup effect when modal closes to prevent ReactFlow state interference
   useEffect(() => {

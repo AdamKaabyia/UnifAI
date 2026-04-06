@@ -122,9 +122,9 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
 
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const USER_ID = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const USER_ID = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)
   const deleteNodeRef = useRef<(id: string) => void>(() => {});
@@ -578,7 +578,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
     try {
       setIsLoadingBlocks(true);
       const response = await axios.get(
-        `/resources/resources.list?userId=${USER_ID}`,
+        `/resources/resources.list?userId=${USER_ID}&identityType=${identityType}`,
       );
       const allBlocks = response.data.resources.map(transformResourceToBlock);
 
@@ -613,7 +613,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
     } finally {
       setIsLoadingBlocks(false);
     }
-  }, [toast, USER_ID]);
+  }, [toast, USER_ID, identityType]);
 
   useEffect(() => {
     loadBuildingBlocks();
@@ -979,7 +979,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
           response = await updateBlueprint(editBlueprintId, yamlString);
           blueprintId = editBlueprintId;
         } else {
-          response = await saveBlueprint(yamlString, USER_ID);
+          response = await saveBlueprint(yamlString, USER_ID, identityType);
           blueprintId = response.blueprint_id;
         }
 
@@ -1021,7 +1021,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
         setIsSaving(false);
       }
     },
-    [yamlFlow, toast, onSaveComplete, USER_ID, isEditMode, editBlueprintId],
+    [yamlFlow, toast, onSaveComplete, USER_ID, identityType, isEditMode, editBlueprintId],
   );
 
   useEffect(() => {

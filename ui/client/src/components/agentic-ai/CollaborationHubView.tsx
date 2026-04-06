@@ -121,10 +121,9 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const { nodeListRef, clearStream } = useStreamingData();
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const contextUserId =
-    viewMode === "team" && selectedTeam
-      ? selectedTeam.name
-      : user?.username || "default";
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
 
   const sessionSelectRequestId = useRef(0);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -197,7 +196,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       setIsLoading(true);
       setError(null);
       const response = await axios.get(
-        `/sessions/session.user.list?userId=${contextUserId}`,
+        `/sessions/session.user.list?userId=${contextUserId}&identityType=${identityType}`,
       );
       const sorted = sortSessionsByTimestamp(
         transformApiDataToSessions(response.data),
@@ -216,7 +215,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     } finally {
       setIsLoading(false);
     }
-  }, [contextUserId, runId]);
+  }, [contextUserId, identityType, runId]);
 
   const handleSessionSelect = async (session: ChatSession) => {
     const requestId = ++sessionSelectRequestId.current;
@@ -315,9 +314,10 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       await axios.post("/sessions/user.session.create", {
         blueprintId: graphId,
         userId: contextUserId,
+        identityType,
       });
       const response = await axios.get(
-        `/sessions/session.user.list?userId=${contextUserId}`,
+        `/sessions/session.user.list?userId=${contextUserId}&identityType=${identityType}`,
       );
       const sorted = sortSessionsByTimestamp(
         transformApiDataToSessions(response.data),
@@ -619,7 +619,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     setSelectedSession(null);
     setCurrentSessionMessages([]);
     fetchChatSessions();
-  }, [contextUserId]);
+  }, [contextUserId, identityType]);
 
   // Join/leave session + polling when selected session changes
   useEffect(() => {

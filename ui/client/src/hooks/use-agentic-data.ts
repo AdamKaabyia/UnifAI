@@ -12,36 +12,36 @@ import { fetchResolvedBlueprints } from "@/api/blueprints";
 export function useAgenticData() {
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
-  const userId = viewMode === "team" && selectedTeam
-    ? selectedTeam.name
-    : (user?.username || "default");
+  const isTeam = viewMode === "team" && !!selectedTeam;
+  const userId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const identityType = isTeam ? "team" : "user";
 
   // Use aggregated stats endpoint for optimal performance
   const agenticStats = useQuery({
-    queryKey: ["agenticStats", userId],
-    queryFn: () => fetchAgenticStats(userId),
+    queryKey: ["agenticStats", userId, identityType],
+    queryFn: () => fetchAgenticStats(userId, identityType),
     staleTime: 0,
   });
 
   // Individual queries for granular data when needed by components
   const workflows = useQuery({
-    queryKey: ["blueprints", userId],
-    queryFn: () => fetchResolvedBlueprints(userId),
+    queryKey: ["blueprints", userId, identityType],
+    queryFn: () => fetchResolvedBlueprints(userId, identityType),
     staleTime: 0,
   });
 
   const activeSessions = useQuery({
-    queryKey: ["activeSessions", userId],
-    queryFn: () => fetchActiveSessions(userId),
+    queryKey: ["activeSessions", userId, identityType],
+    queryFn: () => fetchActiveSessions(userId, identityType),
     staleTime: 0,
   });
-
+  
   // blueprintSessionCounts is now always sourced from agenticStats
   // No separate query needed - follows SOLID principles by using aggregated endpoint
 
   const resources = useQuery({
-    queryKey: ["allResources", userId],
-    queryFn: () => fetchAllResources(userId),
+    queryKey: ["allResources", userId, identityType],
+    queryFn: () => fetchAllResources(userId, identityType),
     staleTime: 0,
   });
 
