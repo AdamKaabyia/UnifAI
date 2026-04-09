@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "identity"
+version = "0.1.0"
+description = "Identity service for authentication with SSO and storing in Redis"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+readme = "README.md"
+
+dependencies = [
+    "flask",
+    "flask-cors",
+    "requests",
+    "Authlib",
+    "PyJWT",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "redis",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ports*", "adapters*", "config*", "utils*", "shared*"]
+
+#[project.scripts]
+#identity = "identity.__main__:main"   
+
+
+
+

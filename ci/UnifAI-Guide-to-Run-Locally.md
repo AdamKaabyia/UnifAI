@@ -11,6 +11,21 @@ UnifAI is an Agentic AI platform for knowledge retrieval across data sources. It
 | 3 | Multi-Agent Backend | `multi-agent/` | 8002 | Agentic AI engine running via Gunicorn. Manages blueprints, workflow sessions, LangGraph plan execution, tools/providers, and LLM orchestration. |
 | 4 | UI | `ui/` | 5000 | React + Vite frontend with Shadcn UI components. Provides the RAG data overview and Agentic Plan Builder interface. Proxies API calls to all three backends. |
 | 5 | Backend | `backend/` |8003 | Main Flask API for configuration and general management. |
+
+## pre-requisites
+
+1. mongodb up and running locally on the server (backend/RAG/multiagent)
+2. redis up and running locally on the server (sso/multiagent)
+3. temporal up and running locally on the server (multiagent)
+
+
+## module installations
+
+## configuration settings
+
+To set your own configuration instead of updating the files (which might cause push errors and conflicts) it's possible to use the enc.sh file in each folder to set the desired values instead (the configuration automatically gets environment vars from the shell).
+first run the virtual environment of the module and then from the module folder run: `source env.sh`
+
 ## Code changes needed for local runs
 
 The following files need adjustments to be able to run locally with no errors:
