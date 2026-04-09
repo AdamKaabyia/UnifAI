@@ -10,9 +10,9 @@ echo "------------------------------------------"
 case "$ROLE" in
   flask)
     echo "🟢 Starting Flask API (Server)..."
-    exec venv/bin/python3.11 app.py
+    exec venv/bin/python3.11 -m bootstrap.flask_app
     ;;
-
+    
   debug)
     echo "🐞 Debug mode activated — container will stay alive."
     tail -f /dev/null

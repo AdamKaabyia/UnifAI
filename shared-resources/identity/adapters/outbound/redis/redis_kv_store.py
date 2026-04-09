@@ -1,11 +1,10 @@
-from __future__ import annotations
-
-from typing import Optional
-
 import redis
-
+import logging
+#from __future__ import annotations
+from typing import Optional
 from ports.kv_store import KVStore
 
+logger = logging.getLogger('redis_kv_store')
 
 class RedisKVStore(KVStore):
     """Redis implementation of the KVStore port (hexagonal adapter)."""

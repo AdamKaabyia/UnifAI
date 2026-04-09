@@ -20,11 +20,12 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "redis",
+    "gunicorn",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ports*", "adapters*", "config*", "utils*", "shared*"]
+include = ["bootstrap*", "ports*", "adapters*", "config*", "utils*"]
 
 #[project.scripts]
 #identity = "identity.__main__:main"   

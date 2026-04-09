@@ -4,15 +4,16 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-import os, uuid, json
+import os, uuid, logging
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
-from shared.logger import logger
 from config.app_config import AppConfig
 from urllib.parse import quote
 
 config = AppConfig.get_instance()
+
+logger = logging.getLogger('auth_manager')
 
 class AuthManager:
     def __init__(self, app=None, redis_store=None):

@@ -17,7 +17,7 @@ from adapters.outbound.redis.redis_kv_store import RedisKVStore
 # configuration setup
 config = AppConfig.get_instance()
 
-#logging setup
+#logging setup for app and all sub-modules.
 logging.basicConfig(
     level=LoggingConfig.log_level,
     format=LoggingConfig.log_format,
