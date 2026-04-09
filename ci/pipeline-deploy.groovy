@@ -28,10 +28,6 @@ def buildParams = [
     CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
     CredCredentialsId  : "jenkins_agent_deploy_key",
-    // CredMainRepoURL    : "gitlab.cee.redhat.com",
-    // CredMainRepoProject: "ai_tools/genie-cred-data", 
-    // CredMainRepoBranch : "main",
-    // CredCredentialsId  : "gitlab-genie",
 
     NodeToRun          : "tag-slave",
     DevRoot            : "/root/workspace/${env.JOB_NAME}",
