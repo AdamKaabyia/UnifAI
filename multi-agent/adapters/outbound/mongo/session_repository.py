@@ -134,6 +134,11 @@ class MongoSessionRepository(SessionRepository):
         result = self._col.delete_one({self._RUN_ID_FIELD: run_id})
         return result.deleted_count > 0
 
+    def delete_by_identity(self, identity: Identity) -> int:
+        """Delete all sessions owned by the given identity. Returns count."""
+        result = self._col.delete_many(self._identity_match(identity))
+        return result.deleted_count
+
     # ---------- Owner-scoped Statistics ----------
 
     def count(self, identity: Identity, filter: Dict[str, Any]) -> int:

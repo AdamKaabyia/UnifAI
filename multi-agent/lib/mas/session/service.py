@@ -96,14 +96,24 @@ class SessionService:
 
     # ---- Private staging ----
 
+    _BUSY_STATUSES = frozenset({"QUEUED", "RUNNING"})
+
     def _stage(
         self,
         session_id: str,
         inputs: Dict[str, Any],
         logged_in_user: str = "",
     ) -> None:
-        """Project raw inputs onto the record and persist (QUEUED)."""
+        """Project raw inputs onto the record and persist (QUEUED).
+
+        Raises ValueError if the session is already executing.
+        """
         record = self._manager.get_record(session_id)
+        if record.status.name in self._BUSY_STATUSES:
+            raise ValueError(
+                f"Session {session_id} is already {record.status.name} — "
+                f"wait for it to finish before submitting again."
+            )
         self._projector.apply(record, inputs or {}, logged_in_user=logged_in_user)
 
     def list_for_user(self, identity: Identity) -> list:

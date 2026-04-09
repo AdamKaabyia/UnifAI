@@ -177,9 +177,9 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   };
 
   const handleDelete = async () => {
-    if (!team) return;
+    if (!team || !user?.username) return;
     try {
-      await deleteTeam(team.id);
+      await deleteTeam(team.id, user.username);
       await refreshTeams();
       setDeleteConfirmOpen(false);
       onOpenChange(false);
@@ -346,9 +346,24 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
         <AlertDialogContent className="bg-background-card border-gray-800">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Team</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{team?.name}</strong>? This action cannot be undone.
-              Resources and workflows created under this team will remain but won't be accessible through the team view.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>
+                  Are you sure you want to delete <strong className="text-gray-200">{team?.name}</strong>?
+                  This action is <strong className="text-red-400">permanent and cannot be undone</strong>.
+                </p>
+                <p>
+                  All data owned by this team will be permanently deleted, including:
+                </p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  <li>All workflows (blueprints) created under this team</li>
+                  <li>All resources (tools, prompts, models) owned by this team</li>
+                  <li>All chat sessions and their history</li>
+                </ul>
+                <p className="text-red-400 font-medium">
+                  None of this data can be recovered after deletion.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

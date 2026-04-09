@@ -1,4 +1,5 @@
 import backendApi from '@/http/backendClient';
+import agentApi from '@/http/axiosAgentConfig';
 
 export type TeamMemberType = 'user' | 'group';
 
@@ -91,8 +92,16 @@ export async function updateTeam(
   return data;
 }
 
-export async function deleteTeam(teamId: string): Promise<void> {
+/**
+ * Clean up all multi-agent data (resources, blueprints, sessions) owned by a
+ * team identity, then delete the team record from the SSO backend.
+ */
+export async function deleteTeam(teamId: string, requestedBy: string): Promise<void> {
+  await agentApi.delete('/workspace/workspace.cleanup', {
+    data: { identityType: 'team', identityId: teamId },
+  });
+
   await backendApi.delete('/teams/team.delete', {
-    params: { teamId },
+    params: { teamId, requestedBy },
   });
 }

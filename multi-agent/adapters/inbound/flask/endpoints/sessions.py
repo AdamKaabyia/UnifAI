@@ -52,6 +52,12 @@ def execute_user_session(session_id, inputs, stream_mode, stream, scope, logged_
     - If `stream` is True, returns an NDJSON stream of channel events.
     """
     svc = current_app.container.session_service
+    try:
+        status = svc.get_status(session_id)
+    except Exception:
+        status = None
+    if status in ("QUEUED", "RUNNING"):
+        return jsonify({"error": f"Session {session_id} is already {status}"}), 409
 
     if not stream:
         result = svc.run(
@@ -107,6 +113,8 @@ def submit_user_session(session_id, inputs, scope, logged_in_user):
         return jsonify({"sessionId": session_id, "workflowId": workflow_id}), 202
     except TypeError as e:
         return jsonify({"error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

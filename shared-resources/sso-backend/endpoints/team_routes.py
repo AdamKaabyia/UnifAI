@@ -91,10 +91,17 @@ def update_team():
 def delete_team():
     svc = current_app.extensions["team_service"]
     team_id = request.args.get("teamId", "").strip()
+    requested_by = request.args.get("requestedBy", "").strip()
     if not team_id:
         return jsonify({"error": "teamId parameter is required"}), 400
+    if not requested_by:
+        return jsonify({"error": "requestedBy parameter is required"}), 400
 
     try:
+        team = svc.get(team_id)
+        if team.created_by != requested_by:
+            return jsonify({"error": "Only the team creator can delete this team"}), 403
+
         svc.delete(team_id)
         return jsonify({"status": "deleted"}), 200
     except KeyError:

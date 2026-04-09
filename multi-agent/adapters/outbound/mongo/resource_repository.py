@@ -73,6 +73,11 @@ class MongoResourceRepository(ResourceRepository):
     def delete(self, rid: str) -> None:
         self.col.delete_one({"_id": rid})
 
+    def delete_by_identity(self, identity: Identity) -> int:
+        """Delete all resources owned by the given identity. Returns count."""
+        result = self.col.delete_many(self._identity_q(identity))
+        return result.deleted_count
+
     def find_by_name(self, identity: Identity, category: str,
                      type: str, name: str):
         q = {**self._identity_q(identity),
