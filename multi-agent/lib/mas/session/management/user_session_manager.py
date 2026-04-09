@@ -140,9 +140,9 @@ class UserSessionManager:
         """Count all sessions system-wide (no user_id constraint)."""
         return self._repo.count_system(since)
 
-    def get_distinct_users(self, since: Optional[datetime] = None) -> List[str]:
-        """Get distinct user IDs from all sessions."""
-        return self._repo.get_distinct_users(since)
+    def get_distinct_identities(self, since: Optional[datetime] = None) -> List[Dict[str, str]]:
+        """Get distinct (type, id) pairs from all sessions."""
+        return self._repo.get_distinct_identities(since)
 
     def group_count_system(
         self,

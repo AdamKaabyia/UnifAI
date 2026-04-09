@@ -19,3 +19,13 @@ class AppConfig(SharedConfig):
     redis_stream_ttl: int = 3600
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
+
+    # Collaboration hub — Redis-backed multi-user session presence
+    collaboration_presence_ttl: int = 300
+
+    # Directory provider: "sso" (via SSO pod) or "" to disable
+    directory_provider: str = ""
+    directory_timeout: int = 10
+
+    # SSO directory URL (used when directory_provider="sso")
+    directory_sso_url: str = ""

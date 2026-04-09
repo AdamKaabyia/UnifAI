@@ -13,8 +13,12 @@ from global_utils.embedding import (
     EmbeddingResponse,
     EmbeddingProcessingError,
 )
+from global_utils.identity import Identity, IdentityType
 
 __all__ = [
+    # Identity
+    "Identity",
+    "IdentityType",
     # Pydantic helpers
     "CoercedStr",
     "coerce_to_str",

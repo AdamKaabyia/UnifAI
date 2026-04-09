@@ -5,6 +5,7 @@ import logging
 from ..decorators import require_admin_access
 from mas.statistics.models import TimeRangePreset
 from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import require_identity_authorization
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,7 @@ statistics_bp = Blueprint("statistics", __name__)
 
 
 @statistics_bp.route("/stats.get", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),

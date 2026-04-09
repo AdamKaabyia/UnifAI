@@ -6,11 +6,13 @@ from pydantic.json import pydantic_encoder
 from mas.core.channels import with_heartbeats
 from mas.session.domain.exceptions import BlueprintNotFoundError
 from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import require_identity_authorization
 
 sessions_bp = Blueprint("sessions", __name__)
 
 
 @sessions_bp.route("/user.session.create", methods=["POST"])
+@require_identity_authorization
 @from_body({
     "blueprint_id": fields.Str(data_key="blueprintId", required=True),
     "user_id": fields.Str(data_key="userId", required=True),
@@ -159,6 +161,7 @@ def get_session_status(session_id):
 
 
 @sessions_bp.route("/session.user.list", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),
@@ -173,6 +176,7 @@ def list_user_sessions(user_id, identity_type):
 
 
 @sessions_bp.route("/session.user.blueprints.get", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),

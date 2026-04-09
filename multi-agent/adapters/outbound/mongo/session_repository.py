@@ -172,9 +172,18 @@ class MongoSessionRepository(SessionRepository):
         """Count all sessions system-wide, optionally filtered by time."""
         return self._col.count_documents(self._time_match(since))
 
-    def get_distinct_users(self, since: Optional[datetime] = None) -> List[str]:
-        """Get distinct user IDs, optionally filtered by time."""
-        return self._col.distinct(self._IDENTITY_ID_FIELD, self._time_match(since))
+    def get_distinct_identities(self, since: Optional[datetime] = None) -> List[Dict[str, str]]:
+        """Get distinct (type, id) pairs, optionally filtered by time."""
+        pipeline = [
+            {"$match": self._time_match(since)},
+            {"$group": {
+                "_id": {
+                    "type": f"${self._IDENTITY_TYPE_FIELD}",
+                    "id": f"${self._IDENTITY_ID_FIELD}",
+                },
+            }},
+        ]
+        return [doc["_id"] for doc in self._col.aggregate(pipeline)]
 
     def group_count_system(
         self,
@@ -263,10 +272,11 @@ class MongoSessionRepository(SessionRepository):
     # ---------- Facet Definitions ----------
 
     def _owner_status_facet(self) -> list:
-        """Group sessions by user and status."""
+        """Group sessions by identity (type+id) and status."""
         return [
             {"$group": {
                 "_id": {
+                    self._IDENTITY_TYPE_FIELD: f"${self._IDENTITY_TYPE_FIELD}",
                     self._IDENTITY_ID_FIELD: f"${self._IDENTITY_ID_FIELD}",
                     self._STATUS_FIELD: f"${self._STATUS_FIELD}"
                 },
@@ -275,10 +285,11 @@ class MongoSessionRepository(SessionRepository):
         ]
 
     def _owner_blueprint_facet(self) -> list:
-        """Group sessions by user and blueprint."""
+        """Group sessions by identity (type+id) and blueprint."""
         return [
             {"$group": {
                 "_id": {
+                    self._IDENTITY_TYPE_FIELD: f"${self._IDENTITY_TYPE_FIELD}",
                     self._IDENTITY_ID_FIELD: f"${self._IDENTITY_ID_FIELD}",
                     self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
                 },

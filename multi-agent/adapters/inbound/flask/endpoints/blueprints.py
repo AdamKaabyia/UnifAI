@@ -11,6 +11,7 @@ from mas.blueprints.exceptions import (
     BlueprintMetadataError,
 )
 from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import require_identity_authorization
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ def _extract_blueprint_data(
 
 
 @blueprints_bp.route("/available.blueprints.get", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),
@@ -101,6 +103,7 @@ def available_doc_list(user_id, identity_type="user"):
 
 
 @blueprints_bp.route("/available.blueprints.summary.get", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),
@@ -120,6 +123,7 @@ def available_blueprint_summaries(user_id, identity_type="user"):
 
 
 @blueprints_bp.route("/available.blueprints.resolved.get", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),
@@ -157,6 +161,7 @@ def available_resolved_doc_list(user_id, identity_type="user", blueprint_id=None
 
 
 @blueprints_bp.route("/blueprint.save", methods=["POST"])
+@require_identity_authorization
 @from_body({
     "blueprint_raw": fields.Str(data_key="blueprintRaw", required=False),
     "user_id": fields.Str(data_key="userId", required=False, load_default="alice"),

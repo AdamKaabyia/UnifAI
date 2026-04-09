@@ -11,6 +11,7 @@ from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 import logging
 from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import require_identity_authorization
 
 from mas.templates.errors import (
     TemplateNotFoundError,
@@ -296,6 +297,7 @@ def instantiate_template(template_id, input):
 
 
 @templates_bp.route("/template.materialize", methods=["POST"])
+@require_identity_authorization
 @from_body({
     "template_id": fields.Str(data_key="templateId", required=True),
     "user_id": fields.Str(data_key="userId", required=True),

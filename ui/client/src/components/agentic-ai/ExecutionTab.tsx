@@ -127,7 +127,7 @@ export default function ExecutionTab({
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
   
   // Ref to hold the updateNodeList callback for use in stream subscription

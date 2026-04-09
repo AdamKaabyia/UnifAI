@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from mas.core.identity import Identity
 
@@ -16,7 +16,7 @@ class ExecutionContext(BaseModel):
     older DB documents that carried fields no longer present.
     """
 
-    identity: Optional[Identity] = None
+    identity: Identity
     scope: str = "public"
     engine_name: str = ""
 
@@ -27,9 +27,20 @@ class ExecutionContext(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_identity(cls, values: Any) -> Any:
+        """Legacy docs stored without identity — synthesize a placeholder."""
+        if isinstance(values, dict) and values.get("identity") is None:
+            values["identity"] = {
+                "type": "user", "id": "unknown",
+                "display_name": "unknown", "email": "",
+            }
+        return values
+
     @property
     def identity_id(self) -> str:
-        return self.identity.id if self.identity else ""
+        return self.identity.id
 
     def with_scope(self, scope: str) -> ExecutionContext:
         return self.model_copy(update={"scope": scope})
@@ -77,5 +88,5 @@ class ExecutionContextHolder:
         return self.context.identity_id
 
     @property
-    def identity(self) -> Optional[Identity]:
+    def identity(self) -> Identity:
         return self.context.identity

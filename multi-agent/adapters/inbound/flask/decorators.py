@@ -1,8 +1,13 @@
 """
 Decorators for Flask endpoints.
 """
+import logging
 from functools import wraps
 from flask import jsonify, request, current_app
+
+import requests as http_requests
+
+logger = logging.getLogger(__name__)
 
 
 def require_admin_access(f):
@@ -24,17 +29,14 @@ def require_admin_access(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            # Access admin_allowed_users from Flask's config (set during app initialization)
             admin_allowed_users = current_app.config.get("admin_allowed_users", [])
             
-            # If admin_allowed_users is empty, deny all access (Analytics is disabled)
             if not admin_allowed_users:
                 return jsonify({
                     "error": "Access denied: Analytics is not enabled",
                     "error_type": "FEATURE_DISABLED"
                 }), 403
             
-            # Extract user_id from kwargs (if passed by @from_query) or query parameters
             user_id = kwargs.get("user_id") or kwargs.get("userId") or request.args.get("user_id") or request.args.get("userId")
             
             if not user_id:
@@ -43,14 +45,12 @@ def require_admin_access(f):
                     "error_type": "AUTHENTICATION_REQUIRED"
                 }), 401
             
-            # Check if user is in admin list
             if user_id not in admin_allowed_users:
                 return jsonify({
                     "error": "Access denied: insufficient permissions",
                     "error_type": "ACCESS_DENIED"
                 }), 403
             
-            # User is authorized, proceed with the request
             return f(*args, **kwargs)
             
         except Exception as e:
@@ -60,4 +60,75 @@ def require_admin_access(f):
             }), 500
     
     return decorated_function
+
+
+def require_identity_authorization(f):
+    """Validate that the caller is authorized for the claimed identity.
+
+    Reads ``X-Authenticated-User`` from the request header (set by the UI).
+    For **user** identity: the claimed ``userId`` must match the header.
+    For **team** identity: the authenticated user must be a member of the
+    claimed team (verified via the SSO backend's teams API).
+
+    Skipped when the header is absent (allows direct/internal calls) or
+    when no ``directory_sso_url`` is configured.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
+        if not authenticated_user:
+            return f(*args, **kwargs)
+
+        identity_type = (
+            kwargs.get("identity_type")
+            or request.args.get("identityType")
+            or (request.get_json(silent=True) or {}).get("identityType")
+            or "user"
+        )
+
+        if identity_type != "team":
+            return f(*args, **kwargs)
+
+        claimed_id = (
+            kwargs.get("user_id")
+            or request.args.get("userId")
+            or (request.get_json(silent=True) or {}).get("userId")
+            or ""
+        )
+
+        if not claimed_id:
+            return f(*args, **kwargs)
+
+        if not _is_team_member(authenticated_user, claimed_id):
+            return jsonify({
+                "error": "Access denied: you are not a member of this team",
+                "error_type": "TEAM_ACCESS_DENIED",
+            }), 403
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def _is_team_member(username: str, team_id: str) -> bool:
+    """Check team membership via the SSO backend's ``teams.list`` endpoint."""
+    sso_url = current_app.config.get("directory_sso_url", "")
+    if not sso_url:
+        return True
+
+    try:
+        resp = http_requests.get(
+            f"{sso_url}/api/teams/teams.list",
+            params={"userId": username},
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            logger.warning("Team membership check failed (HTTP %d)", resp.status_code)
+            return True
+
+        teams = resp.json().get("teams", [])
+        return any(t.get("team_id") == team_id for t in teams)
+    except Exception:
+        logger.exception("Team membership check failed")
+        return True
 

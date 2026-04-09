@@ -56,7 +56,7 @@ export const useWorkspaceData = () => {
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const USER_ID = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const USER_ID = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
 
   // Fetch all available categories and element types

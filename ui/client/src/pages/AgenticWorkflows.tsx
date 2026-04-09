@@ -73,7 +73,7 @@ export default function AgenticWorkflows() {
       setBuiltGraphName(graphName);
 
       const contextUserId = isTeam && selectedTeam
-        ? selectedTeam.name
+        ? selectedTeam.id
         : (user?.username || "default");
       const identityType = isTeam ? "team" : "user";
       const selectedBlueprint = {

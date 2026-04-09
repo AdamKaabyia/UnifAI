@@ -75,7 +75,7 @@ export default function WorkflowsPanel({
   const { openShareForItem } = useShared();
   
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
   
   // Blueprint validation hook

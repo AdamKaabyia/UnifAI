@@ -79,8 +79,12 @@ class SessionRepository(ABC):
         ...
 
     @abstractmethod
-    def get_distinct_users(self, since: Optional[datetime] = None) -> List[str]:
-        """Get distinct identity IDs from all sessions."""
+    def get_distinct_identities(self, since: Optional[datetime] = None) -> List[Dict[str, str]]:
+        """Get distinct (type, id) pairs from all sessions.
+
+        Returns a list of ``{"type": "user"|"team", "id": "..."}`` dicts
+        so that callers can distinguish users from teams with the same id.
+        """
         ...
 
     @abstractmethod

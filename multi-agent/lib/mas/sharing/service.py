@@ -156,17 +156,17 @@ class ShareService:
         
         self._repo.update_status(share_id, ShareStatus.CANCELED)
 
-    def list_received_invites(self, recipient_user_id: str, 
+    def list_received_invites(self, recipient: Identity, 
                              status: Optional[ShareStatus] = None,
                              skip: int = 0, limit: int = 100) -> List[ShareInvite]:
         """List received invitations."""
-        return self._repo.list_for_recipient(recipient_user_id, status, skip, limit)
+        return self._repo.list_for_recipient(recipient, status, skip, limit)
 
-    def list_sent_invites(self, sender_user_id: str,
+    def list_sent_invites(self, sender: Identity,
                          status: Optional[ShareStatus] = None,
                          skip: int = 0, limit: int = 100) -> List[ShareInvite]:
         """List sent invitations."""
-        return self._repo.list_for_sender(sender_user_id, status, skip, limit)
+        return self._repo.list_for_sender(sender, status, skip, limit)
 
     def get_invite(self, share_id: str) -> ShareInvite:
         """Get invitation details."""

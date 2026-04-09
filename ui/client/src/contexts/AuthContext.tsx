@@ -1,6 +1,7 @@
 import { api } from '@/http/authClient';
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { loadAnalytics } from '@/components/shared/LoadAnalytics';
+import { setAuthenticatedUser } from '@/http/axiosAgentConfig';
 
 export interface User {
   username: string;
@@ -143,6 +144,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
   
+  useEffect(() => {
+    setAuthenticatedUser(user?.username ?? '');
+  }, [user]);
+
   // Set up token refresh and expiration checking
   useEffect(() => {
     if (!isAuthenticated || !user) return;

@@ -16,10 +16,12 @@ def create_app(container, config: AppConfig = None) -> Flask:
     app = Flask(__name__)
     app.version = config.get("version", "1.0.0")
     app.config["admin_allowed_users"] = config.admin_allowed_users
+    app.config["directory_sso_url"] = config.directory_sso_url
 
     CORS(app, resources={r"/api/*": {"origins": "*",
                                      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                                     "allow_headers": ["Content-Type", "Authorization"],
+                                     "allow_headers": ["Content-Type", "Authorization",
+                                                       "X-Authenticated-User"],
                                      "supports_credentials": True}})
 
     app.container = container

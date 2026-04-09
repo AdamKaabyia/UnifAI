@@ -13,7 +13,7 @@ export function useAgenticData() {
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const userId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const userId = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
 
   // Use aggregated stats endpoint for optimal performance

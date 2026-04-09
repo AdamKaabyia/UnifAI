@@ -35,3 +35,7 @@ class AppConfig(SharedConfig):
     directory_ldap_bind_dn: str = ""
     directory_ldap_bind_password: str = ""
 
+    # User-groups cache TTL (seconds). Groups are fetched on login and
+    # cached in Redis so we don't hit LDAP on every request.
+    user_groups_cache_ttl: int = 3600
+

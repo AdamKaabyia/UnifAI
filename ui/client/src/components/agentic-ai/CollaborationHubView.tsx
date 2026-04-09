@@ -122,7 +122,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
 
   const sessionSelectRequestId = useRef(0);

@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.sharing.models import ShareItemKind, ShareStatus
+from inbound.flask.identity_helpers import resolve_identity
 
 shares_bp = Blueprint("shares", __name__)
 
@@ -155,12 +156,13 @@ def cancel_share(share_id, sender_user_id="alice"):
     "status": fields.Str(required=False),
     "skip": fields.Int(required=False, load_default=0),
     "limit": fields.Int(required=False, load_default=100),
-    "user_id": fields.Str(data_key="userId", required=False, load_default="alice")
+    "user_id": fields.Str(data_key="userId", required=False, load_default="alice"),
+    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def list_shares(direction="received", status=None, skip=0, limit=100, user_id="alice"):
+def list_shares(direction="received", status=None, skip=0, limit=100,
+                user_id="alice", identity_type="user"):
     """List share invitations."""
     try:
-        # Validate status if provided
         status_enum = None
         if status:
             try:
@@ -168,12 +170,13 @@ def list_shares(direction="received", status=None, skip=0, limit=100, user_id="a
             except ValueError:
                 return jsonify({"error": "Invalid status"}), 400
 
+        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.share_service
 
         if direction == "received":
-            invites = svc.list_received_invites(user_id, status_enum, skip, limit)
+            invites = svc.list_received_invites(identity, status_enum, skip, limit)
         elif direction == "sent":
-            invites = svc.list_sent_invites(user_id, status_enum, skip, limit)
+            invites = svc.list_sent_invites(identity, status_enum, skip, limit)
         else:
             return jsonify({"error": "Direction must be 'received' or 'sent'"}), 400
 

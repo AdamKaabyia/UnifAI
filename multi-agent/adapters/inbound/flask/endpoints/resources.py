@@ -3,11 +3,13 @@ from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.resources.errors import ResourceInUseError
 from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import require_identity_authorization
 
 resources_bp = Blueprint("resources", __name__)
 
 
 @resources_bp.route("/resource.save", methods=["POST"])
+@require_identity_authorization
 @from_body({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),
@@ -49,6 +51,7 @@ def get_resource(resource_id):
 
 
 @resources_bp.route("/resources.list", methods=["GET"])
+@require_identity_authorization
 @from_query({
     "user_id": fields.Str(data_key="userId", required=True),
     "identity_type": fields.Str(data_key="identityType", load_default="user"),

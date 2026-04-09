@@ -15,27 +15,14 @@ class MongoResourceRepository(ResourceRepository):
         self._client = pymongo.MongoClient(mongo_uri)
         self.col = self._client[db_name][coll_name]
         self.col.create_index("nested_refs")
-        self._ensure_identity_unique_index()
-        self.col.create_index(
-            [("identity.type", 1), ("identity.id", 1), ("created", -1)],
-            background=True)
-
-    def _ensure_identity_unique_index(self):
-        """Drop the old uniqueness index (without identity.type) and create the new one."""
-        idx_name = "uq_identity_cat_type_name"
-        try:
-            existing = self.col.index_information().get(idx_name)
-            if existing:
-                existing_keys = [k for k, _ in existing["key"]]
-                if "identity.type" not in existing_keys:
-                    self.col.drop_index(idx_name)
-        except Exception:
-            pass
         self.col.create_index(
             [("identity.type", 1), ("identity.id", 1),
              ("category", 1), ("type", 1), ("name", 1)],
-            name=idx_name,
+            name="uq_identity_cat_type_name",
             unique=True)
+        self.col.create_index(
+            [("identity.type", 1), ("identity.id", 1), ("created", -1)],
+            background=True)
 
     # ---------- helpers ----------
     @staticmethod

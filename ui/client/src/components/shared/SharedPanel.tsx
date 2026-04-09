@@ -131,7 +131,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
   };
 
   const senderUserId = viewMode === 'team' && selectedTeam
-    ? selectedTeam.name
+    ? selectedTeam.id
     : (user?.username || '');
 
   const handleShareToTeam = async (teamName: string) => {

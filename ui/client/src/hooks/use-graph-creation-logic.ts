@@ -123,7 +123,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const USER_ID = isTeam ? selectedTeam!.name : (user?.username || "default");
+  const USER_ID = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)

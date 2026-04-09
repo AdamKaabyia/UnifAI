@@ -42,7 +42,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const userId = user?.username || '';
   const contextUserId = viewMode === 'team' && selectedTeam
-    ? selectedTeam.name
+    ? selectedTeam.id
     : userId;
 
   // Computed values
