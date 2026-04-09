@@ -25,10 +25,6 @@ class Resource(BaseModel):
     created: datetime = Field(default_factory=datetime.utcnow, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
     updated: datetime = Field(default_factory=datetime.utcnow, json_schema_extra=HiddenHint(reason="UI hint to hide this value").to_hints())
 
-    @property
-    def user_id(self) -> str:
-        return self.identity.id
-
 
 class ResourceQuery(BaseModel):
     """Query object for finding resources with pagination and filtering."""

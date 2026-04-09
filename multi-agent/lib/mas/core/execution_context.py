@@ -28,7 +28,7 @@ class ExecutionContext(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     @property
-    def user_id(self) -> str:
+    def identity_id(self) -> str:
         return self.identity.id if self.identity else ""
 
     def with_scope(self, scope: str) -> ExecutionContext:
@@ -45,7 +45,7 @@ class ExecutionContextHolder:
     (real values).  Elements receive a closure over this object — they
     read current values when they need them.
 
-    Fail-fast: accessing ``context``, ``scope``, or ``user_id`` before
+    Fail-fast: accessing ``context``, ``scope``, or ``identity_id`` before
     the holder is filled raises ``RuntimeError`` instead of returning
     silent defaults.
     """
@@ -73,8 +73,8 @@ class ExecutionContextHolder:
         return self.context.scope
 
     @property
-    def user_id(self) -> str:
-        return self.context.user_id
+    def identity_id(self) -> str:
+        return self.context.identity_id
 
     @property
     def identity(self) -> Optional[Identity]:

@@ -137,7 +137,7 @@ def main_resume_session(run_id: str):
 
 def save_resources(app):
     from mas.core.identity import Identity
-    alice = Identity.from_user_id("alice")
+    alice = Identity.user("alice")
 
     llm_rid = app.resources_service.create(identity=alice,
                                            category="llms",

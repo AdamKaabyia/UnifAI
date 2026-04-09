@@ -36,8 +36,3 @@ class Identity(BaseModel):
     def team(cls, team_id: str, display_name: str = "") -> "Identity":
         return cls(type=IdentityType.TEAM, id=team_id,
                    display_name=display_name or team_id)
-
-    @classmethod
-    def from_user_id(cls, user_id: str) -> "Identity":
-        """Backward-compat helper: wrap a plain user_id string."""
-        return cls.user(user_id)

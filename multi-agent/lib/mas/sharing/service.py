@@ -28,8 +28,8 @@ class ShareService:
         item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
         
         invite = ShareInvite(
-            sender_identity=Identity.from_user_id(sender_user_id),
-            recipient_identity=Identity.from_user_id(recipient_user_id),
+            sender_identity=Identity.user(sender_user_id),
+            recipient_identity=Identity.user(recipient_user_id),
             item_kind=item_kind,
             item_id=item_id,
             item_name=item_name,
@@ -44,7 +44,7 @@ class ShareService:
         invite = self._repo.get(share_id)
         
         # Validate recipient
-        if invite.recipient_user_id != recipient_user_id:
+        if invite.recipient_identity.id != recipient_user_id:
             raise ValueError("Not authorized to accept this invite")
         
         # Check if expired
@@ -61,8 +61,8 @@ class ShareService:
         # Perform cloning
         try:
             ctx = CloneContext(
-                sender_user_id=invite.sender_user_id,
-                recipient_user_id=recipient_user_id,
+                sender_id=invite.sender_identity.id,
+                recipient_id=recipient_user_id,
             )
 
             if invite.item_kind == ShareItemKind.RESOURCE:
@@ -105,8 +105,8 @@ class ShareService:
 
         try:
             ctx = CloneContext(
-                sender_user_id=sender_user_id,
-                recipient_user_id=team_name,
+                sender_id=sender_user_id,
+                recipient_id=team_name,
                 is_team_contribution=True,
             )
 
@@ -136,7 +136,7 @@ class ShareService:
         """Decline invitation."""
         invite = self._repo.get(share_id)
         
-        if invite.recipient_user_id != recipient_user_id:
+        if invite.recipient_identity.id != recipient_user_id:
             raise ValueError("Not authorized to decline this invite")
         
         if invite.status != ShareStatus.PENDING:
@@ -148,7 +148,7 @@ class ShareService:
         """Cancel sent invitation."""
         invite = self._repo.get(share_id)
         
-        if invite.sender_user_id != sender_user_id:
+        if invite.sender_identity.id != sender_user_id:
             raise ValueError("Not authorized to cancel this invite")
         
         if invite.status != ShareStatus.PENDING:
@@ -177,13 +177,13 @@ class ShareService:
         """Validate item ownership and get name."""
         if item_kind == ShareItemKind.RESOURCE:
             resource = self._cloner.resources.get(item_id)
-            if resource.user_id != sender_user_id:
+            if resource.identity.id != sender_user_id:
                 raise ValueError(f"Resource {item_id} not owned by sender")
             return resource.name
             
         elif item_kind == ShareItemKind.BLUEPRINT:
             bp_doc = self._cloner.blueprints.get_blueprint_draft_doc(item_id)
-            if bp_doc.user_id != sender_user_id:
+            if bp_doc.identity.id != sender_user_id:
                 raise ValueError(f"Blueprint {item_id} not owned by sender")
             return bp_doc.spec_dict["name"]
         
@@ -248,11 +248,11 @@ class ShareService:
     def _can_delete_invite(self, invite: ShareInvite, user_id: str) -> bool:
         """Check if user can delete this invite."""
         # Sender can delete their own invites (except ACCEPTED)
-        if invite.sender_user_id == user_id and invite.status != ShareStatus.ACCEPTED:
+        if invite.sender_identity.id == user_id and invite.status != ShareStatus.ACCEPTED:
             return True
         
         # Recipient can delete DECLINED/CANCELED from their inbox
-        if (invite.recipient_user_id == user_id and 
+        if (invite.recipient_identity.id == user_id and 
             invite.status in [ShareStatus.DECLINED, ShareStatus.CANCELED]):
             return True
         

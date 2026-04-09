@@ -101,10 +101,6 @@ class BlueprintSummary(BaseModel):
     updated_at: datetime
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @property
-    def user_id(self) -> str:
-        return self.identity.id
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Top-level blueprints
@@ -163,7 +159,3 @@ class BlueprintDocument(BaseModel):
 
     class Config:
         extra = Extra.ignore
-
-    @property
-    def user_id(self) -> str:
-        return self.identity.id

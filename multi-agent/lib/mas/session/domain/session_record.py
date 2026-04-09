@@ -32,10 +32,6 @@ class SessionRecord(BaseModel):
     graph_state: GraphState = Field(default_factory=GraphState)
     status: SessionStatus = SessionStatus.PENDING
 
-    @property
-    def user_id(self) -> str:
-        return self.identity.id
-
     def update_context(self, **updates) -> None:
         """Apply updates to the frozen ExecutionContext."""
         self.run_context = self.run_context.model_copy(update=updates)

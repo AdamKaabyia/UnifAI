@@ -39,14 +39,6 @@ class ShareInvite(BaseModel):
     
     # Result tracking for idempotency
     result_mapping: Dict[str, str] = Field(default_factory=dict)
-    
-    @property
-    def sender_user_id(self) -> str:
-        return self.sender_identity.id
-
-    @property
-    def recipient_user_id(self) -> str:
-        return self.recipient_identity.id
 
     @computed_field
     @property

@@ -198,7 +198,7 @@ def get_share(share_id, user_id="alice"):
         invite = svc.get_invite(share_id)
 
         # Check authorization
-        if invite.sender_user_id != user_id and invite.recipient_user_id != user_id:
+        if invite.sender_identity.id != user_id and invite.recipient_identity.id != user_id:
             return jsonify({"error": "Not authorized to view this invitation"}), 403
 
         return jsonify(invite.model_dump(mode="json")), 200

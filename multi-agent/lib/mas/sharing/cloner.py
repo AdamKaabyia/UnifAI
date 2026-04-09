@@ -47,18 +47,18 @@ class CloneContext:
     receives this as an opaque bundle and never needs to reason about users.
 
     Attributes:
-        sender_user_id:       Original owner; used for ownership validation and logging.
-        recipient_user_id:    The user/team who will own all cloned resources/blueprints.
+        sender_id:            Original owner's identity id; used for ownership validation and logging.
+        recipient_id:         The user/team id who will own all cloned resources/blueprints.
         is_team_contribution: When True the share targets a team workspace and
-                              sender_user_id is recorded as the contributor.
+                              sender_id is recorded as the contributor.
     """
-    sender_user_id: str
-    recipient_user_id: str
+    sender_id: str
+    recipient_id: str
     is_team_contribution: bool = False
 
     @property
     def contributed_by(self) -> Optional[str]:
-        return self.sender_user_id if self.is_team_contribution else None
+        return self.sender_id if self.is_team_contribution else None
 
 
 class ShareCloner:
@@ -85,12 +85,12 @@ class ShareCloner:
     def _recipient_identity(ctx: CloneContext) -> Identity:
         """Build the correct Identity for the recipient of a share."""
         if ctx.is_team_contribution:
-            return Identity.team(ctx.recipient_user_id)
-        return Identity.from_user_id(ctx.recipient_user_id)
+            return Identity.team(ctx.recipient_id)
+        return Identity.user(ctx.recipient_id)
 
     def clone_resource_graph(self, *, root_rid: str, ctx: CloneContext) -> Tuple[Dict[str, str], Dict[str, str]]:
         """Clone resource and all its dependencies."""
-        logger.info(f"Starting resource graph clone: {root_rid} from {ctx.sender_user_id} to {ctx.recipient_user_id}")
+        logger.info(f"Starting resource graph clone: {root_rid} from {ctx.sender_id} to {ctx.recipient_id}")
 
         # Single pass: Load resources + compute dependencies + cache models
         closure_data = self._compute_closure({root_rid}, ctx)
@@ -106,12 +106,12 @@ class ShareCloner:
 
     def clone_blueprint(self, *, blueprint_id: str, ctx: CloneContext) -> Tuple[str, Dict[str, str], Dict[str, str]]:
         """Clone blueprint and all its dependencies."""
-        logger.info(f"Starting blueprint clone: {blueprint_id} from {ctx.sender_user_id} to {ctx.recipient_user_id}")
+        logger.info(f"Starting blueprint clone: {blueprint_id} from {ctx.sender_id} to {ctx.recipient_id}")
 
         try:
             # Load and validate blueprint
             bp_doc = self.blueprints.get_blueprint_draft_doc(blueprint_id)
-            if bp_doc.user_id != ctx.sender_user_id:
+            if bp_doc.identity.id != ctx.sender_id:
                 raise ValueError(f"Blueprint {blueprint_id} not owned by sender")
 
             draft = BlueprintDraft(**bp_doc.spec_dict)
@@ -130,7 +130,7 @@ class ShareCloner:
             # Build metadata for the cloned blueprint
             bp_metadata = {}
             if ctx.is_team_contribution:
-                bp_metadata["contributed_by"] = ctx.sender_user_id
+                bp_metadata["contributed_by"] = ctx.sender_id
 
             new_blueprint_id = self.blueprints.save_draft(
                 identity=recipient,
@@ -229,8 +229,8 @@ class ShareCloner:
                 # Load and validate resource
                 doc = self.resources.get(rid)
 
-                if doc.user_id != ctx.sender_user_id:
-                    logger.warning(f"Resource {rid} not owned by {ctx.sender_user_id}, owned by {doc.user_id}")
+                if doc.identity.id != ctx.sender_id:
+                    logger.warning(f"Resource {rid} not owned by {ctx.sender_id}, owned by {doc.identity.id}")
                     continue
 
                 # Create schema model and compute dependencies
@@ -310,7 +310,7 @@ class ShareCloner:
         if ctx.is_team_contribution:
             base_name = preferred_name
         else:
-            base_name = f"{preferred_name} (from {ctx.sender_user_id})"
+            base_name = f"{preferred_name} (from {ctx.sender_id})"
 
         current_name = base_name
 
@@ -340,7 +340,7 @@ class ShareCloner:
         if ctx.is_team_contribution:
             clone_name = draft.name
         else:
-            clone_name = f"{draft.name} (from {ctx.sender_user_id})"
+            clone_name = f"{draft.name} (from {ctx.sender_id})"
 
         return BlueprintDraft(
             plan=self._clone_plan(draft.plan, rid_mapping),
