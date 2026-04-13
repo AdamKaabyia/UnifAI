@@ -291,7 +291,7 @@ pipeline {
                             sh("oc project ${NameSpace}")
                             updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=./shared-resources/redis/.env_redis --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=../shared-resources/redis/.env_redis --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {
