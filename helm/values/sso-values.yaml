@@ -1,6 +1,7 @@
 backend:
   image:
-    repository: images.paas.redhat.com/unifai/sharedresources/ssobackend
+    #repository: images.paas.redhat.com/unifai/sharedresources/ssobackend
+    repository: images.paas.redhat.com/unifai/sharedresources/identity
     tag: "latest"
     pullPolicy: Always
   env:
