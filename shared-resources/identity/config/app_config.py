@@ -21,6 +21,7 @@ class AppConfig(SharedConfig):
 
     # Redis Configuration
     redis_ip: str = "redis"
+    redis_port: int = 6379
     redis_db: int = 1
     redis_password: str = 'Mc10vin!!'
     redis_decode_responses: bool = True
