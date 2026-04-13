@@ -35,6 +35,12 @@ releases:
     wait: true
     values:
       - {{- toYaml .Values.redis | nindent 8 }}
+    hooks:
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+        - "./scripts/redis-presync.sh"
 
   - name: unifai-redis-insight
     chart: ./shared-resources/redis-insight

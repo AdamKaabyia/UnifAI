@@ -33,6 +33,9 @@ spec:
             - name: "{{ .name }}"
               value: "{{ .value | quote }}"
             {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.redisConfigMapName }}
           volumeMounts:
             - name: redis-volume
               mountPath: /data
