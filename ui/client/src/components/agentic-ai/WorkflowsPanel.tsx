@@ -101,14 +101,13 @@ export default function WorkflowsPanel({
     );
   }, [graphFlows, searchQuery]);
 
-  // Fetch available blueprints from API (resolved – references replaced with actual data)
-  const fetchAvailableFlows = async (): Promise<void> => {
+  // Fetch available blueprints from API (resolved – references replaced with actual data).
+  // `forceAutoSelect` bypasses the `selectedFlow` check so the first item is always
+  // picked after a scope change (where the closure still sees the stale value).
+  const fetchAvailableFlows = async (forceAutoSelect = false): Promise<void> => {
     try {
-      // Use summary endpoint - returns name, description, metadata without heavy spec_dict.
-      // Full resolved data is fetched on selection for the graph + sharing status.
       const summaries = await fetchBlueprintSummaries(contextUserId, identityType);
 
-      // Convert summaries to FlowObject format
       const processedFlows = summaries
         .map((summary, index) =>
           convertGraphFlowToFlowObject(
@@ -126,7 +125,7 @@ export default function WorkflowsPanel({
       setGraphFlows(processedFlows);
 
       // Auto-select the first flow if none is selected and flows are available
-      if (processedFlows.length > 0 && !selectedFlow) {
+      if (processedFlows.length > 0 && (forceAutoSelect || !selectedFlow)) {
         onFlowSelect(processedFlows[0]);
       }
     } catch (error) {
@@ -153,9 +152,10 @@ export default function WorkflowsPanel({
   useEffect(() => {
     onFlowSelect(null);
     setSelectedBlueprintData(null);
+    setGraphFlows([]);
     setIsLoading(true);
     Promise.all([
-      fetchAvailableFlows(),
+      fetchAvailableFlows(true),
       fetchActiveFlows(),
     ]).finally(() => {
       setIsLoading(false);
