@@ -20,7 +20,8 @@ class AppConfig(SharedConfig):
     backend_env: str = "development"
 
     # Redis Configuration
+    redis_ip: str = "redis"
     redis_db: int = 1
-    redis_password: str = ""
+    redis_password: str = 'Mc10vin!!'
     redis_decode_responses: bool = True
     redis_session_ttl: int = 3600
