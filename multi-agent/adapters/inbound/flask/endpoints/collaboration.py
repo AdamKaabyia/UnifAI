@@ -7,9 +7,13 @@ Enables multi-user participation in sessions:
 - List active sessions for a team
 - List sessions a specific user is participating in
 """
-from flask import Blueprint, jsonify, current_app
+import logging
+
+from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
+
+logger = logging.getLogger(__name__)
 
 collaboration_bp = Blueprint("collaboration", __name__)
 
@@ -27,6 +31,18 @@ def _unavailable():
     }), 501
 
 
+def _validate_user(user_id: str):
+    """Verify the claimed userId matches the authenticated caller.
+
+    Returns an error tuple ``(response, status)`` when validation fails,
+    or ``None`` when the caller is legitimate (or no auth header is present).
+    """
+    authenticated = request.headers.get("X-Authenticated-User", "").strip()
+    if authenticated and authenticated != user_id:
+        return jsonify({"error": "userId does not match authenticated user"}), 403
+    return None
+
+
 # ── Join / Leave / Heartbeat ────────────────────────────────────────
 
 @collaboration_bp.route("/session.join", methods=["POST"])
@@ -37,6 +53,9 @@ def _unavailable():
     "role": fields.Str(data_key="role", load_default="collaborator"),
 })
 def join_session(session_id, user_id, display_name, role):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
@@ -54,8 +73,9 @@ def join_session(session_id, user_id, display_name, role):
         return jsonify({"error": f"Session {session_id} not found"}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("join_session failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/session.leave", methods=["POST"])
@@ -64,14 +84,18 @@ def join_session(session_id, user_id, display_name, role):
     "user_id": fields.Str(data_key="userId", required=True),
 })
 def leave_session(session_id, user_id):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
     try:
         svc.leave_session(session_id=session_id, user_id=user_id)
         return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("leave_session failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/session.heartbeat", methods=["POST"])
@@ -80,14 +104,18 @@ def leave_session(session_id, user_id):
     "user_id": fields.Str(data_key="userId", required=True),
 })
 def heartbeat(session_id, user_id):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
     try:
         svc.heartbeat(session_id=session_id, user_id=user_id)
         return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("heartbeat failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # ── Queries ─────────────────────────────────────────────────────────
@@ -103,8 +131,9 @@ def get_participants(session_id):
     try:
         participants = svc.get_participants(session_id)
         return jsonify(participants.model_dump(mode="json")), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_participants failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/team.sessions", methods=["GET"])
@@ -118,8 +147,9 @@ def get_team_sessions(team_id):
     try:
         index = svc.get_team_sessions(team_id)
         return jsonify(index.model_dump(mode="json")), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_team_sessions failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/user.active_sessions", methods=["GET"])
@@ -133,8 +163,9 @@ def get_user_active_sessions(user_id):
     try:
         session_ids = svc.get_user_active_sessions(user_id)
         return jsonify({"userId": user_id, "activeSessions": session_ids}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_user_active_sessions failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # ── Typing indicators ────────────────────────────────────────────
@@ -146,6 +177,9 @@ def get_user_active_sessions(user_id):
     "is_typing": fields.Bool(data_key="isTyping", load_default=True),
 })
 def set_typing(session_id, user_id, is_typing):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
@@ -155,8 +189,9 @@ def set_typing(session_id, user_id, is_typing):
         else:
             svc.clear_typing(session_id=session_id, user_id=user_id)
         return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("set_typing failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/session.typing", methods=["GET"])
@@ -170,8 +205,9 @@ def get_typing(session_id):
     try:
         users = svc.get_typing_users(session_id)
         return jsonify({"sessionId": session_id, "typingUsers": users}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_typing failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @collaboration_bp.route("/health", methods=["GET"])

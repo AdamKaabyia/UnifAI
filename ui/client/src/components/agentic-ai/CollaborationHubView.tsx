@@ -35,51 +35,14 @@ import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
 import { useSessionStream } from "@/hooks/use-session-stream";
 import { FlowObject } from "./graphs/interfaces";
 
+import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
+import { CollabAvatar } from "@/components/shared/CollabAvatar";
+
+export type { MemberDisplay };
+export { buildMemberDisplay, CollabAvatar };
+
 const COLLAB_POLL_INTERVAL = 3000;
 const COLLAB_HEARTBEAT_INTERVAL = 30000;
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-const MEMBER_COLORS = [
-  "from-blue-500 to-blue-600",
-  "from-emerald-500 to-emerald-600",
-  "from-pink-500 to-pink-600",
-  "from-orange-500 to-orange-600",
-  "from-violet-500 to-violet-600",
-  "from-cyan-500 to-cyan-600",
-  "from-amber-500 to-amber-600",
-  "from-rose-500 to-rose-600",
-];
-
-export interface MemberDisplay {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-}
-
-export function buildMemberDisplay(username: string, index: number): MemberDisplay {
-  const parts = username.split(/[._\-\s@]+/).filter(Boolean);
-  const initials =
-    parts.length >= 2
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : username.slice(0, 2).toUpperCase();
-  return {
-    id: username,
-    name: username,
-    initials,
-    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
-  };
-}
-
-export function CollabAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
-  const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
-  return (
-    <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
-      {member.initials}
-    </div>
-  );
-}
 
 interface CollaborationHubViewProps {
   runId: string | null;
@@ -194,6 +157,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     [],
   );
 
+  const handleSessionSelectRef = useRef<(session: ChatSession) => Promise<void>>(null!);
+
   const fetchChatSessions = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -206,11 +171,11 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       );
       setChatSessions(sorted);
 
-      if (sorted.length > 0 && !selectedSession) {
+      if (sorted.length > 0 && !selectedSessionRef.current) {
         const target = runId
           ? sorted.find((s) => s.id === runId) ?? sorted[0]
           : sorted[0];
-        await handleSessionSelect(target);
+        await handleSessionSelectRef.current(target);
       }
     } catch (err) {
       console.error("Error fetching chat sessions:", err);
@@ -218,7 +183,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     } finally {
       setIsLoading(false);
     }
-  }, [contextUserId, identityType, runId]);
+  }, [contextUserId, identityType, runId, transformApiDataToSessions]);
 
   const handleSessionSelect = async (session: ChatSession) => {
     const requestId = ++sessionSelectRequestId.current;
@@ -277,6 +242,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       setCurrentSessionMessages([]);
     }
   };
+  handleSessionSelectRef.current = handleSessionSelect;
 
   // ─── Delete ────────────────────────────────────────────────────────────
 

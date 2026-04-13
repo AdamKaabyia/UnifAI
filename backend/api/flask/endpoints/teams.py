@@ -1,6 +1,11 @@
+import logging
+
 from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
+from pymongo.errors import DuplicateKeyError
 from webargs import fields
+
+logger = logging.getLogger(__name__)
 
 teams_bp = Blueprint("teams", __name__)
 
@@ -27,8 +32,11 @@ def create_team(name, created_by, members):
         return jsonify(_serialize_team(team)), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except DuplicateKeyError:
+        return jsonify({"error": f"A team named '{name}' already exists"}), 409
+    except Exception:
+        logger.exception("create_team failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @teams_bp.route("/teams.list", methods=["GET"])
@@ -39,13 +47,17 @@ def create_team(name, created_by, members):
 def list_teams(user_id, group_ids=None):
     svc = current_app.container.team_service
     try:
-        parsed_groups = group_ids.split(",") if group_ids else None
+        parsed_groups = (
+            [g for g in group_ids.split(",") if g]
+            if group_ids else None
+        )
         teams = svc.list_user_teams(user_id, group_ids=parsed_groups)
         return jsonify({
             "teams": [_serialize_team(t) for t in teams]
         }), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("list_teams failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @teams_bp.route("/team.get", methods=["GET"])
@@ -59,8 +71,9 @@ def get_team(team_id):
         return jsonify(_serialize_team(team)), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_team failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @teams_bp.route("/team.update", methods=["PUT"])
@@ -78,8 +91,11 @@ def update_team(team_id, name=None, members=None):
         return jsonify({"error": "Team not found"}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except DuplicateKeyError:
+        return jsonify({"error": f"A team named '{name}' already exists"}), 409
+    except Exception:
+        logger.exception("update_team failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @teams_bp.route("/team.delete", methods=["DELETE"])
@@ -93,5 +109,6 @@ def delete_team(team_id):
         return jsonify({"status": "deleted"}), 200
     except KeyError:
         return jsonify({"error": "Team not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("delete_team failed")
+        return jsonify({"error": "Internal server error"}), 500

@@ -73,3 +73,7 @@ class BlueprintRepository(ABC):
     @abstractmethod
     def count(self, identity: Optional[Identity] = None) -> int:
         """Total blueprint count, optionally scoped to *identity*."""
+
+    @abstractmethod
+    def delete_by_identity(self, identity: Identity) -> int:
+        """Delete all blueprints owned by *identity*.  Returns the count of deleted documents."""

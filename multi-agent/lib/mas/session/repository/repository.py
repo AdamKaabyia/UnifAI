@@ -121,3 +121,8 @@ class SessionRepository(ABC):
         top blueprints views.
         """
         ...
+
+    @abstractmethod
+    def delete_by_identity(self, identity: Identity) -> int:
+        """Delete all sessions owned by *identity*.  Returns the count of deleted documents."""
+        ...

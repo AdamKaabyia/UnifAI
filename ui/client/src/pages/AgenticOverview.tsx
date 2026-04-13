@@ -26,40 +26,8 @@ import GraphDisplay from "@/components/agentic-ai/graphs/GraphDisplay";
 import { useAgenticData } from "@/hooks/use-agentic-data";
 import { useWorkflowCalculations } from "@/hooks/use-workflow-calculations";
 import { useResourceDistribution } from "@/hooks/use-resource-distribution";
-
-// ─── Shared member display helpers ───────────────────────────────────────────
-
-const MEMBER_COLORS = [
-  "from-blue-500 to-blue-600",
-  "from-emerald-500 to-emerald-600",
-  "from-pink-500 to-pink-600",
-  "from-orange-500 to-orange-600",
-  "from-violet-500 to-violet-600",
-  "from-cyan-500 to-cyan-600",
-  "from-amber-500 to-amber-600",
-  "from-rose-500 to-rose-600",
-];
-
-interface MemberDisplay {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-}
-
-function buildMemberDisplay(username: string, index: number): MemberDisplay {
-  const parts = username.split(/[._\-\s@]+/).filter(Boolean);
-  const initials =
-    parts.length >= 2
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : username.slice(0, 2).toUpperCase();
-  return {
-    id: username,
-    name: username,
-    initials,
-    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
-  };
-}
+import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
+import { CollabAvatar } from "@/components/shared/CollabAvatar";
 
 // ─── Demo data (shown only for team "UnifAI") ───────────────────────────────
 
@@ -106,14 +74,7 @@ const RANK_STYLES = [
 ];
 const RANK_ICONS = [Crown, Medal, Award];
 
-function TeamAvatar({ member, size = "sm" }: { member: MemberDisplay; size?: "xs" | "sm" }) {
-  const sizeClasses = { xs: "w-5 h-5 text-[9px]", sm: "w-7 h-7 text-[10px]" };
-  return (
-    <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${member.color} flex items-center justify-center font-bold text-white flex-shrink-0`}>
-      {member.initials}
-    </div>
-  );
-}
+const TeamAvatar = CollabAvatar;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 

@@ -20,6 +20,7 @@ export interface ViewContextType {
   teams: TeamInfo[];
   refreshTeams: () => Promise<void>;
   teamsLoading: boolean;
+  teamsReady: boolean;
   userGroups: string[];
 }
 
@@ -41,6 +42,7 @@ const defaultViewContext: ViewContextType = {
   teams: [],
   refreshTeams: async () => {},
   teamsLoading: false,
+  teamsReady: false,
   userGroups: [],
 };
 
@@ -48,11 +50,12 @@ const ViewContext = createContext<ViewContextType>(defaultViewContext);
 
 export function ViewProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [viewMode, setViewMode] = useState<ViewMode>("private");
+  const [viewMode, setViewModeRaw] = useState<ViewMode>("private");
   const [selectedTeam, setSelectedTeam] = useState<TeamInfo | null>(null);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [userGroups, setUserGroups] = useState<string[]>([]);
+  const teamsLoadedOnce = useRef(false);
 
   const selectedTeamRef = useRef(selectedTeam);
   selectedTeamRef.current = selectedTeam;
@@ -61,7 +64,6 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
     if (!user?.username) return;
     setTeamsLoading(true);
     try {
-      // Fetch user's ROVER groups for dynamic team membership
       let groups: string[] = [];
       try {
         const { api } = await import('@/http/authClient');
@@ -75,6 +77,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
       const fetched = await listUserTeams(user.username, groups.length > 0 ? groups : undefined);
       const mapped = fetched.map(toTeamInfo);
       setTeams(mapped);
+      teamsLoadedOnce.current = true;
       const current = selectedTeamRef.current;
       if (current) {
         const updated = mapped.find((t) => t.id === current.id);
@@ -99,6 +102,13 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
     refreshTeams();
   }, [refreshTeams]);
 
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeRaw(mode);
+    if (mode === "team" && !teamsLoadedOnce.current) {
+      refreshTeams();
+    }
+  }, [refreshTeams]);
+
   return (
     <ViewContext.Provider
       value={{
@@ -109,6 +119,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
         teams,
         refreshTeams,
         teamsLoading,
+        teamsReady: teamsLoadedOnce.current && !teamsLoading,
         userGroups,
       }}
     >

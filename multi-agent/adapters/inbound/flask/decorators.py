@@ -111,7 +111,12 @@ def require_identity_authorization(f):
 
 
 def _is_team_member(username: str, team_id: str) -> bool:
-    """Check team membership via the SSO backend's ``teams.list`` endpoint."""
+    """Check team membership via the SSO backend's ``teams.list`` endpoint.
+
+    Fails **closed** (denies access) when the SSO backend is configured but
+    unreachable or returns an error.  Only allows access without a check when
+    no ``directory_sso_url`` is configured at all (e.g. local dev).
+    """
     sso_url = current_app.config.get("directory_sso_url", "")
     if not sso_url:
         return True
@@ -123,12 +128,12 @@ def _is_team_member(username: str, team_id: str) -> bool:
             timeout=5,
         )
         if resp.status_code != 200:
-            logger.warning("Team membership check failed (HTTP %d)", resp.status_code)
-            return True
+            logger.warning("Team membership check failed (HTTP %d) — denying access", resp.status_code)
+            return False
 
         teams = resp.json().get("teams", [])
         return any(t.get("team_id") == team_id for t in teams)
     except Exception:
-        logger.exception("Team membership check failed")
-        return True
+        logger.exception("Team membership check failed — denying access")
+        return False
 

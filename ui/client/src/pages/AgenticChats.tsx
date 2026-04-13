@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { useView } from "@/contexts/ViewContext";
 
 import ExecutionTab from "@/components/agentic-ai/ExecutionTab";
-import CollaborationHubView, { buildMemberDisplay } from "@/components/agentic-ai/CollaborationHubView";
+import CollaborationHubView from "@/components/agentic-ai/CollaborationHubView";
+import { buildMemberDisplay } from "@/utils/memberDisplay";
 import { StreamingDataProvider } from "@/components/agentic-ai/StreamingDataContext";
 
 export default function AgenticChats() {

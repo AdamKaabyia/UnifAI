@@ -11,14 +11,24 @@ _TYPE_MAP = {
     "team": IdentityType.TEAM,
 }
 
+_VALID_TYPES = frozenset(_TYPE_MAP.keys())
+
 
 def resolve_identity(
     user_id: str,
     identity_type: str = "user",
     display_name: str = "",
 ) -> Identity:
-    """Build an ``Identity`` from raw request parameters."""
-    id_type = _TYPE_MAP.get(identity_type, IdentityType.USER)
+    """Build an ``Identity`` from raw request parameters.
+
+    Raises ``ValueError`` if *identity_type* is not a recognized value.
+    """
+    if identity_type not in _VALID_TYPES:
+        raise ValueError(
+            f"Invalid identityType '{identity_type}'; "
+            f"must be one of {sorted(_VALID_TYPES)}"
+        )
+    id_type = _TYPE_MAP[identity_type]
     if id_type == IdentityType.TEAM:
         return Identity.team(team_id=user_id, display_name=display_name)
     return Identity.user(user_id=user_id, display_name=display_name)

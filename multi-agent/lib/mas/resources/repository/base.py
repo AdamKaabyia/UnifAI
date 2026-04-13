@@ -69,3 +69,8 @@ class ResourceRepository(ABC):
     ) -> List[GroupedCount]:
         """Group documents by fields and return counts, scoped to *identity*."""
         ...
+
+    @abstractmethod
+    def delete_by_identity(self, identity: Identity) -> int:
+        """Delete all resources owned by *identity*.  Returns the count of deleted documents."""
+        ...

@@ -46,7 +46,7 @@ class AppContainer(metaclass=SingletonMeta):
             action_dispatcher=self.action_dispatcher,
         )
 
-        teams_db = mongo_client["UnifAI"]
+        teams_db = mongo_client[cfg.teams_db]
         self.team_repo = MongoTeamRepository(db=teams_db, coll_name=cfg.teams_coll)
 
         self.team_service = TeamService(repository=self.team_repo)

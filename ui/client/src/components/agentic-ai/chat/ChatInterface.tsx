@@ -23,7 +23,8 @@ import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 import WorkflowStatusBanner, { WorkflowBannerMessages } from '@/components/shared/WorkflowStatusBanner';
 import { useAuth } from "@/contexts/AuthContext";
-import { MemberDisplay, buildMemberDisplay, CollabAvatar } from "../CollaborationHubView";
+import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
+import { CollabAvatar } from "@/components/shared/CollabAvatar";
 
 // Backend message format
 interface BackendMessage {

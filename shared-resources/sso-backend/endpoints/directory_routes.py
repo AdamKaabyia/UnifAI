@@ -1,6 +1,17 @@
+import logging
+
 from flask import Blueprint, jsonify, current_app, request
 
+logger = logging.getLogger(__name__)
+
 directory_bp = Blueprint("directory", __name__)
+
+
+def _parse_limit(default: int = 20) -> int:
+    try:
+        return int(request.args.get("limit", default))
+    except (ValueError, TypeError):
+        return default
 
 
 def _user_token():
@@ -23,12 +34,13 @@ def search_users():
     if not q:
         return jsonify({"error": "q parameter is required"}), 400
 
-    limit = int(request.args.get("limit", 20))
+    limit = _parse_limit()
     try:
         users = svc.search_directory_users(q, limit=limit, user_token=_user_token())
         return jsonify({"users": [u.model_dump(mode="json") for u in users]}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("search_users failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @directory_bp.route("/directory.search_groups", methods=["GET"])
@@ -41,12 +53,13 @@ def search_groups():
     if not q:
         return jsonify({"error": "q parameter is required"}), 400
 
-    limit = int(request.args.get("limit", 20))
+    limit = _parse_limit()
     try:
         groups = svc.search_directory_groups(q, limit=limit, user_token=_user_token())
         return jsonify({"groups": [g.model_dump(mode="json") for g in groups]}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("search_groups failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @directory_bp.route("/directory.search", methods=["GET"])
@@ -60,7 +73,7 @@ def search_all():
     if not q:
         return jsonify({"error": "q parameter is required"}), 400
 
-    limit = int(request.args.get("limit", 20))
+    limit = _parse_limit()
     token = _user_token()
     try:
         users = svc.search_directory_users(q, limit=limit, user_token=token)
@@ -69,8 +82,9 @@ def search_all():
             "users": [u.model_dump(mode="json") for u in users],
             "groups": [g.model_dump(mode="json") for g in groups],
         }), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("search_all failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @directory_bp.route("/directory.get_user", methods=["GET"])
@@ -88,8 +102,9 @@ def get_user():
         if not user:
             return jsonify({"error": "User not found"}), 404
         return jsonify(user.model_dump(mode="json")), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_user failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @directory_bp.route("/directory.get_group", methods=["GET"])
@@ -107,5 +122,6 @@ def get_group():
         if not group:
             return jsonify({"error": "Group not found"}), 404
         return jsonify(group.model_dump(mode="json")), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("get_group failed")
+        return jsonify({"error": "Internal server error"}), 500

@@ -100,27 +100,31 @@ class LdapDirectoryProvider(DirectoryProvider):
     def _get_connection(self) -> Connection:
         """Return a reusable connection, reconnecting only when necessary."""
         with self._conn_lock:
-            if self._conn is not None:
-                try:
-                    if self._conn.bound:
-                        return self._conn
-                except Exception:
-                    pass
-                try:
-                    self._conn.unbind()
-                except Exception:
-                    pass
+            return self._get_locked_connection()
 
-            conn = Connection(
-                self._pool,
-                user=self._bind_dn,
-                password=self._bind_pw,
-                auto_bind=True,
-                read_only=True,
-                receive_timeout=self._timeout,
-            )
-            self._conn = conn
-            return conn
+    def _get_locked_connection(self) -> Connection:
+        """Like ``_get_connection`` but assumes ``_conn_lock`` is already held."""
+        if self._conn is not None:
+            try:
+                if self._conn.bound:
+                    return self._conn
+            except Exception:
+                pass
+            try:
+                self._conn.unbind()
+            except Exception:
+                pass
+
+        conn = Connection(
+            self._pool,
+            user=self._bind_dn,
+            password=self._bind_pw,
+            auto_bind=True,
+            read_only=True,
+            receive_timeout=self._timeout,
+        )
+        self._conn = conn
+        return conn
 
     def _search(self, base_dn: str, search_filter: str,
                 attributes: list, limit: int = 0) -> list:
@@ -130,38 +134,37 @@ class LdapDirectoryProvider(DirectoryProvider):
             logger.debug("LDAP cache hit: %s", cache_key)
             return cached
 
-        try:
-            conn = self._get_connection()
-            conn.search(
-                search_base=base_dn,
-                search_filter=search_filter,
-                search_scope=SUBTREE,
-                attributes=attributes,
-                size_limit=limit,
-            )
-            results = [
-                entry for entry in conn.entries
-                if str(entry.entry_dn) != base_dn
-            ]
-            logger.debug(
-                "LDAP search base=%s filter=%s → %d result(s)",
-                base_dn, search_filter, len(results),
-            )
-            self._cache.put(cache_key, results)
-            return results
-        except LDAPException:
-            logger.exception(
-                "LDAP search failed: base=%s filter=%s", base_dn, search_filter,
-            )
-            # Connection may be broken; discard it so next call reconnects
-            with self._conn_lock:
+        with self._conn_lock:
+            try:
+                conn = self._get_locked_connection()
+                conn.search(
+                    search_base=base_dn,
+                    search_filter=search_filter,
+                    search_scope=SUBTREE,
+                    attributes=attributes,
+                    size_limit=limit,
+                )
+                results = [
+                    entry for entry in conn.entries
+                    if str(entry.entry_dn) != base_dn
+                ]
+                logger.debug(
+                    "LDAP search base=%s filter=%s → %d result(s)",
+                    base_dn, search_filter, len(results),
+                )
+                self._cache.put(cache_key, results)
+                return results
+            except LDAPException:
+                logger.exception(
+                    "LDAP search failed: base=%s filter=%s", base_dn, search_filter,
+                )
                 try:
                     if self._conn is not None:
                         self._conn.unbind()
                 except Exception:
                     pass
                 self._conn = None
-            return []
+                return []
 
     @staticmethod
     def _escape(value: str) -> str:

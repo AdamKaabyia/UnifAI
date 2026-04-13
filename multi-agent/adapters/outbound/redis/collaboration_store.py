@@ -162,12 +162,17 @@ class RedisCollaborationStore(CollaborationStore):
 
     def get_typing_users(self, session_id: str) -> list[str]:
         r = self._client()
-        keys = r.keys(self._typing_pattern(session_id))
         prefix = f"{_PREFIX}session:{session_id}:typing:"
+        pattern = self._typing_pattern(session_id)
         users: list[str] = []
-        for k in keys:
-            key_str = k.decode() if isinstance(k, bytes) else k
-            users.append(key_str[len(prefix):])
+        cursor = 0
+        while True:
+            cursor, keys = r.scan(cursor=cursor, match=pattern, count=100)
+            for k in keys:
+                key_str = k.decode() if isinstance(k, bytes) else k
+                users.append(key_str[len(prefix):])
+            if cursor == 0:
+                break
         return users
 
     # ── Health ──────────────────────────────────────────────────────

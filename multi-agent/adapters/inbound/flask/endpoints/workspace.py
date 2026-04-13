@@ -1,9 +1,15 @@
-from flask import Blueprint, jsonify, current_app
+import logging
+
+from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body
 from webargs import fields
 from mas.core.identity import Identity, IdentityType
 
+logger = logging.getLogger(__name__)
+
 workspace_bp = Blueprint("workspace", __name__)
+
+_CLEANUP_SECRET_HEADER = "X-Internal-Secret"
 
 
 @workspace_bp.route("/workspace.cleanup", methods=["DELETE"])
@@ -16,7 +22,19 @@ def cleanup_workspace(identity_type, identity_id):
 
     Intended for team deletion cascade — the SSO backend deletes the team
     record, this endpoint removes everything the team owned in multi-agent.
+
+    Protected by a shared secret header so only trusted internal callers
+    (e.g. the SSO backend) can invoke it.
     """
+    cleanup_secret = current_app.config.get("cleanup_secret", "")
+    if not cleanup_secret:
+        logger.error("workspace.cleanup called but cleanup_secret is not configured")
+        return jsonify({"error": "Endpoint not configured"}), 503
+
+    provided = request.headers.get(_CLEANUP_SECRET_HEADER, "")
+    if provided != cleanup_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
     try:
         id_type = IdentityType(identity_type)
     except ValueError:
@@ -28,6 +46,12 @@ def cleanup_workspace(identity_type, identity_id):
     resources_deleted = container.resource_repo.delete_by_identity(identity)
     blueprints_deleted = container.blueprint_repo.delete_by_identity(identity)
     sessions_deleted = container.session_repo.delete_by_identity(identity)
+
+    logger.info(
+        "workspace.cleanup identity=%s/%s deleted resources=%d blueprints=%d sessions=%d",
+        identity_type, identity_id,
+        resources_deleted, blueprints_deleted, sessions_deleted,
+    )
 
     return jsonify({
         "status": "cleaned",
