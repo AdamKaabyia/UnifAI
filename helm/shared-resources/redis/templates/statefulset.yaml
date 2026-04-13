@@ -29,13 +29,15 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
-            {{- range .Values.env }}
-            - name: "{{ .name }}"
-              value: "{{ .value | quote }}"
-            {{- end }}
+          {{- range .Values.env }}
+            - name: {{ .name | quote }}
+              value: {{ .value | quote }}
+          {{- end }}
+          {{- if .Values.redisConfigMapName }}
           envFrom:
             - configMapRef:
-                name: {{ .Values.redisConfigMapName }}
+                name: {{ .Values.redisConfigMapName | quote }}
+          {{- end }}
           volumeMounts:
             - name: redis-volume
               mountPath: /data
