@@ -151,7 +151,7 @@ pipeline {
                     when { expression { params.build_sso_image } }
                     steps {
                         script {
-                            def component = "shared-resources/sso-backend"
+                            def component = "shared-resources/identity"
                             def module = ""
                             dir("${buildParams.DevRoot}/${params.BRANCH}/") {
                                 cleanWorkspace(component)
