@@ -47,6 +47,8 @@ spec:
           envFrom:
           - configMapRef:
               name: {{ .Values.SSOConfigMapName }}
+          - configMapRef:
+              name: {{ .Values.globalConfigMapName }}
           env:
           {{- range $key, $value := .Values.backend.env }}
             - name: "{{ $key }}"

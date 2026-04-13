@@ -13,6 +13,7 @@ replicaCount: 1
 #   # Overrides the image tag whose default is the chart appVersion.
 #   tag: ""
 SSOConfigMapName: sso-config
+globalConfigMapName: shared-config
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
