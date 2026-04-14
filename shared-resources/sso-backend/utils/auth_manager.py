@@ -64,7 +64,41 @@ class AuthManager:
             'SESSION_COOKIE_SAMESITE': 'None',  # Must be 'None' for cross-origin
             'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
         })
-    
+
+    def _log_auth_diagnostics(self, event: str) -> None:
+        """Log non-sensitive session/request context (no tokens or cookie values)."""
+        user = session.get('user') or {}
+        sess_exp = user.get('session_expires_at') or 0
+        logger.info(
+            "auth_diag event=%s pid=%s scheme=%s host=%s cookie_keys=%s "
+            "has_user=%s has_access_token=%s has_refresh_token=%s "
+            "username=%s sub=%s session_expires_at=%s session_expires_missing_or_zero=%s "
+            "token_expires_at_top=%s",
+            event,
+            os.getpid(),
+            request.scheme,
+            request.host,
+            list(request.cookies.keys()),
+            bool(session.get('user')),
+            bool(session.get('access_token')),
+            bool(session.get('refresh_token')),
+            user.get('username'),
+            user.get('sub'),
+            sess_exp,
+            not bool(sess_exp),
+            session.get('token_expires_at', 0),
+        )
+
+    def _get_auth_user_failure_reason(self) -> str:
+        """Why is_authenticated() is false for /api/auth/user (no secrets)."""
+        if 'user' not in session:
+            return 'missing_session_user'
+        if 'access_token' not in session:
+            return 'missing_access_token'
+        if self._is_session_expired():
+            return 'session_expired'
+        return 'unknown'
+
     def _register_auth_routes(self):
         """Register authentication routes"""
         
@@ -120,6 +154,18 @@ class AuthManager:
                 session['access_token'] = token.get('access_token')
                 session['refresh_token'] = token.get('refresh_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
+
+                token_expires_at = token.get('expires_at', 0)
+                logger.info(
+                    "auth_callback session_stored pid=%s username=%s token_expires_at=%s "
+                    "token_expires_at_missing_or_zero=%s has_refresh_token=%s",
+                    os.getpid(),
+                    userinfo.get('preferred_username'),
+                    token_expires_at,
+                    not bool(token_expires_at),
+                    bool(session.get('refresh_token')),
+                )
+                self._log_auth_diagnostics('auth_callback_after_store')
                 
                 logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
                 
@@ -148,11 +194,18 @@ class AuthManager:
         @self.app.route('/api/auth/user')
         def get_current_user():
             """Get current user information"""
+            self._log_auth_diagnostics('auth_user_request')
             if not self.is_authenticated():
+                detail = self._get_auth_user_failure_reason()
+                logger.info(
+                    "auth_401 route=/api/auth/user reason=not_authenticated detail=%s",
+                    detail,
+                )
                 return jsonify({'error': 'Not authenticated'}), 401
             
             # Check if session has expired (requires re-authentication)
             if self._is_session_expired():
+                logger.info("auth_401 route=/api/auth/user reason=session_expired branch=redundant_check")
                 session.clear()
                 return jsonify({'error': 'Session expired'}), 401
             
@@ -160,14 +213,14 @@ class AuthManager:
             if self._should_refresh_token():
                 if not self._refresh_access_token():
                     # Don't clear session - token refresh failure doesn't mean session expired
+                    logger.info("auth_401 route=/api/auth/user reason=token_refresh_failed")
                     return jsonify({'error': 'Token refresh failed'}), 401
             
-           # Get user and add permissions
+            # Get user and add permissions
             user = session.get('user')
             
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
-          
 
             return jsonify({
                 'user': user,
