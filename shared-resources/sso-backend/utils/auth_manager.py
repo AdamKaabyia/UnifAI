@@ -5,6 +5,8 @@ Handles user authentication, session management, and token validation
 from datetime import datetime, timedelta
 from functools import wraps
 import os
+import secrets
+import threading
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
@@ -13,6 +15,9 @@ from config.app_config import AppConfig
 from urllib.parse import quote
 
 config = AppConfig.get_instance()
+# In-process SSO session payload (single worker / single pod). Replace with Redis for scale-out.
+_SERVER_STORE: dict[str, dict] = {}
+_SERVER_STORE_LOCK = threading.Lock()
 
 class AuthManager:
     def __init__(self, app=None):
@@ -65,9 +70,26 @@ class AuthManager:
             'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
         })
 
+    def _get_server_session(self):
+        """Server-side session dict for current cookie session_id, or None."""
+        sid = session.get('session_id')
+        if not sid:
+            return None
+        with _SERVER_STORE_LOCK:
+            return _SERVER_STORE.get(sid)
+
+    def _pop_server_session(self, sid=None):
+        """Remove server session; default sid from cookie."""
+        if sid is None:
+            sid = session.get('session_id')
+        if sid:
+            with _SERVER_STORE_LOCK:
+                _SERVER_STORE.pop(sid, None)
+
     def _log_auth_diagnostics(self, event: str) -> None:
         """Log non-sensitive session/request context (no tokens or cookie values)."""
-        user = session.get('user') or {}
+        data = self._get_server_session()
+        user = (data or {}).get('user') or {}
         sess_exp = user.get('session_expires_at') or 0
         logger.info(
             "auth_diag event=%s pid=%s scheme=%s host=%s cookie_keys=%s "
@@ -79,21 +101,24 @@ class AuthManager:
             request.scheme,
             request.host,
             list(request.cookies.keys()),
-            bool(session.get('user')),
-            bool(session.get('access_token')),
-            bool(session.get('refresh_token')),
+            bool(user),
+            bool((data or {}).get('access_token')),
+            bool((data or {}).get('refresh_token')),
             user.get('username'),
             user.get('sub'),
             sess_exp,
             not bool(sess_exp),
-            session.get('token_expires_at', 0),
+            (data or {}).get('token_expires_at', 0),
         )
 
     def _get_auth_user_failure_reason(self) -> str:
         """Why is_authenticated() is false for /api/auth/user (no secrets)."""
-        if 'user' not in session:
+        data = self._get_server_session()
+        if not data:
             return 'missing_session_user'
-        if 'access_token' not in session:
+        if 'user' not in data:
+            return 'missing_session_user'
+        if 'access_token' not in data:
             return 'missing_access_token'
         if self._is_session_expired():
             return 'session_expired'
@@ -140,22 +165,30 @@ class AuthManager:
                 session_created_at = datetime.now()
                 session_expires_at = session_created_at + timedelta(hours=10)
                 
-                # Store user info in session
-                session.permanent = True
-                session['user'] = {
-                    'username': userinfo.get('preferred_username'),
-                    'email': userinfo.get('email'),
-                    'name': userinfo.get('name'),
-                    'sub': userinfo.get('sub'),
-                    'session_created_at': session_created_at.timestamp(),
-                    'session_expires_at': session_expires_at.timestamp(),
-                    'token_expires_at': token.get('expires_at', 0)
-                }
-                session['access_token'] = token.get('access_token')
-                session['refresh_token'] = token.get('refresh_token')
-                session['token_expires_at'] = token.get('expires_at', 0)
-
+                session_id = str(secrets.token_urlsafe(16))
                 token_expires_at = token.get('expires_at', 0)
+                session_data = {
+                    'user': {
+                        'username': userinfo.get('preferred_username'),
+                        'email': userinfo.get('email'),
+                        'name': userinfo.get('name'),
+                        'sub': userinfo.get('sub'),
+                        'session_created_at': session_created_at.timestamp(),
+                        'session_expires_at': session_expires_at.timestamp(),
+                        'token_expires_at': token_expires_at,
+                    },
+                    'access_token': token.get('access_token'),
+                    'refresh_token': token.get('refresh_token'),
+                    'token_expires_at': token_expires_at,
+                }
+                with _SERVER_STORE_LOCK:
+                    _SERVER_STORE[session_id] = session_data
+
+                # Thin cookie: only opaque session_id in Flask session
+                session.clear()
+                session.permanent = True
+                session['session_id'] = session_id
+
                 logger.info(
                     "auth_callback session_stored pid=%s username=%s token_expires_at=%s "
                     "token_expires_at_missing_or_zero=%s has_refresh_token=%s",
@@ -163,7 +196,7 @@ class AuthManager:
                     userinfo.get('preferred_username'),
                     token_expires_at,
                     not bool(token_expires_at),
-                    bool(session.get('refresh_token')),
+                    bool(session_data.get('refresh_token')),
                 )
                 self._log_auth_diagnostics('auth_callback_after_store')
                 
@@ -186,7 +219,9 @@ class AuthManager:
         @self.app.route('/api/auth/logout', methods=['POST'])
         def logout():
             """Logout user and clear session"""
-            username = session.get('user', {}).get('username', 'Unknown')
+            data = self._get_server_session()
+            username = (data or {}).get('user', {}).get('username', 'Unknown')
+            self._pop_server_session()
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})
@@ -206,6 +241,7 @@ class AuthManager:
             # Check if session has expired (requires re-authentication)
             if self._is_session_expired():
                 logger.info("auth_401 route=/api/auth/user reason=session_expired branch=redundant_check")
+                self._pop_server_session()
                 session.clear()
                 return jsonify({'error': 'Session expired'}), 401
             
@@ -216,8 +252,8 @@ class AuthManager:
                     logger.info("auth_401 route=/api/auth/user reason=token_refresh_failed")
                     return jsonify({'error': 'Token refresh failed'}), 401
             
-            # Get user and add permissions
-            user = session.get('user')
+            # Get user and add permissions (copy so is_admin is not stored in server session)
+            user = dict(self.get_current_user() or {})
             
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
@@ -230,11 +266,13 @@ class AuthManager:
         @self.app.route('/api/auth/refresh', methods=['POST'])
         def refresh_token():
             """Refresh access token"""
-            if not session.get('refresh_token'):
+            data = self._get_server_session()
+            if not data or not data.get('refresh_token'):
                 return jsonify({'error': 'No refresh token available'}), 401
             
             # Check if session has expired first
             if self._is_session_expired():
+                self._pop_server_session()
                 session.clear()
                 return jsonify({'error': 'Session expired'}), 401
             
@@ -245,8 +283,8 @@ class AuthManager:
     
     def is_authenticated(self):
         """Check if user is authenticated and session is valid"""
-        has_session = 'user' in session and 'access_token' in session
-        if not has_session:
+        data = self._get_server_session()
+        if not data or 'user' not in data or 'access_token' not in data:
             return False
         
         # Check if session has expired
@@ -256,12 +294,17 @@ class AuthManager:
         return True
     
     def get_current_user(self):
-        """Get current user from session"""
-        return session.get('user')
+        """Get current user profile dict from server-side session (not Flask cookie payload)."""
+        data = self._get_server_session()
+        if not data:
+            return None
+        user = data.get('user')
+        return dict(user) if user else None
     
     def _is_session_expired(self):
         """Check if the user session has expired (requires re-authentication)"""
-        session_expires_at = session.get('user', {}).get('session_expires_at', 0)
+        data = self._get_server_session()
+        session_expires_at = (data or {}).get('user', {}).get('session_expires_at', 0)
         if not session_expires_at:
             return True # No expiration time means session is invalid
         
@@ -275,7 +318,8 @@ class AuthManager:
     
     def _should_refresh_token(self):
         """Check if access token should be refreshed (expires in next 5 minutes)"""
-        token_expires_at = session.get('token_expires_at', 0)
+        data = self._get_server_session()
+        token_expires_at = (data or {}).get('token_expires_at', 0)
         if not token_expires_at:
             return True # No token expiration means we should try to refresh
         
@@ -287,7 +331,13 @@ class AuthManager:
     
     def _refresh_access_token(self):
         """Refresh the access token using refresh token"""
-        refresh_token = session.get('refresh_token')
+        sid = session.get('session_id')
+        if not sid:
+            logger.error("No session_id in cookie")
+            return False
+        with _SERVER_STORE_LOCK:
+            data = _SERVER_STORE.get(sid)
+            refresh_token = (data or {}).get('refresh_token')
         if not refresh_token:
             logger.error("No refresh token available")
             return False
@@ -298,14 +348,18 @@ class AuthManager:
                 refresh_token=refresh_token
             )
             
-            # Update session with new token info
-            session['access_token'] = token.get('access_token')
-            if token.get('refresh_token'):
-                session['refresh_token'] = token.get('refresh_token')
-            
-            # Update token expiration (but keep session expiration unchanged)
-            session['token_expires_at'] = token.get('expires_at', 0)
-            session['user']['token_expires_at'] = token.get('expires_at', 0)
+            new_access = token.get('access_token')
+            new_expires = token.get('expires_at', 0)
+            with _SERVER_STORE_LOCK:
+                data = _SERVER_STORE.get(sid)
+                if not data:
+                    return False
+                data['access_token'] = new_access
+                if token.get('refresh_token'):
+                    data['refresh_token'] = token.get('refresh_token')
+                data['token_expires_at'] = new_expires
+                if data.get('user') is not None:
+                    data['user']['token_expires_at'] = new_expires
             logger.info("Access token refreshed successfully")
             return True
         
