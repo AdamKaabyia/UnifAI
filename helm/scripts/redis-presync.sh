@@ -9,5 +9,5 @@ source "$(dirname "$0")/postsync-lib.sh"
 
 # Create configmap
 create_or_update_configmap redis-config \
-  --from-literal=redis_port="$redis_port" \
-  --from-literal=redis_password="$redis_password" 
+  --from-literal=REDIS_PORT="$redis_port" \
+  --from-literal=REDIS_PASSWORD="$redis_password" 
