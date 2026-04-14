@@ -10,8 +10,7 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 import logging
-from inbound.flask.identity_helpers import resolve_identity
-from inbound.flask.decorators import require_identity_authorization
+from inbound.flask.decorators import require_identity_authorization, with_identity
 
 from mas.templates.errors import (
     TemplateNotFoundError,
@@ -298,15 +297,14 @@ def instantiate_template(template_id, input):
 
 @templates_bp.route("/template.materialize", methods=["POST"])
 @require_identity_authorization
+@with_identity
 @from_body({
     "template_id": fields.Str(data_key="templateId", required=True),
-    "user_id": fields.Str(data_key="userId", required=True),
-    "identity_type": fields.Str(data_key="identityType", load_default="user"),
     "input": fields.Dict(required=True),
     "blueprint_name": fields.Str(data_key="blueprintName", required=False, load_default=None),
     "skip_validation": fields.Bool(data_key="skipValidation", required=False, load_default=False),
 })
-def materialize_template(template_id, user_id, identity_type="user", input=None,
+def materialize_template(identity, template_id, input=None,
                          blueprint_name=None, skip_validation=False):
     """
     Instantiate template and save blueprint to user's account.
@@ -315,8 +313,6 @@ def materialize_template(template_id, user_id, identity_type="user", input=None,
     
     Args:
         templateId: Template to instantiate
-        userId: User who owns the result
-        identityType: Type of identity (default "user")
         input: User-provided values for placeholders
         blueprintName: Optional name override
         skipValidation: If true, skip blueprint validation (default false)
@@ -328,7 +324,6 @@ def materialize_template(template_id, user_id, identity_type="user", input=None,
         name: Blueprint name
     """
     try:
-        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.template_service
         result = svc.materialize(
             template_id=template_id,

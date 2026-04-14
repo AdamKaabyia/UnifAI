@@ -216,10 +216,16 @@ def _forward_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> di
     for uid_path, id_path in nested_pairs:
         query = {uid_path: {"$exists": True}, id_path: {"$exists": False}}
         docs = list(col.find(query, {"_id": 1, uid_path: 1}))
-        stats["found"] += len(docs)
-        print(f"\n  {coll_name} (nested) {uid_path} -> {id_path}: {len(docs)} document(s)")
 
-        for doc in docs:
+        both_query = {uid_path: {"$exists": True}, id_path: {"$exists": True}}
+        both_docs = list(col.find(both_query, {"_id": 1, uid_path: 1}))
+
+        all_docs = docs + both_docs
+        stats["found"] += len(all_docs)
+        print(f"\n  {coll_name} (nested) {uid_path} -> {id_path}: "
+              f"{len(docs)} new + {len(both_docs)} partial = {len(all_docs)} document(s)")
+
+        for doc in all_docs:
             uid = _resolve_nested(doc, uid_path)
             if not isinstance(uid, str) or not uid:
                 stats["skipped"] += 1
@@ -283,7 +289,10 @@ def _fix_team_types(db, dry_run: bool) -> dict:
 
     # Sessions: cross-reference against known team names
     teams_col = db["teams"]
-    team_names = set(doc["name"] for doc in teams_col.find({}, {"name": 1}))
+    team_names = set(
+        doc["name"] for doc in teams_col.find({}, {"name": 1})
+        if doc.get("name")
+    )
     if team_names:
         sess_col = db["workflow_sessions"]
         sess_query = {"identity.id": {"$in": list(team_names)}, "identity.type": "user"}

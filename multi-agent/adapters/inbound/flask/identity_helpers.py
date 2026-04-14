@@ -1,8 +1,12 @@
 """
-Helpers for resolving an Identity from Flask request parameters.
+Helpers for resolving an Identity from raw request parameters.
 
-Backward-compatible: when only ``userId`` is supplied (no ``identityType``),
-the identity defaults to ``IdentityType.USER``.
+``resolve_identity`` is the low-level builder: it turns raw strings
+(``userId``, ``identityType``) into an ``Identity`` domain object.
+
+For endpoint-level usage prefer the ``@with_identity`` decorator in
+``inbound.flask.decorators`` — it reads the params from the Flask request
+automatically and injects the resolved ``Identity`` as a kwarg.
 """
 from mas.core.identity import Identity, IdentityType
 

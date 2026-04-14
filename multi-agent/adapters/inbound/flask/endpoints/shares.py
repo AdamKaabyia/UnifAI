@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.sharing.models import ShareItemKind, ShareStatus
-from inbound.flask.identity_helpers import resolve_identity
+from inbound.flask.decorators import with_identity
 
 shares_bp = Blueprint("shares", __name__)
 
@@ -151,16 +151,14 @@ def cancel_share(share_id, sender_user_id="alice"):
 
 
 @shares_bp.route("/shares.list", methods=["GET"])
+@with_identity
 @from_query({
     "direction": fields.Str(required=False, load_default="received"),
     "status": fields.Str(required=False),
     "skip": fields.Int(required=False, load_default=0),
     "limit": fields.Int(required=False, load_default=100),
-    "user_id": fields.Str(data_key="userId", required=False, load_default="alice"),
-    "identity_type": fields.Str(data_key="identityType", load_default="user"),
 })
-def list_shares(direction="received", status=None, skip=0, limit=100,
-                user_id="alice", identity_type="user"):
+def list_shares(identity, direction="received", status=None, skip=0, limit=100):
     """List share invitations."""
     try:
         status_enum = None
@@ -170,7 +168,6 @@ def list_shares(direction="received", status=None, skip=0, limit=100,
             except ValueError:
                 return jsonify({"error": "Invalid status"}), 400
 
-        identity = resolve_identity(user_id, identity_type)
         svc = current_app.container.share_service
 
         if direction == "received":

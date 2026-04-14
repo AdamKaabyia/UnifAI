@@ -7,6 +7,8 @@ from flask import jsonify, request, current_app
 
 import requests as http_requests
 
+from inbound.flask.identity_helpers import resolve_identity
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,4 +138,51 @@ def _is_team_member(username: str, team_id: str) -> bool:
     except Exception:
         logger.exception("Team membership check failed — denying access")
         return False
+
+
+def with_identity(f):
+    """Decorator that resolves ``Identity`` from the incoming request.
+
+    Reads ``userId``, ``identityType`` (default ``"user"``), and
+    ``displayName`` from query parameters **or** JSON body and passes the
+    resulting ``Identity`` as the ``identity`` keyword argument.
+
+    Returns **400** when ``userId`` is absent or ``identityType`` is
+    unrecognised, so the endpoint never has to handle those error cases.
+
+    Usage::
+
+        @bp.route("/things.list", methods=["GET"])
+        @with_identity
+        def list_things(identity):
+            ...
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        body = request.get_json(silent=True) or {}
+
+        user_id = request.args.get("userId") or body.get("userId")
+        identity_type = (
+            request.args.get("identityType")
+            or body.get("identityType")
+            or "user"
+        )
+        display_name = (
+            request.args.get("displayName")
+            or body.get("displayName")
+            or ""
+        )
+
+        if not user_id:
+            return jsonify({"error": "userId is required"}), 400
+
+        try:
+            kwargs["identity"] = resolve_identity(
+                user_id, identity_type, display_name,
+            )
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+        return f(*args, **kwargs)
+    return decorated
 

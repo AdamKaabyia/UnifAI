@@ -26,6 +26,14 @@ class Identity(BaseModel):
     display_name: str = ""
     email: str = ""
 
+    @property
+    def is_user(self) -> bool:
+        return self.type == IdentityType.USER
+
+    @property
+    def is_team(self) -> bool:
+        return self.type == IdentityType.TEAM
+
     @classmethod
     def user(cls, user_id: str, display_name: str = "",
              email: str = "") -> "Identity":

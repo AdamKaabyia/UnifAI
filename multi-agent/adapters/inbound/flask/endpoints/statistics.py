@@ -4,8 +4,7 @@ from webargs import fields, validate
 import logging
 from ..decorators import require_admin_access
 from mas.statistics.models import TimeRangePreset
-from inbound.flask.identity_helpers import resolve_identity
-from inbound.flask.decorators import require_identity_authorization
+from inbound.flask.decorators import require_identity_authorization, with_identity
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +13,13 @@ statistics_bp = Blueprint("statistics", __name__)
 
 @statistics_bp.route("/stats.get", methods=["GET"])
 @require_identity_authorization
-@from_query({
-    "user_id": fields.Str(data_key="userId", required=True),
-    "identity_type": fields.Str(data_key="identityType", load_default="user"),
-})
-def get_all(user_id, identity_type):
+@with_identity
+def get_all(identity):
     """
     Get aggregated statistics for all features (identity-scoped).
     Returns all stats in a single response for optimal performance.
     """
     try:
-        identity = resolve_identity(user_id, identity_type)
         container = current_app.container
         statistics_service = container.statistics_service
         
@@ -34,7 +29,7 @@ def get_all(user_id, identity_type):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        logger.exception("Unexpected error in get_all stats for user %s", user_id)
+        logger.exception("Unexpected error in get_all stats for identity %s", identity.id)
         return jsonify({"error": str(e)}), 500
 
 
