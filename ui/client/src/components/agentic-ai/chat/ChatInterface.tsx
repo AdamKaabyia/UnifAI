@@ -748,14 +748,14 @@ export default function ChatInterface({
   };
 
   const handleExportMarkdown = useCallback(() => {
-    const md = exportSessionAsMarkdown(messages);
-    downloadFile(md, buildExportFilename(undefined, "md"), "text/markdown");
-  }, [messages]);
+    const md = exportSessionAsMarkdown(messages, runId);
+    downloadFile(md, buildExportFilename(runId, "md"), "text/markdown");
+  }, [messages, runId]);
 
   const handleExportJSON = useCallback(() => {
-    const json = exportSessionAsJSON(messages);
-    downloadFile(json, buildExportFilename(undefined, "json"), "application/json");
-  }, [messages]);
+    const json = exportSessionAsJSON(messages, runId);
+    downloadFile(json, buildExportFilename(runId, "json"), "application/json");
+  }, [messages, runId]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
