@@ -11,7 +11,8 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ .Chart.Name }}
+        #app: {{ .Chart.Name }}
+        {{- include "redis.labels" . | nindent 4 }}
     spec:
       volumes:
         - name: redis-volume
