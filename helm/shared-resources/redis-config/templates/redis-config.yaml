@@ -4,6 +4,6 @@ kind: ConfigMap
 metadata:
   name: redis-config
 labels:
-    {{- include "redis.labels" . | nindent 4 }}
+    {{- include "redis-config.labels" . | nindent 4 }}
 data:
   dummy: "true"
