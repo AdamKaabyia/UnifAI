@@ -8,6 +8,7 @@ class AppConfig(SharedConfig):
     session_coll: str = "workflow_sessions"
     shares_coll: str = "shares"
     templates_coll: str = "templates"
+    auth_tokens_coll: str = "auth_tokens"
     hostname: str = "0.0.0.0"
     port: str = "8002"
     version: str = "1.0.0"
@@ -19,3 +20,7 @@ class AppConfig(SharedConfig):
     redis_stream_ttl: int = 3600
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
+    # MCP Auth
+    mcp_auth_state_secret: str = ""
+    sso_callback_url: str = "http://localhost:13456/api/mcp-auth/callback"
+    internal_service_token: str = "unifai-dev-internal-token"  # TODO: move to env var / secrets manager for production

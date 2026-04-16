@@ -1,0 +1,130 @@
+"""
+MCP Auth Callback Relay
+
+Receives OAuth callbacks from external authorization servers (GitHub, Atlassian, etc.)
+and relays the authorization code + state to the multi-agent backend for token exchange.
+
+The SSO pod is publicly accessible, so it can receive OAuth redirects.
+The multi-agent pod is behind a VPN, so it cannot receive direct callbacks.
+This route bridges that gap.
+
+After the exchange, the popup is given a small HTML page that posts the result
+back to the parent window via postMessage and closes itself.
+"""
+
+import json
+import logging
+from html import escape as html_escape
+
+import requests
+from flask import Blueprint, request, make_response
+
+from config.app_config import AppConfig
+
+logger = logging.getLogger(__name__)
+
+mcp_auth_bp = Blueprint("mcp_auth", __name__)
+
+_POPUP_CLOSE_TEMPLATE = """\
+<!DOCTYPE html>
+<html><head><title>MCP Auth</title></head>
+<body>
+<p id="msg">Completing sign-in&hellip;</p>
+<script>
+(function() {{
+  var payload = {payload_json};
+  if (window.opener) {{
+    window.opener.postMessage(payload, "*");
+  }}
+  document.getElementById("msg").textContent = payload.success
+    ? "Signed in! You can close this window."
+    : "Error: " + (payload.error || "unknown");
+  setTimeout(function() {{ window.close(); }}, 1200);
+}})();
+</script>
+</body></html>
+"""
+
+
+def _popup_response(payload: dict):
+    """Return a small HTML page that posts *payload* to the opener and closes."""
+    html = _POPUP_CLOSE_TEMPLATE.format(
+        payload_json=json.dumps(payload),
+    )
+    resp = make_response(html, 200)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return resp
+
+
+@mcp_auth_bp.route("/callback", methods=["GET"])
+def mcp_auth_callback():
+    """
+    Receive OAuth callback from an external authorization server.
+
+    Query params (from the AS redirect):
+      - code: authorization code
+      - state: HMAC-signed state parameter
+
+    Forwards code + state to multi-agent's /api/mcp-auth/exchange endpoint,
+    then returns a small self-closing HTML page that notifies the parent window.
+    """
+    config = AppConfig.get_instance()
+
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    error_description = request.args.get("error_description", "")
+
+    if error:
+        logger.error("OAuth error from AS: %s — %s", error, error_description)
+        return _popup_response({
+            "type": "mcp_auth_callback",
+            "success": False,
+            "error": error_description or error,
+        })
+
+    if not code or not state:
+        return _popup_response({
+            "type": "mcp_auth_callback",
+            "success": False,
+            "error": "Missing code or state",
+        })
+
+    multi_agent_url = config.get(
+        "multi_agent_exchange_url",
+        "http://localhost:8002/api/mcp-auth/exchange",
+    )
+    internal_token = config.get("internal_service_token", "")
+
+    try:
+        resp = requests.post(
+            multi_agent_url,
+            json={"code": code, "state": state},
+            headers={
+                "X-Internal-Service-Token": internal_token,
+                "Content-Type": "application/json",
+            },
+            timeout=15,
+        )
+
+        if resp.status_code == 200:
+            return _popup_response({
+                "type": "mcp_auth_callback",
+                "success": True,
+            })
+        else:
+            error_msg = resp.json().get("error", "Token exchange failed")
+            logger.error("Token exchange failed: %s", error_msg)
+            return _popup_response({
+                "type": "mcp_auth_callback",
+                "success": False,
+                "error": error_msg,
+            })
+
+    except requests.RequestException as exc:
+        logger.error("Failed to reach multi-agent for token exchange: %s", exc)
+        return _popup_response({
+            "type": "mcp_auth_callback",
+            "success": False,
+            "error": "Internal communication error",
+        })

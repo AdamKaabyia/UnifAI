@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from pydantic import HttpUrl
 from mcp.types import Tool
 from global_utils.utils.async_bridge import get_async_bridge
@@ -8,6 +10,9 @@ from mas.elements.tools.mcp_proxy.mcp_proxy_tool import McpProxyTool
 from mas.elements.providers.mcp_server_client.mcp_server_client import McpServerClient
 from .provider_tool_registry import ProviderToolRegistry
 from .transport.enums import McpTransportType
+
+if TYPE_CHECKING:
+    from mas.core.auth.credentials.credential import AuthCredential
 
 
 class McpProvider:
@@ -36,28 +41,26 @@ class McpProvider:
         tool_names: Optional[List[str]] = None,
         headers: Optional[Dict[str, str]] = None,
         transport_type: McpTransportType = McpTransportType.STREAMABLE_HTTP,
+        auth: Optional[AuthCredential] = None,
     ):
         """
         Initialize MCP provider for the specified server.
-        
-        Creates a provider instance configured for the given MCP server.
-        The provider is not fully initialized until create_async() or
-        create_sync() is called to perform tool discovery.
-        
+
         Args:
             mcp_url: MCP server endpoint URL for communication
             tool_names: Specific tool names to create (None discovers all)
             headers: Optional HTTP headers for authentication (e.g., bearer token)
             transport_type: Transport protocol to use (SSE or Streamable HTTP)
+            auth: Optional AuthCredential for live token refresh
         """
         self.mcp_url = mcp_url
         self.tool_names = tool_names or []
         self.headers = headers or {}
         self.transport_type = transport_type
+        self._auth = auth
         self._tools: List[McpProxyTool] = []
         self._initialized = False
-        
-        # Provider-level tool registry for caching
+
         self._tool_registry = ProviderToolRegistry()
 
     async def _initialize_tools(self) -> None:
@@ -93,11 +96,11 @@ class McpProvider:
             # Get cached tool info
             cached_tool_info = self._tool_registry.get_cached_tool_by_name(tool_name)
             if cached_tool_info:
-                # Create tool with pre-cached schema and headers for authentication
                 tool = McpProxyTool.create_with_cached_schema(
                     tool_name, self.mcp_url, cached_tool_info,
                     headers=self.headers,
                     transport_type=self.transport_type,
+                    auth=self._auth,
                 )
                 self._tools.append(tool)
             else:
@@ -171,7 +174,7 @@ class McpProvider:
         with get_async_bridge() as bridge:
             bridge.run(self._initialize_tools())
 
-    def clone(self) -> "McpProvider":
+    def clone(self) -> McpProvider:
         """
         Create a new McpProvider with the same configuration.
         """
@@ -180,6 +183,7 @@ class McpProvider:
             tool_names=self.tool_names.copy() if self.tool_names else None,
             headers=self.headers.copy() if self.headers else None,
             transport_type=self.transport_type,
+            auth=self._auth,
         )
 
     @property
@@ -212,20 +216,16 @@ class McpProvider:
         tool_names: Optional[List[str]] = None,
         headers: Optional[Dict[str, str]] = None,
         transport_type: McpTransportType = McpTransportType.STREAMABLE_HTTP,
-    ) -> "McpProvider":
+        auth: Optional[AuthCredential] = None,
+    ) -> McpProvider:
         """
         Async factory method for creating a fully initialized McpProvider.
-        
-        Args:
-            mcp_url: HTTP(S) endpoint for MCP server communication
-            tool_names: List of specific tool names to use from the MCP server
-            headers: Optional HTTP headers for authentication
-            transport_type: Transport protocol to use (SSE or Streamable HTTP)
-            
-        Returns:
-            Fully initialized McpProvider instance
         """
-        provider = cls(mcp_url, tool_names, headers, transport_type=transport_type)
+        provider = cls(
+            mcp_url, tool_names, headers,
+            transport_type=transport_type,
+            auth=auth,
+        )
         await provider._initialize_tools()
         return provider
 
@@ -236,23 +236,17 @@ class McpProvider:
         tool_names: Optional[List[str]] = None,
         headers: Optional[Dict[str, str]] = None,
         transport_type: McpTransportType = McpTransportType.STREAMABLE_HTTP,
-    ) -> "McpProvider":
+        auth: Optional[AuthCredential] = None,
+    ) -> McpProvider:
         """
         Sync factory method for creating a fully initialized McpProvider.
         Uses AsyncBridge internally to handle the async initialization.
-        
-        Args:
-            mcp_url: HTTP(S) endpoint for MCP server communication
-            tool_names: List of specific tool names to use from the MCP server
-            headers: Optional HTTP headers for authentication
-            transport_type: Transport protocol to use (SSE or Streamable HTTP)
-        
-        Returns:
-            Fully initialized McpProvider instance
         """
         with get_async_bridge() as bridge:
             return bridge.run(cls.create_async(
-                mcp_url, tool_names, headers, transport_type=transport_type
+                mcp_url, tool_names, headers,
+                transport_type=transport_type,
+                auth=auth,
             ))
 
     def __repr__(self) -> str:

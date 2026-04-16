@@ -2,7 +2,8 @@ from typing import Any, Dict, Literal, List, Optional
 from .identifiers import Identifier
 from pydantic import Field, HttpUrl
 from mas.elements.providers.common.base_config import ProviderBaseConfig
-from mas.core.field_hints import ActionHint, HintType, SelectionType, SecretHint
+from mas.core.field_hints import ActionHint, HiddenHint, HintType, SelectionType
+from mas.core.ref.models import AuthRef
 from .transport.enums import McpTransportType
 
 
@@ -22,16 +23,20 @@ class McpProviderConfig(ProviderBaseConfig):
             hint_type=HintType.VALIDATE,
             field_mapping="is_reachable",
             dependencies={
-                "bearer_token": "bearer_token",
+                "mcp_url": "mcp_url",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
             }
         ).to_hints()
     )
-    bearer_token: Optional[str] = Field(
+    auth: Optional[AuthRef] = Field(
         default=None,
-        description="Bearer token for MCP server authentication (sent as 'Authorization: Bearer <token>' header)",
-        json_schema_extra=SecretHint(reason="API credentials should be masked").to_hints()
+        description="Reference to an auth element for authenticated connections",
+    )
+    server_identifier: str = Field(
+        default="",
+        description="Auth server issuer discovered by validate_connection (e.g. https://accounts.google.com)",
+        json_schema_extra=HiddenHint(reason="Set automatically by connection validation").to_hints()
     )
     additional_headers: Dict[str, Any] = Field(
         default_factory=dict,
@@ -48,7 +53,6 @@ class McpProviderConfig(ProviderBaseConfig):
             multi_select=True,
             dependencies={
                 "mcp_url": "mcp_url",
-                "bearer_token": "bearer_token",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
             }

@@ -9,7 +9,8 @@ class ResourceCategory(str, Enum):
     CONDITION = "conditions"
     PROVIDER = "providers"
     NODE = "nodes"
-    
+    AUTH = "auths"
+
     @classmethod
     def plan_categories(cls) -> frozenset:
         """Categories that appear in the final blueprint (plan-referenced)."""

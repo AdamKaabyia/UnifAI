@@ -5,6 +5,7 @@ from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mas.core.execution_context import ExecutionContextHolder
+    from mas.core.auth.infra import AuthInfra
 
 
 @dataclass
@@ -17,3 +18,4 @@ class ElementDeps:
     """
 
     execution_ctx: Optional[ExecutionContextHolder] = field(default=None)
+    auth_infra: Optional[AuthInfra] = field(default=None)

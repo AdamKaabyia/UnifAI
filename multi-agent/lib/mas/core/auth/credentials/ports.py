@@ -1,0 +1,26 @@
+"""
+Token storage port — protocol-agnostic persistence contract.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from .models import StoredCredential
+
+
+class TokenStore(ABC):
+    """Persist and retrieve :class:`StoredCredential` objects."""
+
+    @abstractmethod
+    def upsert(self, credential: StoredCredential) -> None: ...
+
+    @abstractmethod
+    def find_by_server(self, user_id: str, server_identifier: str) -> Optional[StoredCredential]: ...
+
+    @abstractmethod
+    def delete(self, user_id: str, server_identifier: str) -> None: ...
+
+    @abstractmethod
+    def update_status(self, user_id: str, server_identifier: str, status: str) -> None: ...

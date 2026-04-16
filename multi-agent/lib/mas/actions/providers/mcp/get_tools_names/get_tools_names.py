@@ -13,10 +13,6 @@ from mas.core.enums import ResourceCategory
 class GetToolsNamesInput(BaseActionInput):
     """Input for MCP tools discovery"""
     mcp_url: HttpUrl
-    bearer_token: Optional[str] = Field(
-        default=None,
-        description="Bearer token for MCP server authentication"
-    )
     transport_type: McpTransportType = Field(
         default=McpTransportType.STREAMABLE_HTTP,
         description="Transport protocol for MCP server communication"
@@ -77,7 +73,6 @@ class GetToolsNamesAction(BaseAction):
             # Create config from input data
             config = McpProviderConfig(
                 mcp_url=input_data.mcp_url,
-                bearer_token=input_data.bearer_token,
                 transport_type=input_data.transport_type,
                 additional_headers=input_data.additional_headers,
             )

@@ -79,36 +79,16 @@ def list_actions(category=None, type=None, action_type=None, tags=None):
 @from_body({
     "uid": fields.Str(required=True),
     "input_data": fields.Dict(data_key="inputData", required=False, load_default={}),
-    "context": fields.Dict(required=False, load_default={})
+    "context": fields.Dict(required=False, load_default={}),
+    "user_id": fields.Str(data_key="userId", required=False, load_default=""),
 })
-def execute_action(uid, input_data, context):
-    """
-    Execute a specific action by UID (synchronously).
-    Input is validated automatically before execution.
-    
-    Request body:
-    {
-        "uid": "mcp.validate_connection",
-        "inputData": {
-            "mcp_url": "http://localhost:3000/sse"
-        },
-        "context": {
-            "element_config": {...}
-        }
-    }
-    
-    Response format:
-    {
-        "success": true,
-        "message": "Connection successful",
-        "is_reachable": true,
-        "response_time_ms": 125.5
-    }
-    """
+def execute_action(uid, input_data, context, user_id):
+    """Execute a specific action by UID (synchronously)."""
     try:
-        svc = current_app.container.actions_service
+        if user_id and "user_id" not in input_data:
+            input_data["user_id"] = user_id
 
-        # Execute the action (validation happens automatically inside)
+        svc = current_app.container.actions_service
         result = svc.execute_action_sync(uid, input_data, context)
 
         return jsonify(result), 200
