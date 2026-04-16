@@ -6,11 +6,17 @@ that Temporal-backed sessions can be shared across team members through
 the existing Redis Streams channel infrastructure.
 """
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from mas.core.identity import Identity, IdentityType
 from mas.session.repository.repository import SessionRepository
-from .models import Participant, ParticipantRole, SessionParticipants, TeamSessionIndex
+from .models import (
+    Participant,
+    ParticipantRole,
+    SessionParticipants,
+    TeamEditLockHolder,
+    TeamSessionIndex,
+)
 from .ports import CollaborationStore
 
 logger = logging.getLogger(__name__)
@@ -31,10 +37,12 @@ class CollaborationService:
         store: CollaborationStore,
         session_repo: SessionRepository,
         presence_ttl: int = 300,
+        edit_lock_ttl: int = 180,
     ):
         self._store = store
         self._session_repo = session_repo
         self._presence_ttl = presence_ttl
+        self._edit_lock_ttl = edit_lock_ttl
 
     # ── Join / Leave ────────────────────────────────────────────────
 
@@ -112,3 +120,68 @@ class CollaborationService:
 
     def is_available(self) -> bool:
         return self._store.is_available()
+
+    # ── Team edit locks ─────────────────────────────────────────────
+
+    def acquire_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str = "",
+    ) -> Tuple[bool, Optional[TeamEditLockHolder]]:
+        return self._store.acquire_team_edit_lock(
+            team_id,
+            entity_kind,
+            entity_id,
+            user_id,
+            display_name,
+            ttl=self._edit_lock_ttl,
+        )
+
+    def release_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+    ) -> None:
+        self._store.release_team_edit_lock(
+            team_id, entity_kind, entity_id, user_id
+        )
+
+    def renew_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str = "",
+    ) -> bool:
+        return self._store.renew_team_edit_lock(
+            team_id,
+            entity_kind,
+            entity_id,
+            user_id,
+            display_name,
+            ttl=self._edit_lock_ttl,
+        )
+
+    def get_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+    ) -> Optional[TeamEditLockHolder]:
+        return self._store.get_team_edit_lock(team_id, entity_kind, entity_id)
+
+    def get_team_edit_locks_batch(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_ids: list[str],
+    ) -> Dict[str, Optional[TeamEditLockHolder]]:
+        return self._store.get_team_edit_locks_batch(
+            team_id, entity_kind, entity_ids
+        )

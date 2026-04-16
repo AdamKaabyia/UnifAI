@@ -44,6 +44,8 @@ export default function AgenticWorkflows() {
   const { toast } = useToast();
   const { cacheBlueprintValidationResults } = useAgenticAI();
   const { viewMode, selectedTeam } = useView();
+  /** Team API identity only when a team is selected (matches ExecutionTab / graph builder hooks). */
+  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
   const isTeam = viewMode === "team";
   const [, navigate] = useLocation();
   
@@ -72,10 +74,10 @@ export default function AgenticWorkflows() {
       setBuiltGraphId(graphId);
       setBuiltGraphName(graphName);
 
-      const contextUserId = isTeam && selectedTeam
-        ? selectedTeam.id
+      const contextUserId = isTeamWorkspace
+        ? selectedTeam!.id
         : (user?.username || "default");
-      const identityType = isTeam ? "team" : "user";
+      const identityType = isTeamWorkspace ? "team" : "user";
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,

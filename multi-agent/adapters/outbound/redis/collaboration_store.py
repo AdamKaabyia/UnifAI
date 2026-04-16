@@ -6,6 +6,7 @@ Data structures:
     mas:collab:session:{session_id}:presence:{uid} — String with TTL (heartbeat sentinel)
     mas:collab:team:{team_id}:sessions            — Set of session_ids
     mas:collab:user:{user_id}:sessions            — Set of session_ids
+    mas:collab:editlock:team:{team_id}:{kind}:{entity_id} — JSON edit-lock holder
 
 Presence is maintained via per-user keys with a TTL.  Participants whose
 presence key has expired are lazily pruned on the next ``get_participants``
@@ -14,7 +15,7 @@ call so that stale entries never accumulate.
 import json
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 from redis import ConnectionPool, Redis
 from redis.exceptions import RedisError
@@ -23,6 +24,7 @@ from mas.collaboration.models import (
     Participant,
     ParticipantRole,
     SessionParticipants,
+    TeamEditLockHolder,
     TeamSessionIndex,
 )
 from mas.collaboration.ports import CollaborationStore
@@ -46,6 +48,10 @@ def _team_sessions_key(team_id: str) -> str:
 
 def _user_sessions_key(user_id: str) -> str:
     return f"{_PREFIX}user:{user_id}:sessions"
+
+
+def _team_edit_lock_key(team_id: str, entity_kind: str, entity_id: str) -> str:
+    return f"{_PREFIX}editlock:team:{team_id}:{entity_kind}:{entity_id}"
 
 
 class RedisCollaborationStore(CollaborationStore):
@@ -182,3 +188,116 @@ class RedisCollaborationStore(CollaborationStore):
             return self._client().ping()
         except RedisError:
             return False
+
+    # ── Team edit locks ─────────────────────────────────────────────
+
+    @staticmethod
+    def _lock_payload(user_id: str, display_name: str) -> str:
+        return json.dumps(
+            {"user_id": user_id, "display_name": display_name or user_id},
+            separators=(",", ":"),
+        )
+
+    def acquire_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str,
+        ttl: int,
+    ) -> Tuple[bool, Optional[TeamEditLockHolder]]:
+        key = _team_edit_lock_key(team_id, entity_kind, entity_id)
+        payload = self._lock_payload(user_id, display_name)
+        r = self._client()
+
+        while True:
+            cur = r.get(key)
+            if cur is None:
+                if r.set(key, payload, nx=True, ex=ttl):
+                    return True, None
+                continue
+            try:
+                data = json.loads(cur)
+                holder = TeamEditLockHolder.model_validate(data)
+            except (json.JSONDecodeError, ValueError):
+                r.delete(key)
+                continue
+            if holder.user_id == user_id:
+                r.set(key, payload, ex=ttl)
+                return True, None
+            return False, holder
+
+    def release_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+    ) -> None:
+        key = _team_edit_lock_key(team_id, entity_kind, entity_id)
+        r = self._client()
+        cur = r.get(key)
+        if not cur:
+            return
+        try:
+            data = json.loads(cur)
+            holder = TeamEditLockHolder.model_validate(data)
+        except (json.JSONDecodeError, ValueError):
+            r.delete(key)
+            return
+        if holder.user_id == user_id:
+            r.delete(key)
+
+    def renew_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str,
+        ttl: int,
+    ) -> bool:
+        acquired, _holder = self.acquire_team_edit_lock(
+            team_id, entity_kind, entity_id, user_id, display_name, ttl
+        )
+        return acquired
+
+    def get_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+    ) -> Optional[TeamEditLockHolder]:
+        key = _team_edit_lock_key(team_id, entity_kind, entity_id)
+        cur = self._client().get(key)
+        if not cur:
+            return None
+        try:
+            return TeamEditLockHolder.model_validate(json.loads(cur))
+        except (json.JSONDecodeError, ValueError):
+            return None
+
+    def get_team_edit_locks_batch(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_ids: list[str],
+    ) -> Dict[str, Optional[TeamEditLockHolder]]:
+        if not entity_ids:
+            return {}
+        r = self._client()
+        pipe = r.pipeline(transaction=False)
+        for eid in entity_ids:
+            pipe.get(_team_edit_lock_key(team_id, entity_kind, eid))
+        raw_list = pipe.execute()
+        out: Dict[str, Optional[TeamEditLockHolder]] = {}
+        for eid, cur in zip(entity_ids, raw_list):
+            if not cur:
+                out[eid] = None
+                continue
+            try:
+                out[eid] = TeamEditLockHolder.model_validate(json.loads(cur))
+            except (json.JSONDecodeError, ValueError):
+                out[eid] = None
+        return out

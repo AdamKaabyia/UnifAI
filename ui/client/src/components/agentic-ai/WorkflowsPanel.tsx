@@ -23,6 +23,7 @@ import { convertGraphFlowToFlowObject } from "@/utils/blueprintHelpers";
 import ShareWorkflow from "./ShareWorkflow";
 import { BlueprintValidationResult } from "@/types/validation";
 import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
+import { useTeamEditLockPoll } from "@/hooks/use-team-edit-lock-poll";
 
 export interface WorkflowsPanelProps {
   selectedFlow: FlowObject | null;
@@ -90,6 +91,13 @@ export default function WorkflowsPanel({
     onValidationChange,
     showToastOnFailure: true,
   });
+
+  const blueprintEditLocks = useTeamEditLockPoll(
+    selectedTeam?.id,
+    "blueprint",
+    graphFlows.map((f) => f.id),
+    isTeam && graphFlows.length > 0,
+  );
 
   const filteredFlows = useMemo(() => {
     const normalizedSearch = (searchQuery ?? "").trim().toLowerCase();
@@ -340,7 +348,17 @@ export default function WorkflowsPanel({
                 </div>
               </div>
             ) : (
-              filteredFlows.map((flow) => (
+              filteredFlows.map((flow) => {
+                const bpLock = blueprintEditLocks[flow.id];
+                const bpLockedByOther =
+                  isTeam &&
+                  !!bpLock &&
+                  !!user?.username &&
+                  bpLock.userId !== user.username;
+                const bpLockedByLabel =
+                  bpLock?.displayName?.trim() || bpLock?.userId || "another teammate";
+
+                return (
                 <motion.div
                   key={flow.id}
                   className={`px-4 py-2 border-l-2 cursor-pointer ${
@@ -364,15 +382,26 @@ export default function WorkflowsPanel({
                         </span>
                       )}
                       {showEditButton && (
-                        <SimpleTooltip content={<p>Edit this workflow</p>}>
+                        <SimpleTooltip
+                          content={
+                            bpLockedByOther ? (
+                              <p>Currently being edited by {bpLockedByLabel}</p>
+                            ) : (
+                              <p>Edit this workflow</p>
+                            )
+                          }
+                        >
+                          <span className="inline-flex">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
                             onClick={(e) => handleEditClick(flow, e)}
+                            disabled={bpLockedByOther}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
+                          </span>
                         </SimpleTooltip>
                       )}
                       <SimpleTooltip content={<p>Share this workflow</p>}>
@@ -411,7 +440,8 @@ export default function WorkflowsPanel({
                     </div>
                   )}
                 </motion.div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

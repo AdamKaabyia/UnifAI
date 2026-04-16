@@ -18,6 +18,15 @@ import { FieldRenderer, getStringEnumFromRef } from "./FieldRenderer";
 import { ItemValidationResult } from "./FieldValidation";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
+import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
+import { useToast } from "@/hooks/use-toast";
+import {
+  acquireTeamEditLock,
+  heartbeatTeamEditLock,
+  releaseTeamEditLock,
+} from "@/api/collaborationEditLock";
+import { LoaderCircle } from "lucide-react";
 
 interface ElementFormProps {
   isOpen: boolean;
@@ -49,6 +58,116 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   const [populateResults, setPopulateResults] = useState<{ [fieldName: string]: string[] | any }>({});
 
   const { fetchResourcesForCategory } = useWorkspaceData();
+  const { user } = useAuth();
+  const { viewMode, selectedTeam } = useView();
+  const { toast } = useToast();
+  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
+  const needsResourceEditLock =
+    isOpen && isTeamWorkspace && !!editingElement?.rid && !!user?.username;
+  const [resourceEditLockReady, setResourceEditLockReady] = useState(true);
+  const [resourceLockHeld, setResourceLockHeld] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setResourceEditLockReady(true);
+      setResourceLockHeld(false);
+      return;
+    }
+    if (!needsResourceEditLock || !selectedTeam || !user?.username) {
+      setResourceEditLockReady(true);
+      setResourceLockHeld(false);
+      return;
+    }
+
+    setResourceEditLockReady(false);
+    setResourceLockHeld(false);
+    let cancelled = false;
+    let lockTaken = false;
+    const teamId = selectedTeam.id;
+    const rid = editingElement!.rid;
+    const displayName = user.name?.trim() || user.username;
+
+    (async () => {
+      try {
+        const result = await acquireTeamEditLock({
+          teamId,
+          entityKind: "resource",
+          entityId: rid,
+          userId: user.username,
+          displayName,
+        });
+        if (cancelled) return;
+        if (!result.acquired) {
+          toast({
+            title: "Someone else is editing this element",
+            description: `Currently being edited by ${result.lockedBy.displayName || result.lockedBy.userId}.`,
+            variant: "destructive",
+          });
+          onClose();
+          return;
+        }
+        lockTaken = true;
+        setResourceLockHeld(true);
+        setResourceEditLockReady(true);
+      } catch {
+        if (cancelled) return;
+        toast({
+          title: "Could not start editing",
+          description: "Failed to acquire edit lock. Try again.",
+          variant: "destructive",
+        });
+        onClose();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (lockTaken) {
+        void releaseTeamEditLock({
+          teamId,
+          entityKind: "resource",
+          entityId: rid,
+          userId: user.username,
+        });
+        setResourceLockHeld(false);
+      }
+    };
+  }, [
+    isOpen,
+    needsResourceEditLock,
+    selectedTeam?.id,
+    editingElement?.rid,
+    user?.username,
+    user?.name,
+    onClose,
+    toast,
+  ]);
+
+  useEffect(() => {
+    if (!resourceLockHeld || !needsResourceEditLock || !selectedTeam || !user?.username || !editingElement?.rid) {
+      return;
+    }
+    const teamId = selectedTeam.id;
+    const rid = editingElement.rid;
+    const displayName = user.name?.trim() || user.username;
+    const interval = window.setInterval(() => {
+      void heartbeatTeamEditLock({
+        teamId,
+        entityKind: "resource",
+        entityId: rid,
+        userId: user.username,
+        displayName,
+      });
+    }, 45_000);
+    return () => window.clearInterval(interval);
+  }, [
+    resourceLockHeld,
+    needsResourceEditLock,
+    selectedTeam?.id,
+    editingElement?.rid,
+    user?.username,
+    user?.name,
+  ]);
 
   // Helper to check if a field has validation hint
   const fieldHasValidation = useCallback((fieldName: string): boolean => {
@@ -705,6 +824,14 @@ export const ElementForm: React.FC<ElementFormProps> = ({
           <DialogDescription>{elementSchema.description}</DialogDescription>
         </DialogHeader>
 
+        {needsResourceEditLock && !resourceEditLockReady ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
+            <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm">Reserving edit access…</p>
+          </div>
+        ) : null}
+
+        {!(needsResourceEditLock && !resourceEditLockReady) ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -781,6 +908,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
             </UmamiTrack>
           </DialogFooter>
         </form>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

@@ -7,9 +7,9 @@ Redis; a local in-memory fallback is possible for tests or single-node
 deployments.
 """
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from .models import Participant, SessionParticipants, TeamSessionIndex
+from .models import Participant, SessionParticipants, TeamEditLockHolder, TeamSessionIndex
 
 
 class CollaborationStore(ABC):
@@ -88,4 +88,68 @@ class CollaborationStore(ABC):
     @abstractmethod
     def is_available(self) -> bool:
         """Return True if the backing store is reachable."""
+        ...
+
+    # ── Team edit locks (resources / blueprints) ─────────────────────
+
+    @abstractmethod
+    def acquire_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str,
+        ttl: int,
+    ) -> tuple[bool, Optional[TeamEditLockHolder]]:
+        """
+        Attempt to take (or renew) an edit lock.
+
+        Returns ``(True, None)`` on success. If another user holds the lock,
+        returns ``(False, holder)``.
+        """
+        ...
+
+    @abstractmethod
+    def release_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+    ) -> None:
+        """Remove the lock only if *user_id* is the current holder."""
+        ...
+
+    @abstractmethod
+    def renew_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+        user_id: str,
+        display_name: str,
+        ttl: int,
+    ) -> bool:
+        """Refresh TTL if *user_id* holds the lock. Returns whether renew succeeded."""
+        ...
+
+    @abstractmethod
+    def get_team_edit_lock(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_id: str,
+    ) -> Optional[TeamEditLockHolder]:
+        """Return current lock holder, if any."""
+        ...
+
+    @abstractmethod
+    def get_team_edit_locks_batch(
+        self,
+        team_id: str,
+        entity_kind: str,
+        entity_ids: list[str],
+    ) -> Dict[str, Optional[TeamEditLockHolder]]:
+        """Return lock holder per entity id (``None`` if unlocked)."""
         ...

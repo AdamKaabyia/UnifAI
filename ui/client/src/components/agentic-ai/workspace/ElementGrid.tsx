@@ -17,6 +17,9 @@ import {
 import SimpleTooltip from '@/components/shared/SimpleTooltip';
 import { useShared } from '@/contexts/SharedContext';
 import { useAgenticAI } from '@/contexts/AgenticAIContext';
+import { useAuth } from "@/contexts/AuthContext";
+import { useView } from "@/contexts/ViewContext";
+import { useTeamEditLockPoll } from "@/hooks/use-team-edit-lock-poll";
 import { ElementInstance, ElementType, ElementSchema } from '../../../types/workspace';
 import { ElementValidationResult } from '../../../types/validation';
 import { ElementData } from './ElementData';
@@ -46,6 +49,15 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
   const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
   const [selectedValidationResult, setSelectedValidationResult] = useState<ElementValidationResult | null>(null);
   const { openShareForItem } = useShared();
+  const { user } = useAuth();
+  const { viewMode, selectedTeam } = useView();
+  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
+  const resourceEditLocks = useTeamEditLockPoll(
+    selectedTeam?.id,
+    "resource",
+    elements.map((el) => el.rid),
+    isTeamWorkspace,
+  );
   const { 
     getResourceName, 
     getValidationResult, 
@@ -147,7 +159,17 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {elements.map((element, index) => (
+      {elements.map((element, index) => {
+        const lockHolder = resourceEditLocks[element.rid];
+        const lockedByOther =
+          isTeamWorkspace &&
+          !!lockHolder &&
+          !!user?.username &&
+          lockHolder.userId !== user.username;
+        const lockedByLabel =
+          lockHolder?.displayName?.trim() || lockHolder?.userId || "another teammate";
+
+        return (
         <motion.div
           key={element.rid}
           initial={{ opacity: 0, y: 20 }}
@@ -258,15 +280,28 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
 
             <CardFooter className="px-6 py-3 border-t border-gray-800 bg-background-dark">
               <div className="flex gap-2 w-full">
+                <SimpleTooltip
+                  content={
+                    lockedByOther ? (
+                      <p>Currently being edited by {lockedByLabel}</p>
+                    ) : (
+                      <p>Configure this element</p>
+                    )
+                  }
+                >
+                  <span className="flex-1 flex">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="flex-1 flex items-center justify-center gap-2"
                   onClick={() => onEditElement(element)}
+                  disabled={lockedByOther}
                 >
                   <Settings className="h-3 w-3" />
                   Configure
                 </Button>
+                  </span>
+                </SimpleTooltip>
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -280,7 +315,8 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
             </CardFooter>
           </Card>
         </motion.div>
-      ))}
+        );
+      })}
       
       {/* Element Details Modal */}
       <ElementData

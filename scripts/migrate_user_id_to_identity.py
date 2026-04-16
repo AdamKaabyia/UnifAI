@@ -21,9 +21,20 @@ Reverse (--reverse):
   Extracts ``identity.id`` back into a flat ``user_id`` string, removes the
   ``identity`` subdocument, and drops ``identity.*`` indexes.
 
+  **Important:** reverse migration **cannot preserve** whether the owner was a
+  ``user`` or a ``team`` — only the id string survives. After you run forward
+  again, every owner is initially wrapped as ``type: "user"``. The post-forward
+  ``_fix_team_types`` pass restores ``type: "team"`` where heuristics match
+  (see below).
+
 Forward also corrects team-owned documents that were saved with
-``identity.type="user"`` instead of ``"team"`` (uses ``contributed_by``
-markers and the ``teams`` collection to identify affected docs).
+``identity.type="user"`` instead of ``"team"``:
+
+  * **Blueprints / resources:** ``contributed_by`` / ``metadata.contributed_by``
+  * **workflow_sessions:** ``identity.id`` (and ``run_context.identity.id``)
+    compared to **``teams._id``** (canonical team id), not display name
+  * **shares:** ``sender_identity`` / ``recipient_identity`` when ``*.id`` is a
+    known team id
 
 The script is **idempotent** — documents already in the target state are skipped.
 
@@ -253,9 +264,31 @@ def _forward_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> di
 # Fix team identity types
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _known_team_ids(db) -> list[str]:
+    """Return all team ids (``teams`` collection Mongo ``_id`` values)."""
+    teams_col = db["teams"]
+    out: list[str] = []
+    for doc in teams_col.find({}, {"_id": 1}):
+        tid = doc.get("_id")
+        if tid is not None:
+            out.append(str(tid))
+    return out
+
+
 def _fix_team_types(db, dry_run: bool) -> dict:
     """Correct identity.type='user' → 'team' for team-owned documents."""
-    stats = {"blueprints": 0, "resources": 0, "sessions": 0}
+    stats = {
+        "blueprints": 0,
+        "resources": 0,
+        "sessions": 0,
+        "sessions_run_context": 0,
+        "shares_sender": 0,
+        "shares_recipient": 0,
+    }
+
+    team_id_list = _known_team_ids(db)
+    if not team_id_list:
+        print("\n  [teams] no team documents found — session/share team-id fixes are skipped")
 
     # Blueprints: contributed_by marker means it was shared to a team
     bp_col = db["blueprints"]
@@ -287,17 +320,15 @@ def _fix_team_types(db, dry_run: bool) -> dict:
             res_col.update_one({"_id": doc["_id"]}, {"$set": {"identity.type": "team"}})
         stats["resources"] += 1
 
-    # Sessions: cross-reference against known team names
-    teams_col = db["teams"]
-    team_names = set(
-        doc["name"] for doc in teams_col.find({}, {"name": 1})
-        if doc.get("name")
-    )
-    if team_names:
+    # Sessions: identity.id must match a real team id (teams._id).  After a
+    # reverse→forward round-trip, team-owned rows become type=user with id still
+    # equal to the team uuid — the old name-only check missed almost all of them.
+    if team_id_list:
         sess_col = db["workflow_sessions"]
-        sess_query = {"identity.id": {"$in": list(team_names)}, "identity.type": "user"}
+        sess_query = {"identity.id": {"$in": team_id_list}, "identity.type": "user"}
         sess_docs = list(sess_col.find(sess_query, {"_id": 1, "run_id": 1, "identity": 1}))
-        print(f"\n  sessions: {len(sess_docs)} team-owned doc(s) with wrong identity.type")
+        print(f"\n  sessions (top-level identity): {len(sess_docs)} doc(s) "
+              f"with identity.id ∈ teams._id but identity.type=user")
         for doc in sess_docs:
             if dry_run:
                 run_id = doc.get("run_id", doc["_id"])
@@ -306,8 +337,53 @@ def _fix_team_types(db, dry_run: bool) -> dict:
             else:
                 sess_col.update_one({"_id": doc["_id"]}, {"$set": {"identity.type": "team"}})
             stats["sessions"] += 1
-    else:
-        print("\n  sessions: no teams found in database — nothing to check")
+
+        rc_query = {
+            "run_context.identity.id": {"$in": team_id_list},
+            "run_context.identity.type": "user",
+        }
+        rc_docs = list(sess_col.find(rc_query, {"_id": 1, "run_id": 1, "run_context.identity": 1}))
+        print(f"\n  sessions (run_context.identity): {len(rc_docs)} doc(s) to fix")
+        for doc in rc_docs:
+            if dry_run:
+                run_id = doc.get("run_id", doc["_id"])
+                owner = _resolve_nested(doc, "run_context.identity.id") or "?"
+                print(f"    [DRY RUN] run_id={run_id}  run_context.identity.id={owner}  → type=team")
+            else:
+                sess_col.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"run_context.identity.type": "team"}},
+                )
+            stats["sessions_run_context"] += 1
+
+        # Shares: sender or recipient may be a team; reverse+forward loses type.
+        if "shares" in db.list_collection_names():
+            sh_col = db["shares"]
+            snd_query = {
+                "sender_identity.id": {"$in": team_id_list},
+                "sender_identity.type": "user",
+            }
+            snd_docs = list(sh_col.find(snd_query, {"_id": 1, "sender_identity": 1}))
+            print(f"\n  shares (sender_identity): {len(snd_docs)} doc(s) to fix")
+            for doc in snd_docs:
+                if dry_run:
+                    print(f"    [DRY RUN] _id={doc['_id']}  → sender_identity.type=team")
+                else:
+                    sh_col.update_one({"_id": doc["_id"]}, {"$set": {"sender_identity.type": "team"}})
+                stats["shares_sender"] += 1
+
+            rcv_query = {
+                "recipient_identity.id": {"$in": team_id_list},
+                "recipient_identity.type": "user",
+            }
+            rcv_docs = list(sh_col.find(rcv_query, {"_id": 1, "recipient_identity": 1}))
+            print(f"\n  shares (recipient_identity): {len(rcv_docs)} doc(s) to fix")
+            for doc in rcv_docs:
+                if dry_run:
+                    print(f"    [DRY RUN] _id={doc['_id']}  → recipient_identity.type=team")
+                else:
+                    sh_col.update_one({"_id": doc["_id"]}, {"$set": {"recipient_identity.type": "team"}})
+                stats["shares_recipient"] += 1
 
     return stats
 
@@ -433,6 +509,12 @@ def main():
     print(f"Connecting to MongoDB: {mongo_uri}")
     print(f"Database: {DB_NAME}")
     print(f"Direction: {direction}")
+    if reverse:
+        print(
+            "\nNote: reverse drops identity.type — only the id string is kept as user_id.\n"
+            "After you migrate forward again, team rows look like type=user until the\n"
+            "FIX TEAM IDENTITY TYPES pass runs (automatic on forward --apply).",
+        )
 
     if dry_run:
         print("\n" + "=" * 60)
@@ -488,8 +570,14 @@ def main():
         print(f"{'=' * 60}")
         fix_stats = _fix_team_types(db, dry_run)
         verb = "Would fix" if dry_run else "Fixed"
-        print(f"\n  {verb}: {fix_stats['blueprints']} blueprints, "
-              f"{fix_stats['resources']} resources, {fix_stats['sessions']} sessions")
+        print(
+            f"\n  {verb}: {fix_stats['blueprints']} blueprints, "
+            f"{fix_stats['resources']} resources, "
+            f"{fix_stats['sessions']} sessions, "
+            f"{fix_stats['sessions_run_context']} session run_context, "
+            f"{fix_stats['shares_sender']} share senders, "
+            f"{fix_stats['shares_recipient']} share recipients",
+        )
 
     # Summary
     print(f"\n{'=' * 60}")

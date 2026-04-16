@@ -209,6 +209,7 @@ class AppContainer(metaclass=SingletonMeta):
                 store=store,
                 session_repo=session_repo,
                 presence_ttl=cfg.collaboration_presence_ttl,
+                edit_lock_ttl=cfg.collaboration_edit_lock_ttl_sec,
             )
         return None
 

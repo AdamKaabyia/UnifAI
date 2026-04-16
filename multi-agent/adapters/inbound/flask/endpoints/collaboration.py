@@ -15,6 +15,8 @@ from webargs import fields
 
 logger = logging.getLogger(__name__)
 
+_EDIT_LOCK_KINDS = frozenset({"resource", "blueprint"})
+
 collaboration_bp = Blueprint("collaboration", __name__)
 
 
@@ -29,6 +31,12 @@ def _unavailable():
     return jsonify({
         "error": "Collaboration service not available — Redis is not configured"
     }), 501
+
+
+def _invalid_edit_lock_kind():
+    return jsonify({
+        "error": f"entityKind must be one of: {', '.join(sorted(_EDIT_LOCK_KINDS))}"
+    }), 400
 
 
 def _validate_user(user_id: str):
@@ -216,3 +224,144 @@ def collaboration_health():
     if svc is None:
         return jsonify({"available": False, "reason": "not_configured"}), 200
     return jsonify({"available": svc.is_available()}), 200
+
+
+# ── Team workspace edit locks (resources / blueprints) ───────────────
+
+
+def _holder_to_json(holder):
+    if holder is None:
+        return None
+    return {
+        "userId": holder.user_id,
+        "displayName": holder.display_name or holder.user_id,
+    }
+
+
+@collaboration_bp.route("/edit_lock.acquire", methods=["POST"])
+@from_body({
+    "team_id": fields.Str(data_key="teamId", required=True),
+    "entity_kind": fields.Str(data_key="entityKind", required=True),
+    "entity_id": fields.Str(data_key="entityId", required=True),
+    "user_id": fields.Str(data_key="userId", required=True),
+    "display_name": fields.Str(data_key="displayName", load_default=""),
+})
+def edit_lock_acquire(team_id, entity_kind, entity_id, user_id, display_name):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
+    if entity_kind not in _EDIT_LOCK_KINDS:
+        return _invalid_edit_lock_kind()
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        acquired, holder = svc.acquire_team_edit_lock(
+            team_id=team_id,
+            entity_kind=entity_kind,
+            entity_id=entity_id,
+            user_id=user_id,
+            display_name=display_name,
+        )
+        body = {"acquired": acquired}
+        if not acquired and holder is not None:
+            body["lockedBy"] = _holder_to_json(holder)
+        return jsonify(body), 200
+    except Exception:
+        logger.exception("edit_lock_acquire failed")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@collaboration_bp.route("/edit_lock.release", methods=["POST"])
+@from_body({
+    "team_id": fields.Str(data_key="teamId", required=True),
+    "entity_kind": fields.Str(data_key="entityKind", required=True),
+    "entity_id": fields.Str(data_key="entityId", required=True),
+    "user_id": fields.Str(data_key="userId", required=True),
+})
+def edit_lock_release(team_id, entity_kind, entity_id, user_id):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
+    if entity_kind not in _EDIT_LOCK_KINDS:
+        return _invalid_edit_lock_kind()
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        svc.release_team_edit_lock(team_id, entity_kind, entity_id, user_id)
+        return jsonify({"success": True}), 200
+    except Exception:
+        logger.exception("edit_lock_release failed")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@collaboration_bp.route("/edit_lock.heartbeat", methods=["POST"])
+@from_body({
+    "team_id": fields.Str(data_key="teamId", required=True),
+    "entity_kind": fields.Str(data_key="entityKind", required=True),
+    "entity_id": fields.Str(data_key="entityId", required=True),
+    "user_id": fields.Str(data_key="userId", required=True),
+    "display_name": fields.Str(data_key="displayName", load_default=""),
+})
+def edit_lock_heartbeat(team_id, entity_kind, entity_id, user_id, display_name):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
+    if entity_kind not in _EDIT_LOCK_KINDS:
+        return _invalid_edit_lock_kind()
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        renewed = svc.renew_team_edit_lock(
+            team_id, entity_kind, entity_id, user_id, display_name
+        )
+        return jsonify({"renewed": renewed}), 200
+    except Exception:
+        logger.exception("edit_lock_heartbeat failed")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@collaboration_bp.route("/edit_lock.status", methods=["GET"])
+@from_query({
+    "team_id": fields.Str(data_key="teamId", required=True),
+    "entity_kind": fields.Str(data_key="entityKind", required=True),
+    "entity_id": fields.Str(data_key="entityId", required=True),
+})
+def edit_lock_status(team_id, entity_kind, entity_id):
+    if entity_kind not in _EDIT_LOCK_KINDS:
+        return _invalid_edit_lock_kind()
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        holder = svc.get_team_edit_lock(team_id, entity_kind, entity_id)
+        return jsonify({"locked": holder is not None, "lockedBy": _holder_to_json(holder)}), 200
+    except Exception:
+        logger.exception("edit_lock_status failed")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@collaboration_bp.route("/edit_lock.statuses", methods=["POST"])
+@from_body({
+    "team_id": fields.Str(data_key="teamId", required=True),
+    "entity_kind": fields.Str(data_key="entityKind", required=True),
+    "entity_ids": fields.List(fields.Str(), data_key="entityIds", required=True),
+})
+def edit_lock_statuses(team_id, entity_kind, entity_ids):
+    if entity_kind not in _EDIT_LOCK_KINDS:
+        return _invalid_edit_lock_kind()
+    svc = _collab_svc()
+    if svc is None:
+        return _unavailable()
+    try:
+        batch = svc.get_team_edit_locks_batch(team_id, entity_kind, entity_ids)
+        locks = {
+            eid: _holder_to_json(h) if h is not None else None
+            for eid, h in batch.items()
+        }
+        return jsonify({"locks": locks}), 200
+    except Exception:
+        logger.exception("edit_lock_statuses failed")
+        return jsonify({"error": "Internal server error"}), 500

@@ -43,3 +43,9 @@ class TeamSessionIndex(BaseModel):
     """Active sessions for a team (real-time view from Redis)."""
     team_id: str
     active_session_ids: List[str] = Field(default_factory=list)
+
+
+class TeamEditLockHolder(BaseModel):
+    """Who currently holds a team-scoped edit lock on a resource or blueprint."""
+    user_id: str
+    display_name: str = ""
