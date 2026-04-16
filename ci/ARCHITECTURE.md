@@ -683,10 +683,10 @@ def buildParams = [
     CredentialsId: "github-unifai-token",
     
     // Credentials Repository
-    CredMainRepoURL: "gitlab.cee.redhat.com",
-    CredMainRepoProject: "ai_tools/genie-cred-data",
+    CredMainRepoURL: "github.com",
+    CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets",
     CredMainRepoBranch: "main",
-    CredCredentialsId: "gitlab-genie",
+    CredCredentialsId: "jenkins_agent_deploy_key",
     
     // Jenkins Configuration
     NodeToRun: "tag-slave",
