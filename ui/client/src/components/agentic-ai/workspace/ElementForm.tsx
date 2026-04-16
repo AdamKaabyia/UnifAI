@@ -694,11 +694,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-800">
           <DialogTitle>
             {editingElement ? "Edit" : "Create"} {elementType.name}
           </DialogTitle>
@@ -710,61 +710,63 @@ export const ElementForm: React.FC<ElementFormProps> = ({
             e.preventDefault();
             handleSave();
           }}
-          className="space-y-4"
+          className="flex flex-col flex-1 min-h-0"
         >
-          {/* Render fields from combined schema */}
-          {Object.entries(elementSchema.config_schema.properties)
-            .filter(([fieldName, fieldSchema]) => {
-              // Always exclude category and type (handled by GUI)
-              if (['category', 'type'].includes(fieldName)) {
-                return false;
-              }
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Render fields from combined schema */}
+            {Object.entries(elementSchema.config_schema.properties)
+              .filter(([fieldName, fieldSchema]) => {
+                // Always exclude category and type (handled by GUI)
+                if (['category', 'type'].includes(fieldName)) {
+                  return false;
+                }
 
-              // Filter out hidden fields - check if field has hints.hidden.hint_type === "hidden"
-              if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
-                return false;
-              }
+                // Filter out hidden fields - check if field has hints.hidden.hint_type === "hidden"
+                if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+                  return false;
+                }
 
-              // For both Create New and Edit mode: show only first-level required fields (name) + all cfg_dict fields
-              // Show first-level required fields (name is required from resource.schema)
-              const firstLevelRequiredFields = ['name'];
-              if (firstLevelRequiredFields.includes(fieldName)) {
-                return true;
-              }
+                // For both Create New and Edit mode: show only first-level required fields (name) + all cfg_dict fields
+                // Show first-level required fields (name is required from resource.schema)
+                const firstLevelRequiredFields = ['name'];
+                if (firstLevelRequiredFields.includes(fieldName)) {
+                  return true;
+                }
 
-              // Show all cfg_dict fields (element-specific config fields)
-              // These are fields that are NOT first-level fields from resource.schema
-              const firstLevelFields = ['name', 'category', 'type', 'cfg_dict', 'version', 'created', 'updated', 'nested_refs', 'rid', 'user_id'];
-              const isCfgDictField = !firstLevelFields.includes(fieldName);
-              return isCfgDictField;
+                // Show all cfg_dict fields (element-specific config fields)
+                // These are fields that are NOT first-level fields from resource.schema
+                const firstLevelFields = ['name', 'category', 'type', 'cfg_dict', 'version', 'created', 'updated', 'nested_refs', 'rid', 'user_id'];
+                const isCfgDictField = !firstLevelFields.includes(fieldName);
+                return isCfgDictField;
 
-              // Comment out the old edit mode logic that showed extra fields
-              // // For Edit mode: show all fields (except category/type)
-              // if (editingElement) {
-              //   return true;
-              // }
-            })
-            .sort(([fieldNameA, fieldSchemaA], [fieldNameB, fieldSchemaB]) => {
-              // Sort fields so that fields with dependencies come after their dependency fields
-              const populateHintA = fieldSchemaA?.hints?.action?.hint_type === 'populate' ? fieldSchemaA.hints.action : null;
-              const populateHintB = fieldSchemaB?.hints?.action?.hint_type === 'populate' ? fieldSchemaB.hints.action : null;
-              
-              // If A depends on B, A should come after B
-              if (populateHintA?.dependencies && Object.keys(populateHintA.dependencies).includes(fieldNameB)) {
-                return 1; // A comes after B
-              }
-              
-              // If B depends on A, B should come after A
-              if (populateHintB?.dependencies && Object.keys(populateHintB.dependencies).includes(fieldNameA)) {
-                return -1; // A comes before B
-              }
-              
-              // Otherwise, maintain original order
-              return 0;
-            })
-            .map(([fieldName, fieldSchema]) => renderFormField(fieldName, fieldSchema))}
+                // Comment out the old edit mode logic that showed extra fields
+                // // For Edit mode: show all fields (except category/type)
+                // if (editingElement) {
+                //   return true;
+                // }
+              })
+              .sort(([fieldNameA, fieldSchemaA], [fieldNameB, fieldSchemaB]) => {
+                // Sort fields so that fields with dependencies come after their dependency fields
+                const populateHintA = fieldSchemaA?.hints?.action?.hint_type === 'populate' ? fieldSchemaA.hints.action : null;
+                const populateHintB = fieldSchemaB?.hints?.action?.hint_type === 'populate' ? fieldSchemaB.hints.action : null;
+                
+                // If A depends on B, A should come after B
+                if (populateHintA?.dependencies && Object.keys(populateHintA.dependencies).includes(fieldNameB)) {
+                  return 1; // A comes after B
+                }
+                
+                // If B depends on A, B should come after A
+                if (populateHintB?.dependencies && Object.keys(populateHintB.dependencies).includes(fieldNameA)) {
+                  return -1; // A comes before B
+                }
+                
+                // Otherwise, maintain original order
+                return 0;
+              })
+              .map(([fieldName, fieldSchema]) => renderFormField(fieldName, fieldSchema))}
+          </div>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t border-gray-800">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
