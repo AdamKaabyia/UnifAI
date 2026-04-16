@@ -40,9 +40,8 @@ jobs:
             secretId: ${{ env.SECRET_ID }}
             tlsSkipVerify: true
             secrets: |
-                apps/automation-and-tools/password password
-                apps/automation-and-tools/password password1
-                apps/automation-and-tools/test key
+                apps/automation-and-tools/password
+                apps/automation-and-tools/test
 
       - name: Sensitive Operation
         run: "password1 value '${{ steps.import-secrets.outputs.PASSWORD1 }}'"
