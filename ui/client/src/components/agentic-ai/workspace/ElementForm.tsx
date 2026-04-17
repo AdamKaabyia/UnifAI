@@ -16,6 +16,7 @@ import {
 } from "../../../types/workspace";
 import { FieldRenderer, getStringEnumFromRef } from "./FieldRenderer";
 import { ItemValidationResult } from "./FieldValidation";
+
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 
@@ -50,7 +51,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
   const { fetchResourcesForCategory } = useWorkspaceData();
 
-  // Helper to check if a field has validation hint
   const fieldHasValidation = useCallback((fieldName: string): boolean => {
     const fieldSchema = elementSchema?.config_schema.properties[fieldName];
     if (!fieldSchema) return false;
@@ -647,12 +647,10 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     const isRequired = elementSchema.config_schema.required?.includes(fieldName);
     const value = formData[fieldName] || "";
     
-    // Check for validation hints - supports both ActionHint and ApiHint
     const actionValidationHint = fieldSchema.hints?.action?.hint_type === 'validate' ? fieldSchema.hints.action : null;
     const apiValidationHint = fieldSchema.hints?.api?.hint_type === 'validate' ? fieldSchema.hints.api : null;
     const validationHint = actionValidationHint || apiValidationHint;
 
-    // Check for populate hints - supports both ActionHint and ApiHint
     const actionPopulateHint = fieldSchema.hints?.action?.hint_type === 'populate' ? fieldSchema.hints.action : null;
     const apiPopulateHint = fieldSchema.hints?.api?.hint_type === 'populate' ? fieldSchema.hints.api : null;
     const populateHint = actionPopulateHint || apiPopulateHint;
@@ -715,7 +713,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({
           {/* Render fields from combined schema */}
           {Object.entries(elementSchema.config_schema.properties)
             .filter(([fieldName, fieldSchema]) => {
-              // Always exclude category and type (handled by GUI)
               if (['category', 'type'].includes(fieldName)) {
                 return false;
               }

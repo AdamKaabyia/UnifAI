@@ -43,6 +43,7 @@ from mas.core.auth.protocols.oauth2.exchange_service import OAuth2ExchangeServic
 from outbound.mongo.client_config_repository import MongoClientConfigStore
 from mas.actions.auth.authenticate.action import AuthenticateAction
 from mas.actions.providers.mcp.validate_connection.validate_connection import ValidateConnectionAction
+from mas.actions.providers.mcp.get_tools_names.get_tools_names import GetToolsNamesAction
 
 from config.app_config import AppConfig
 
@@ -146,7 +147,7 @@ class AppContainer(metaclass=SingletonMeta):
             redis_client = redis_lib.Redis.from_url(redis_url)
             pending_store = RedisPendingStore(redis_client=redis_client)
 
-        oauth2_protocol = OAuth2Protocol(http_client)
+        oauth2_protocol = OAuth2Protocol()
 
         # Detection
         oauth2_detection = OAuth2DetectionStrategy()
@@ -202,6 +203,9 @@ class AppContainer(metaclass=SingletonMeta):
             detector=detector,
             login_service=login_service,
             client_configs=client_config_store,
+        ))
+        self.actions_service.register_instance(GetToolsNamesAction(
+            auth_infra=auth_infra,
         ))
 
         # ── Session factory ───────────────────────────────────────────

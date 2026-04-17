@@ -19,47 +19,6 @@ class McpProviderFactory(BaseFactory[McpProviderConfig, McpProvider]):
     def accepts(self, cfg: McpProviderConfig, element_type: str) -> bool:
         return element_type == Identifier.TYPE
 
-    def _resolve_auth(self, cfg: McpProviderConfig, kwargs: Dict[str, Any]) -> Optional[AuthCredential]:
-        """Resolve auth from either auth element (Path 1) or server_identifier (Path 2)."""
-        # Path 1: auth element credential passed by ProviderBuilder
-        auth = kwargs.get("auth_credential")
-        if auth:
-            return auth
-
-        # Path 2: server_identifier passed by ProviderBuilder → build credential from token store
-        server_id = kwargs.get("server_identifier", "")
-        if not server_id:
-            return None
-
-        deps = kwargs.get("deps")
-        auth_infra = getattr(deps, "auth_infra", None) if deps else None
-        if not auth_infra:
-            return None
-
-        exec_ctx = getattr(deps, "execution_ctx", None)
-        user_id = getattr(exec_ctx, "user_id", None) if exec_ctx else None
-        if not user_id:
-            return None
-
-        runtime_config = {}
-        if auth_infra.client_config_store:
-            client_cfg = auth_infra.client_config_store.find_by_server(user_id, server_id)
-            if client_cfg:
-                runtime_config = client_cfg.model_dump()
-
-        from mas.core.auth.credentials.store import CredentialService
-        from mas.core.auth.credentials.lifecycle import TokenLifecycleService
-        cred_service = CredentialService(auth_infra.token_store)
-        lifecycle = TokenLifecycleService(cred_service, auth_infra.protocol)
-
-        from mas.elements.auths.oauth_client.oauth_client_instance import OAuthClientInstance
-        return OAuthClientInstance(
-            lifecycle=lifecycle,
-            user_id=user_id,
-            server_identifier=server_id,
-            config=runtime_config,
-        )
-
     def _resolve_headers(
         self,
         cfg: McpProviderConfig,
@@ -77,7 +36,7 @@ class McpProviderFactory(BaseFactory[McpProviderConfig, McpProvider]):
 
     def create(self, cfg: McpProviderConfig, **kwargs: Any) -> McpProvider:
         try:
-            auth = self._resolve_auth(cfg, kwargs)
+            auth = kwargs.get("auth_credential")
             headers = self._resolve_headers(cfg, auth)
 
             return McpProvider.create_sync(
@@ -94,7 +53,7 @@ class McpProviderFactory(BaseFactory[McpProviderConfig, McpProvider]):
 
     async def create_async(self, cfg: McpProviderConfig, **kwargs: Any) -> McpProvider:
         try:
-            auth = self._resolve_auth(cfg, kwargs)
+            auth = kwargs.get("auth_credential")
             headers = self._resolve_headers(cfg, auth)
 
             return await McpProvider.create_async(
