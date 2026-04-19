@@ -52,17 +52,6 @@ class GetToolsNamesAction(BaseAction):
         self._factory = factory or McpProviderFactory()
         self._auth_service = auth_service
 
-    def execute_sync(self, input_data, context=None):
-        try:
-            return super().execute_sync(input_data, context)
-        except RuntimeError as e:
-            return GetToolsNamesOutput(
-                success=False,
-                message=f"Failed to retrieve tools: {e}",
-                tool_names=[],
-                total_count=0,
-            )
-
     async def execute(
         self,
         input_data: GetToolsNamesInput,
