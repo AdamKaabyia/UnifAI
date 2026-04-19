@@ -8,8 +8,9 @@ from mas.elements.providers.mcp_server_client.identifiers import Identifier
 from mas.elements.providers.mcp_server_client.transport.enums import McpTransportType
 from mas.core.enums import ResourceCategory
 
-
+# Input/Output models for this action
 class GetToolsNamesInput(BaseActionInput):
+    """Input for MCP tools discovery"""
     mcp_url: HttpUrl
     transport_type: McpTransportType = Field(
         default=McpTransportType.STREAMABLE_HTTP,
@@ -24,6 +25,7 @@ class GetToolsNamesInput(BaseActionInput):
 
 
 class GetToolsNamesOutput(BaseActionOutput):
+    """Output for MCP tools discovery"""
     tool_names: List[str] = []
     total_count: int = 0
 
@@ -39,16 +41,43 @@ class GetToolsNamesAction(BaseAction):
     tags = {"mcp", "discovery", "tools"}
     elements = {(ResourceCategory.PROVIDER.value, Identifier.TYPE)}
 
-    def __init__(self, factory: McpProviderFactory = None, auth_infra=None):
+    def __init__(self, factory: McpProviderFactory = None, auth_service=None):
+        """
+        Initialize action with optional factory injection.
+        
+        Args:
+            factory: McpProviderFactory instance (creates default if not provided)
+        """
         super().__init__()
         self._factory = factory or McpProviderFactory()
-        self._auth_infra = auth_infra
+        self._auth_service = auth_service
+
+    def execute_sync(self, input_data, context=None):
+        try:
+            return super().execute_sync(input_data, context)
+        except RuntimeError as e:
+            return GetToolsNamesOutput(
+                success=False,
+                message=f"Failed to retrieve tools: {e}",
+                tool_names=[],
+                total_count=0,
+            )
 
     async def execute(
         self,
         input_data: GetToolsNamesInput,
         context: Optional[Dict[str, Any]] = None,
     ) -> GetToolsNamesOutput:
+        """
+        Execute tools discovery asynchronously.
+        
+        Args:
+            input_data: Validated discovery input
+            context: Optional execution context (element configs, etc.)
+            
+        Returns:
+            Discovery result with tool names and count
+        """
         try:
             config = McpProviderConfig(
                 mcp_url=input_data.mcp_url,
@@ -57,8 +86,8 @@ class GetToolsNamesAction(BaseAction):
             )
 
             auth = None
-            if self._auth_infra and input_data.user_id and input_data.server_identifier:
-                auth = self._auth_infra.resolve_credential(
+            if self._auth_service and input_data.user_id and input_data.server_identifier:
+                auth = self._auth_service.bind(
                     input_data.user_id, input_data.server_identifier,
                 )
 
@@ -70,7 +99,7 @@ class GetToolsNamesAction(BaseAction):
                 success=True,
                 message=f"Found {len(tool_names)} tools",
                 tool_names=tool_names,
-                total_count=len(tool_names),
+                total_count=len(tool_names)
             )
 
         except Exception as e:
@@ -78,5 +107,5 @@ class GetToolsNamesAction(BaseAction):
                 success=False,
                 message=f"Failed to retrieve tools: {str(e)}",
                 tool_names=[],
-                total_count=0,
+                total_count=0
             )
