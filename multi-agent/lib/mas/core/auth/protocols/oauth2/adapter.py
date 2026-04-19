@@ -125,6 +125,37 @@ class OAuth2Protocol(AuthProtocol):
 
         return _to_token_set(token)
 
+    async def validate_token(
+        self,
+        access_token: str,
+        server_url: str,
+    ) -> bool:
+        """Probe *server_url* with the Bearer token; ``True`` if 2xx."""
+        headers = self.build_headers(access_token)
+        headers.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        })
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    server_url,
+                    json={
+                        "jsonrpc": "2.0", "id": 1,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "unifai-probe", "version": "1.0"},
+                        },
+                    },
+                    headers=headers,
+                )
+                return 200 <= resp.status_code < 300
+        except Exception as exc:
+            logger.debug("Token validation probe failed for %s: %s", server_url, exc)
+            return False
+
     def build_headers(self, access_token: str) -> Dict[str, str]:
         return {"Authorization": f"Bearer {access_token}"}
 

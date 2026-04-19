@@ -1,15 +1,14 @@
 """
-Credential models — protocol-agnostic.
+Auth-layer models — protocol-agnostic.
 
-Any auth protocol (OAuth2, API key, ...) produces tokens that
-get stored and retrieved using these models.
+All credential, token, and client-config models live here.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -66,3 +65,16 @@ class StoredCredential(BaseModel):
         if self.status != TokenStatus.ACTIVE:
             return False
         return not _is_expired(self.expires_at, buffer_seconds)
+
+
+class ClientConfig(BaseModel):
+    """Client credentials for an auth server (OAuth app registration)."""
+    client_id: str
+    client_secret: Optional[str] = None
+    authorization_endpoint: str = ""
+    token_endpoint: str = ""
+    scopes: List[str] = Field(default_factory=list)
+    resource_uri: Optional[str] = None
+    extra_authorize_params: Dict[str, str] = Field(default_factory=dict)
+    protocol_type: str = "oauth2"
+    server_identifier: str = ""

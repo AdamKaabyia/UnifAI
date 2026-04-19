@@ -2,7 +2,7 @@ from typing import Any, Dict, Literal, List, Optional
 from .identifiers import Identifier
 from pydantic import Field, HttpUrl
 from mas.elements.providers.common.base_config import ProviderBaseConfig
-from mas.core.field_hints import ActionHint, HiddenHint, HintType, SelectionType
+from mas.core.field_hints import ActionHint, HintType, SelectionType
 from mas.core.ref.models import AuthRef
 from .transport.enums import McpTransportType
 
@@ -26,6 +26,7 @@ class McpProviderConfig(ProviderBaseConfig):
                 "mcp_url": "mcp_url",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
+                "server_identifier": "server_identifier",
             }
         ).to_hints()
     )
@@ -35,8 +36,12 @@ class McpProviderConfig(ProviderBaseConfig):
     )
     server_identifier: str = Field(
         default="",
-        description="Auth server issuer discovered by validate_connection (e.g. https://accounts.google.com)",
-        json_schema_extra=HiddenHint(reason="Set automatically by connection validation").to_hints()
+        description="Auth server issuer (set automatically by connection validation)",
+    )
+    bearer_token: Optional[str] = Field(
+        default=None,
+        description="Deprecated — use auth elements instead",
+        exclude=True,
     )
     additional_headers: Dict[str, Any] = Field(
         default_factory=dict,
@@ -55,6 +60,7 @@ class McpProviderConfig(ProviderBaseConfig):
                 "mcp_url": "mcp_url",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
+                "server_identifier": "server_identifier",
             }
         ).to_hints()
     )

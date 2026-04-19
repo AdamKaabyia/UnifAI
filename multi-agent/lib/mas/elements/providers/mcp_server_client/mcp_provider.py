@@ -63,6 +63,16 @@ class McpProvider:
 
         self._tool_registry = ProviderToolRegistry()
 
+    def _get_current_headers(self) -> Dict[str, str]:
+        """Merge static headers with live auth headers."""
+        current = dict(self.headers) if self.headers else {}
+        if self._auth:
+            try:
+                current = {**self._auth.get_headers(), **current}
+            except Exception:
+                pass
+        return current
+
     async def _initialize_tools(self) -> None:
         """
         Discover and cache tool metadata from the server.
@@ -75,9 +85,10 @@ class McpProvider:
         if self._initialized:
             return
 
+        init_headers = self._get_current_headers()
         async with McpServerClient(
             mcp_url=self.mcp_url,
-            headers=self.headers,
+            headers=init_headers,
             transport_type=self.transport_type,
         ) as mcp_client:
             # Fetch all available tools in one go

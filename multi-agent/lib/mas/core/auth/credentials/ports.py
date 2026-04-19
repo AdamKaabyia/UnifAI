@@ -1,5 +1,5 @@
 """
-Token storage port — protocol-agnostic persistence contract.
+Auth-layer storage ports — protocol-agnostic persistence contracts.
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from .models import StoredCredential
+from .models import StoredCredential, ClientConfig
 
 
 class TokenStore(ABC):
@@ -24,3 +24,13 @@ class TokenStore(ABC):
 
     @abstractmethod
     def update_status(self, user_id: str, server_identifier: str, status: str) -> None: ...
+
+
+class ClientConfigStore(ABC):
+    """Persist and retrieve :class:`ClientConfig` objects."""
+
+    @abstractmethod
+    def find_by_server(self, user_id: str, server_identifier: str) -> Optional[ClientConfig]: ...
+
+    @abstractmethod
+    def save(self, user_id: str, config: ClientConfig) -> None: ...

@@ -52,6 +52,19 @@ class AuthProtocol(ABC):
         ...
 
     @abstractmethod
+    async def validate_token(
+        self,
+        access_token: str,
+        server_url: str,
+    ) -> bool:
+        """Check whether *access_token* is accepted by *server_url*.
+
+        Makes a real connection to the server (e.g. a lightweight probe)
+        and returns ``True`` if the token is valid, ``False`` otherwise.
+        """
+        ...
+
+    @abstractmethod
     def build_headers(self, access_token: str) -> Dict[str, str]:
         """Return HTTP headers for an authenticated request."""
         ...

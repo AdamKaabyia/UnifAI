@@ -29,19 +29,15 @@ class OAuthClientFactory(BaseFactory[OAuthClientConfig, OAuthClientInstance]):
     def create(self, cfg: OAuthClientConfig, **kwargs: Any) -> OAuthClientInstance:
         try:
             deps = kwargs.get("deps")
-            auth_infra = getattr(deps, "auth_infra", None) if deps else None
+            auth_service = getattr(deps, "auth_service", None) if deps else None
             exec_ctx = getattr(deps, "execution_ctx", None) if deps else None
-            user_id = getattr(exec_ctx, "user_id", None) if exec_ctx else None
 
-            if auth_infra and user_id and cfg.server_identifier:
-                cred = auth_infra.resolve_credential(user_id, cfg.server_identifier)
+            if auth_service and exec_ctx and cfg.server_identifier:
+                cred = auth_service.bind_lazy(exec_ctx, cfg.server_identifier)
                 if cred:
                     return cred
 
-            return OAuthClientInstance(
-                lifecycle=None, user_id="", server_identifier="",
-                config={},
-            )
+            return OAuthClientInstance()
 
         except Exception as e:
             raise PluginConfigurationError(

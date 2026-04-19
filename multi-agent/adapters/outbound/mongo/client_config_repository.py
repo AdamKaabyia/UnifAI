@@ -12,7 +12,8 @@ from typing import Optional
 
 from pymongo import MongoClient, ASCENDING
 
-from mas.core.auth.credentials.client_config import ClientConfig, ClientConfigStore
+from mas.core.auth.credentials.models import ClientConfig
+from mas.core.auth.credentials.ports import ClientConfigStore
 
 logger = logging.getLogger(__name__)
 

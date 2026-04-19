@@ -17,9 +17,7 @@ from mas.actions.common.action_models import (
     BaseActionOutput,
     ActionType,
 )
-from mas.core.auth.credentials.lifecycle import TokenLifecycleService
-from mas.core.auth.credentials.client_config import ClientConfigStore
-from mas.core.auth.protocols.oauth2.login_service import OAuth2LoginService
+from mas.core.auth.service import AuthService
 from mas.core.enums import ResourceCategory
 
 logger = logging.getLogger(__name__)
@@ -53,16 +51,9 @@ class AuthenticateAction(BaseAction):
         (ResourceCategory.AUTH.value, "jira_oauth"),
     }
 
-    def __init__(
-        self,
-        token_lifecycle: Optional[TokenLifecycleService] = None,
-        login_service: Optional[OAuth2LoginService] = None,
-        client_configs: Optional[ClientConfigStore] = None,
-    ):
+    def __init__(self, auth_service: Optional[AuthService] = None):
         super().__init__()
-        self._tokens = token_lifecycle
-        self._login = login_service
-        self._configs = client_configs
+        self._auth = auth_service
 
     def execute_sync(self, input_data, context=None):
         try:
@@ -87,19 +78,15 @@ class AuthenticateAction(BaseAction):
                 success=False, message="Missing server_identifier", status="not_configured",
             )
 
-        # Load client config
-        config = self._configs.find_by_server(user_id, server_id) if self._configs else None
-        config_dict = config.model_dump() if config else None
-
-        # Check token / try refresh
-        if self._tokens:
-            token = self._tokens.get_valid_token(user_id, server_id, config_dict)
+        if self._auth:
+            token = self._auth.get_valid_token(user_id, server_id)
             if token:
                 return AuthenticateOutput(
                     success=True, message="Authenticated",
                     status="authenticated", authenticated=True,
                 )
 
+        config = self._auth.get_client_config(user_id, server_id) if self._auth else None
         if not config:
             return AuthenticateOutput(
                 success=False,
@@ -107,9 +94,8 @@ class AuthenticateAction(BaseAction):
                 status="not_configured",
             )
 
-        # Build login URL
-        if self._login:
-            url = await self._login.build_login_url(user_id, server_id, config_dict)
+        if self._auth:
+            url = await self._auth.build_login_url(user_id, server_id)
             if url:
                 return AuthenticateOutput(
                     success=True, message="Sign in required",

@@ -31,10 +31,8 @@ from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
 
 # Auth layer
-from mas.core.auth.infra import AuthInfra
+from mas.core.auth.service import AuthService
 from mas.core.auth.discovery import AuthDetector
-from mas.core.auth.credentials.store import CredentialService
-from mas.core.auth.credentials.lifecycle import TokenLifecycleService
 from mas.core.auth.protocols.oauth2.login_service import OAuth2LoginService
 from mas.core.auth.protocols.oauth2.adapter import OAuth2Protocol
 from mas.core.auth.protocols.oauth2.detection import OAuth2DetectionStrategy
@@ -164,13 +162,6 @@ class AppContainer(metaclass=SingletonMeta):
             coll_name="client_configs",
         )
 
-        # AuthInfra bundle for ElementDeps (session build time)
-        auth_infra = AuthInfra(
-            token_store=self.token_store,
-            protocol=oauth2_protocol,
-            client_config_store=client_config_store,
-        )
-
         # OAuth2 state + exchange (callback handler)
         state_secret = cfg.mcp_auth_state_secret or "dev-only-change-me"
         state_manager = OAuthStateManager(secret=state_secret)
@@ -182,10 +173,6 @@ class AppContainer(metaclass=SingletonMeta):
             protocol=oauth2_protocol,
         )
 
-        # Auth services
-        credential_service = CredentialService(self.token_store)
-        token_lifecycle = TokenLifecycleService(credential_service, oauth2_protocol)
-
         login_service = OAuth2LoginService(
             protocol=oauth2_protocol,
             pending_store=pending_store,
@@ -193,26 +180,30 @@ class AppContainer(metaclass=SingletonMeta):
             callback_url=cfg.sso_callback_url,
         )
 
-        self.actions_service.register_instance(AuthenticateAction(
-            token_lifecycle=token_lifecycle,
-            login_service=login_service,
-            client_configs=client_config_store,
-        ))
-        self.actions_service.register_instance(ValidateConnectionAction(
-            token_lifecycle=token_lifecycle,
+        # AuthService — single service for the full auth lifecycle
+        auth_service = AuthService(
+            token_store=self.token_store,
+            protocol=oauth2_protocol,
+            client_config_store=client_config_store,
             detector=detector,
             login_service=login_service,
-            client_configs=client_config_store,
+        )
+
+        self.actions_service.register_instance(AuthenticateAction(
+            auth_service=auth_service,
+        ))
+        self.actions_service.register_instance(ValidateConnectionAction(
+            auth_service=auth_service,
         ))
         self.actions_service.register_instance(GetToolsNamesAction(
-            auth_infra=auth_infra,
+            auth_service=auth_service,
         ))
 
         # ── Session factory ───────────────────────────────────────────
         self.session_factory = WorkflowSessionFactory(
             element_registry=self.element_registry,
             engine_name=cfg.engine_name,
-            auth_infra=auth_infra,
+            auth_service=auth_service,
         )
         self.session_repo = MongoSessionRepository(
             mongodb_port=cfg.mongodb_port,

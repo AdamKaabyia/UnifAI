@@ -22,13 +22,12 @@ class ProviderBuilder(CategoryBuilder):
             auth_instance = session_registry.get_instance(ResourceCategory.AUTH, auth_ref.ref)
             return {"auth_credential": auth_instance}
 
-        # Path 2: auto-resolve by server_identifier
+        # Path 2: auto-resolve by server_identifier (deferred user_id)
         server_id = getattr(cfg, "server_identifier", "")
-        if server_id and deps and deps.auth_infra:
-            exec_ctx = getattr(deps, "execution_ctx", None)
-            user_id = getattr(exec_ctx, "user_id", None) if exec_ctx else None
-            if user_id:
-                cred = deps.auth_infra.resolve_credential(user_id, server_id)
+        if server_id and deps and deps.auth_service:
+            ctx_holder = getattr(deps, "execution_ctx", None)
+            if ctx_holder:
+                cred = deps.auth_service.bind_lazy(ctx_holder, server_id)
                 if cred:
                     return {"auth_credential": cred}
 
