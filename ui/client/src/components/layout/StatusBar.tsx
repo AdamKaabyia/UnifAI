@@ -1,9 +1,18 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 export default function StatusBar() {
   const lastSyncTime = "10 minutes ago";
   const apiVersion = "v2.4.1";
-  
+  const [supportLink, setSupportLink] = useState("");
+
+  useEffect(() => {
+    fetch("/config.json")
+      .then((res) => res.json())
+      .then((config) => setSupportLink(config?.supportLink || ""))
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="h-8 bg-background-surface border-t border-gray-800 px-6 flex items-center justify-between text-xs text-gray-400">
       <div className="flex items-center space-x-4">
@@ -20,11 +29,13 @@ export default function StatusBar() {
       <div className="flex items-center space-x-4">
         <div>API {apiVersion}</div>
         <div>
-          <a href="#" className="hover:text-white transition-colors">Docs</a>
+          <a href="/get-to-know" className="hover:text-white transition-colors">Docs</a>
         </div>
-        <div>
-          <a href="#" className="hover:text-white transition-colors">Support</a>
-        </div>
+        {supportLink && (
+          <div>
+            <a href={supportLink} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Support</a>
+          </div>
+        )}
       </div>
     </footer>
   );

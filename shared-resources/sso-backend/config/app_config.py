@@ -7,8 +7,8 @@ class AppConfig(SharedConfig):
     port: str = "13456"
 
     # Keycloak Configuration
-    keycloak_base_url: str = ""
-    client_id: str = "1"
+    keycloak_base_url: str = "0.0.0.0"
+    client_id: str = ""
     client_secret: str = ""
     keycloak_realm: str = ""
     version: str = "1.0.0"

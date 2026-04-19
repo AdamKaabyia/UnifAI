@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,10 @@ import { ItemValidationResult } from "./FieldValidation";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 
+function normalizeElementName(v: string): string {
+  return v.trim().toLowerCase();
+}
+
 interface ElementFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,7 +30,9 @@ interface ElementFormProps {
   elementSchema: ElementSchema;
   elementActions?: any[];
   editingElement: ElementInstance | null;
-  onSave: (data: any) => Promise<void>;
+  /** Names of other instances of this element type (used for duplicate name checks). */
+  existingNames?: string[];
+  onSave: (data: any) => Promise<unknown>;
 }
 
 export const ElementForm: React.FC<ElementFormProps> = ({
@@ -36,6 +42,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   elementSchema,
   elementActions = [],
   editingElement,
+  existingNames = [],
   onSave,
 }) => {
   const [formData, setFormData] = useState<any>({});
@@ -49,6 +56,35 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   const [populateResults, setPopulateResults] = useState<{ [fieldName: string]: string[] | any }>({});
 
   const { fetchResourcesForCategory } = useWorkspaceData();
+
+  const existingNamesSet = useMemo(
+    () =>
+      new Set(
+        existingNames
+          .map((n) => normalizeElementName(n))
+          .filter((n) => n.length > 0),
+      ),
+    [existingNames],
+  );
+
+  const nameError = useMemo(() => {
+    const raw = formData.name;
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    if (
+      editingElement?.name &&
+      normalizeElementName(editingElement.name) === normalizeElementName(raw)
+    ) {
+      return null;
+    }
+
+    if (existingNamesSet.has(normalizeElementName(raw))) {
+      return `A ${elementType.name} named "${trimmed}" already exists. Please choose a different name.`;
+    }
+    return null;
+  }, [formData.name, existingNamesSet, editingElement?.name, elementType.name]);
 
   // Helper to check if a field has validation hint
   const fieldHasValidation = useCallback((fieldName: string): boolean => {
@@ -499,12 +535,16 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     // This handles both required and non-required fields with validation hints (ActionHint or ApiHint)
     const noFailedValidations = !Object.values(fieldValidationStates).some(isValid => isValid === false);
 
-    return allRequiredFieldsValid && noFailedValidations;
+    return allRequiredFieldsValid && noFailedValidations && !nameError;
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
+
+      if (nameError) {
+        return;
+      }
 
       // Validate all required fields from combined schema, excluding hidden fields
       const required = elementSchema.config_schema.required || [];
@@ -632,8 +672,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
       const result = await onSave(saveData);
 
-      // Only close the dialog if save was successful (result is not null/false)
-      if (result !== null) {
+      if (result) {
         onClose();
       }
     } catch (error) {
@@ -694,11 +733,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="bg-background-card border-gray-800 text-foreground max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-gray-800">
           <DialogTitle>
             {editingElement ? "Edit" : "Create"} {elementType.name}
           </DialogTitle>
@@ -710,61 +749,70 @@ export const ElementForm: React.FC<ElementFormProps> = ({
             e.preventDefault();
             handleSave();
           }}
-          className="space-y-4"
+          className="flex flex-col flex-1 min-h-0"
         >
-          {/* Render fields from combined schema */}
-          {Object.entries(elementSchema.config_schema.properties)
-            .filter(([fieldName, fieldSchema]) => {
-              // Always exclude category and type (handled by GUI)
-              if (['category', 'type'].includes(fieldName)) {
-                return false;
-              }
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Render fields from combined schema */}
+            {Object.entries(elementSchema.config_schema.properties)
+              .filter(([fieldName, fieldSchema]) => {
+                // Always exclude category and type (handled by GUI)
+                if (['category', 'type'].includes(fieldName)) {
+                  return false;
+                }
 
-              // Filter out hidden fields - check if field has hints.hidden.hint_type === "hidden"
-              if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
-                return false;
-              }
+                // Filter out hidden fields - check if field has hints.hidden.hint_type === "hidden"
+                if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+                  return false;
+                }
 
-              // For both Create New and Edit mode: show only first-level required fields (name) + all cfg_dict fields
-              // Show first-level required fields (name is required from resource.schema)
-              const firstLevelRequiredFields = ['name'];
-              if (firstLevelRequiredFields.includes(fieldName)) {
-                return true;
-              }
+                // For both Create New and Edit mode: show only first-level required fields (name) + all cfg_dict fields
+                // Show first-level required fields (name is required from resource.schema)
+                const firstLevelRequiredFields = ['name'];
+                if (firstLevelRequiredFields.includes(fieldName)) {
+                  return true;
+                }
 
-              // Show all cfg_dict fields (element-specific config fields)
-              // These are fields that are NOT first-level fields from resource.schema
-              const firstLevelFields = ['name', 'category', 'type', 'cfg_dict', 'version', 'created', 'updated', 'nested_refs', 'rid', 'user_id'];
-              const isCfgDictField = !firstLevelFields.includes(fieldName);
-              return isCfgDictField;
+                // Show all cfg_dict fields (element-specific config fields)
+                // These are fields that are NOT first-level fields from resource.schema
+                const firstLevelFields = ['name', 'category', 'type', 'cfg_dict', 'version', 'created', 'updated', 'nested_refs', 'rid', 'user_id'];
+                const isCfgDictField = !firstLevelFields.includes(fieldName);
+                return isCfgDictField;
 
-              // Comment out the old edit mode logic that showed extra fields
-              // // For Edit mode: show all fields (except category/type)
-              // if (editingElement) {
-              //   return true;
-              // }
-            })
-            .sort(([fieldNameA, fieldSchemaA], [fieldNameB, fieldSchemaB]) => {
-              // Sort fields so that fields with dependencies come after their dependency fields
-              const populateHintA = fieldSchemaA?.hints?.action?.hint_type === 'populate' ? fieldSchemaA.hints.action : null;
-              const populateHintB = fieldSchemaB?.hints?.action?.hint_type === 'populate' ? fieldSchemaB.hints.action : null;
-              
-              // If A depends on B, A should come after B
-              if (populateHintA?.dependencies && Object.keys(populateHintA.dependencies).includes(fieldNameB)) {
-                return 1; // A comes after B
-              }
-              
-              // If B depends on A, B should come after A
-              if (populateHintB?.dependencies && Object.keys(populateHintB.dependencies).includes(fieldNameA)) {
-                return -1; // A comes before B
-              }
-              
-              // Otherwise, maintain original order
-              return 0;
-            })
-            .map(([fieldName, fieldSchema]) => renderFormField(fieldName, fieldSchema))}
+                // Comment out the old edit mode logic that showed extra fields
+                // // For Edit mode: show all fields (except category/type)
+                // if (editingElement) {
+                //   return true;
+                // }
+              })
+              .sort(([fieldNameA, fieldSchemaA], [fieldNameB, fieldSchemaB]) => {
+                // Sort fields so that fields with dependencies come after their dependency fields
+                const populateHintA = fieldSchemaA?.hints?.action?.hint_type === 'populate' ? fieldSchemaA.hints.action : null;
+                const populateHintB = fieldSchemaB?.hints?.action?.hint_type === 'populate' ? fieldSchemaB.hints.action : null;
+                
+                // If A depends on B, A should come after B
+                if (populateHintA?.dependencies && Object.keys(populateHintA.dependencies).includes(fieldNameB)) {
+                  return 1; // A comes after B
+                }
+                
+                // If B depends on A, B should come after A
+                if (populateHintB?.dependencies && Object.keys(populateHintB.dependencies).includes(fieldNameA)) {
+                  return -1; // A comes before B
+                }
+                
+                // Otherwise, maintain original order
+                return 0;
+              })
+              .map(([fieldName, fieldSchema]) => (
+                <div key={fieldName}>
+                  {renderFormField(fieldName, fieldSchema)}
+                  {fieldName === "name" && nameError ? (
+                    <p className="text-destructive text-sm mt-1">{nameError}</p>
+                  ) : null}
+                </div>
+              ))}
+          </div>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t border-gray-800">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>

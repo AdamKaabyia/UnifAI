@@ -33,10 +33,10 @@ def buildParams = [
     ImageRegistryPath  : "unifai",
     ImageRegistryCreds : "images.paas.registry-unifai",
 
-    CredMainRepoURL    : "gitlab.cee.redhat.com",
-    CredMainRepoProject: "ai_tools/genie-cred-data", 
+    CredMainRepoURL    : "github.com",
+    CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "gitlab-genie",
+    CredCredentialsId  : "jenkins_agent_deploy_key",
 ]
 
 
@@ -133,11 +133,11 @@ pipeline {
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
                         //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "genie-cred-data"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "UnifAI-secrets"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
-                            url: "https://${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
+                            url: "git@${buildParams.CredMainRepoURL}:${buildParams.CredMainRepoProject}.git"
                         ]]
                     ])
                 }
