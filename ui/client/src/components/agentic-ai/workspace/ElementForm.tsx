@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,10 @@ import { ItemValidationResult } from "./FieldValidation";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 
+function normalizeElementName(v: string): string {
+  return v.trim().toLowerCase();
+}
+
 interface ElementFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,7 +30,9 @@ interface ElementFormProps {
   elementSchema: ElementSchema;
   elementActions?: any[];
   editingElement: ElementInstance | null;
-  onSave: (data: any) => Promise<void>;
+  /** Names of other instances of this element type (used for duplicate name checks). */
+  existingNames?: string[];
+  onSave: (data: any) => Promise<unknown>;
 }
 
 export const ElementForm: React.FC<ElementFormProps> = ({
@@ -36,6 +42,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   elementSchema,
   elementActions = [],
   editingElement,
+  existingNames = [],
   onSave,
 }) => {
   const [formData, setFormData] = useState<any>({});
@@ -49,6 +56,35 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   const [populateResults, setPopulateResults] = useState<{ [fieldName: string]: string[] | any }>({});
 
   const { fetchResourcesForCategory } = useWorkspaceData();
+
+  const existingNamesSet = useMemo(
+    () =>
+      new Set(
+        existingNames
+          .map((n) => normalizeElementName(n))
+          .filter((n) => n.length > 0),
+      ),
+    [existingNames],
+  );
+
+  const nameError = useMemo(() => {
+    const raw = formData.name;
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    if (
+      editingElement?.name &&
+      normalizeElementName(editingElement.name) === normalizeElementName(raw)
+    ) {
+      return null;
+    }
+
+    if (existingNamesSet.has(normalizeElementName(raw))) {
+      return `A ${elementType.name} named "${trimmed}" already exists. Please choose a different name.`;
+    }
+    return null;
+  }, [formData.name, existingNamesSet, editingElement?.name, elementType.name]);
 
   // Helper to check if a field has validation hint
   const fieldHasValidation = useCallback((fieldName: string): boolean => {
@@ -499,12 +535,16 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     // This handles both required and non-required fields with validation hints (ActionHint or ApiHint)
     const noFailedValidations = !Object.values(fieldValidationStates).some(isValid => isValid === false);
 
-    return allRequiredFieldsValid && noFailedValidations;
+    return allRequiredFieldsValid && noFailedValidations && !nameError;
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
+
+      if (nameError) {
+        return;
+      }
 
       // Validate all required fields from combined schema, excluding hidden fields
       const required = elementSchema.config_schema.required || [];
@@ -632,8 +672,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
       const result = await onSave(saveData);
 
-      // Only close the dialog if save was successful (result is not null/false)
-      if (result !== null) {
+      if (result) {
         onClose();
       }
     } catch (error) {
@@ -763,7 +802,14 @@ export const ElementForm: React.FC<ElementFormProps> = ({
                 // Otherwise, maintain original order
                 return 0;
               })
-              .map(([fieldName, fieldSchema]) => renderFormField(fieldName, fieldSchema))}
+              .map(([fieldName, fieldSchema]) => (
+                <div key={fieldName}>
+                  {renderFormField(fieldName, fieldSchema)}
+                  {fieldName === "name" && nameError ? (
+                    <p className="text-destructive text-sm mt-1">{nameError}</p>
+                  ) : null}
+                </div>
+              ))}
           </div>
 
           <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t border-gray-800">
