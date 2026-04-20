@@ -42,7 +42,6 @@ class AuthManager:
         client_id = config.client_id
         client_secret = config.client_secret
         realm = config.get('keycloak_realm', 'master')
-        print(AppConfig.get_instance().model_dump())
         if not all([keycloak_base_url, client_id, client_secret]):
             raise ValueError("Missing required Keycloak configuration")
         
@@ -71,6 +70,23 @@ class AuthManager:
             'SESSION_COOKIE_SAMESITE': 'None',  # Must be 'None' for cross-origin
             'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
         })
+
+    def _get_server_session(self):
+        """Server-side session dict for current cookie session_id, or None."""
+        sid = session.get('session_id')
+        if not sid:
+            return None
+        return self.redis_store.hget(sid)
+
+    def _ttl_seconds_until_session_expires(self, session_expires_at) -> int:
+        """
+        Redis EXPIRE seconds until session_expires_at (unix seconds).
+        Aligns key TTL with absolute app session end (not access-token lifetime).
+        """
+        if session_expires_at is None:
+            return 0
+        remaining = float(session_expires_at) - datetime.now().timestamp()
+        return max(0, int(remaining))
     
     def _register_auth_routes(self):
         """Register authentication routes"""
@@ -115,6 +131,7 @@ class AuthManager:
                 
                 # Store user info in session
                 session_id = str(uuid.uuid4())
+                session['session_id'] = session_id
                 session.permanent = True
                 session['user'] = {
                     'username': userinfo.get('preferred_username'),
@@ -129,7 +146,6 @@ class AuthManager:
                 session['refresh_token'] = token.get('refresh_token')
                 session['token_expires_at'] = token.get('expires_at', 0)
                 session_data = {
-                    'cookie': request.cookies.get("session"),
                     'username': userinfo.get('preferred_username'),
                     'email': userinfo.get('email'),
                     'name': userinfo.get('name'),
@@ -140,17 +156,35 @@ class AuthManager:
                     'access_token': token.get('access_token'),
                     'refresh_token': token.get('refresh_token')
                 }
-                # logger.info(f"user: {session['user'].get('username')}")
-                logger.info(f"refresh_token: {session['refresh_token']}")
-                logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
 
-                logger.info(f"session_id: {session_id}")
-                logger.info(f"saving session {session_id} to redis")
-                logger.info(f"#########################")
-                logger.info(f"session: {session}")
-                logger.info(f"#########################")
-                self.redis_store.hset(request.cookies.get("session"), session_data, ttl_seconds=3600)
-                logger.info(f"saved session {session_id} to redis")
+                # session_data = {
+                #     'user': {
+                #         'username': userinfo.get('preferred_username'),
+                #         'email': userinfo.get('email'),
+                #         'name': userinfo.get('name'),
+                #         'sub': userinfo.get('sub'),
+                #         'session_created_at': session_created_at.timestamp(),
+                #         'session_expires_at': session_expires_at.timestamp(),
+                #         'token_expires_at': token.get('expires_at', 0),
+                #     },
+                #     'access_token': token.get('access_token'),
+                #     'refresh_token': token.get('refresh_token'),
+                #     'token_expires_at': token.get('expires_at', 0),
+                # }
+                # logger.info(f"user: {session['user'].get('username')}")
+                # logger.info(f"refresh_token: {session['refresh_token']}")
+                # logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
+
+                # logger.info(f"session_id: {session_id}")
+                # logger.info(f"saving session {session_id} to redis")
+                # logger.info(f"#########################")
+                # logger.info(f"session: {session}")
+                # logger.info(f"#########################")
+                ttl_seconds = self._ttl_seconds_until_session_expires(
+                    session_expires_at.timestamp()
+                )
+                self.redis_store.hset(session_id, session_data, ttl_seconds=ttl_seconds)
+                # logger.info(f"saved session {session_id} to redis")
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""
@@ -168,19 +202,24 @@ class AuthManager:
         @self.app.route('/api/auth/logout', methods=['POST'])
         def logout():
             """Logout user and clear session"""
-            username = session.get('user', {}).get('username', 'Unknown')
+            session_data = self._get_server_session()
+            username = (session_data or {}).get('username', 'Unknown')  
+            if session.get('session_id'):      
+                self.redis_store.hdel(session.get('session_id'))
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})
         
         @self.app.route('/api/auth/user')
         def get_current_user():
+            user = {}
             """Get current user information"""
             if not self.is_authenticated():
                 return jsonify({'error': 'Not authenticated'}), 401
             
             # Check if session has expired (requires re-authentication)
             if self._is_session_expired():
+                self.redis_store.hdel(session.get('session_id'))
                 session.clear()
                 return jsonify({'error': 'Session expired'}), 401
             
@@ -190,8 +229,13 @@ class AuthManager:
                     # Don't clear session - token refresh failure doesn't mean session expired
                     return jsonify({'error': 'Token refresh failed'}), 401
             
-           # Get user and add permissions
-            user = session.get('user')
+            # Get user and add permissions
+            #session_data = self._get_server_session()
+            user = self.get_user_info()
+            if not user:
+                return jsonify({'error': 'No user information available'}), 401
+            # username = session_data.get('username')
+            # user['user'] = username
             
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
@@ -205,11 +249,13 @@ class AuthManager:
         @self.app.route('/api/auth/refresh', methods=['POST'])
         def refresh_token():
             """Refresh access token"""
-            if not session.get('refresh_token'):
+            session_data = self._get_server_session()
+            if not session_data or not session_data.get('refresh_token'):
                 return jsonify({'error': 'No refresh token available'}), 401
             
             # Check if session has expired first
             if self._is_session_expired():
+                self.redis_store.hdel(session.get('session_id'))
                 session.clear()
                 return jsonify({'error': 'Session expired'}), 401
             
@@ -220,8 +266,8 @@ class AuthManager:
     
     def is_authenticated(self):
         """Check if user is authenticated and session is valid"""
-        has_session = 'user' in session and 'access_token' in session
-        if not has_session:
+        session_data = self._get_server_session()
+        if not session_data or 'username' not in session_data or 'access_token' not in session_data:
             return False
         
         # Check if session has expired
@@ -230,39 +276,54 @@ class AuthManager:
 
         return True
     
-    def get_current_user(self):
+    def get_user_info(self):
         """Get current user from session"""
-        return session.get('user')
+        user = {}
+        session_data = self._get_server_session()
+        if not session_data:
+            return None
+        user['username'] = session_data.get('username')
+        user['email'] = session_data.get('email')
+        user['name'] = session_data.get('name')
+        user['sub'] = session_data.get('sub')
+        user['session_created_at'] = session_data.get('session_created_at')
+        user['session_expires_at'] = session_data.get('session_expires_at')
+        user['token_expires_at'] = session_data.get('token_expires_at')
+        return dict(user) if user else None
     
     def _is_session_expired(self):
         """Check if the user session has expired (requires re-authentication)"""
-        session_expires_at = session.get('user', {}).get('session_expires_at', 0)
+        session_data = self._get_server_session()
+        session_expires_at = (session_data or {}).get('session_expires_at', 0)
         if not session_expires_at:
             return True # No expiration time means session is invalid
         
         current_time = datetime.now().timestamp()
-        is_expired = current_time >= session_expires_at
+        is_expired = current_time >= float(session_expires_at)
         
         if is_expired:
-            logger.info(f"Session expired at {datetime.fromtimestamp(session_expires_at).strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"Session expired at {datetime.fromtimestamp(float(session_expires_at)).strftime('%Y-%m-%d %H:%M:%S')}")
         
         return is_expired
     
     def _should_refresh_token(self):
         """Check if access token should be refreshed (expires in next 5 minutes)"""
-        token_expires_at = session.get('token_expires_at', 0)
+        session_data = self._get_server_session()
+        token_expires_at = (session_data or {}).get('token_expires_at', 0)
         if not token_expires_at:
             return True # No token expiration means we should try to refresh
         
         current_time = datetime.now().timestamp()
         
         # Refresh if token expires in the next minute
-        should_refresh = current_time >= (token_expires_at - 60)  # 1 minute buffer
+        should_refresh = current_time >= (float(token_expires_at) - 60)  # 1 minute buffer
         return should_refresh
     
     def _refresh_access_token(self):
         """Refresh the access token using refresh token"""
-        refresh_token = session.get('refresh_token')
+
+        session_data = self._get_server_session()
+        refresh_token = (session_data or {}).get('refresh_token')
         if not refresh_token:
             logger.error("No refresh token available")
             return False
@@ -274,13 +335,19 @@ class AuthManager:
             )
             
             # Update session with new token info
-            session['access_token'] = token.get('access_token')
+            session_data['access_token'] = token.get('access_token')
             if token.get('refresh_token'):
-                session['refresh_token'] = token.get('refresh_token')
+                session_data['refresh_token'] = token.get('refresh_token')
             
             # Update token expiration (but keep session expiration unchanged)
-            session['token_expires_at'] = token.get('expires_at', 0)
-            session['user']['token_expires_at'] = token.get('expires_at', 0)
+            session_data['token_expires_at'] = token.get('expires_at', 0)
+            # session_data['user']['token_expires_at'] = token.get('expires_at', 0)
+            ttl_seconds = self._ttl_seconds_until_session_expires(
+                session_data.get('session_expires_at')
+            )
+            self.redis_store.hset(
+                session.get('session_id'), session_data, ttl_seconds=ttl_seconds
+            )
             logger.info("Access token refreshed successfully")
             return True
         
@@ -334,5 +401,5 @@ def get_current_user():
     """Helper function to get current user"""
     auth_manager = current_app.extensions.get('auth_manager')
     if auth_manager and auth_manager.is_authenticated():
-        return auth_manager.get_current_user()
+        return auth_manager.get_user_info()
     return None

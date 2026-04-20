@@ -35,7 +35,7 @@ class RedisKVStore(KVStore):
         return str(raw)
 
     def set(self, key: str, value: any, ttl_seconds: Optional[int] = None) -> None:
-        # value is a string
+        # create a bew key/value in redis
         if ttl_seconds is not None:
             self._client.set(key, value, ex=ttl_seconds)
         else:
@@ -47,8 +47,16 @@ class RedisKVStore(KVStore):
     def ping(self) -> bool:
         return self._client.ping()
 
+    def hget(self, key: str) -> None:
+        # get the hash in redis
+        return self._client.hgetall(key)
+
     def hset(self, key: str, value: any, ttl_seconds: Optional[int] = None) -> None:
-        # value is a string
+        # create a new hash in redis
         self._client.hset(key, mapping=value)
         if ttl_seconds is not None:
             self._client.expire(key, ttl_seconds)
+
+    def hdel(self, key: str) -> None:
+        # delete the hash in redis
+        self._client.hdel(key)
