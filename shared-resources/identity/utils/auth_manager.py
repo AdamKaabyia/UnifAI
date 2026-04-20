@@ -124,7 +124,10 @@ class AuthManager:
                 # Process the OAuth callback - exchange authorization code for tokens
                 token = self.keycloak_client.authorize_access_token()
                 userinfo = self.keycloak_client.userinfo()
-                
+                logger.info("***************************************")
+                logger.info(f"userinfo: {userinfo}")
+                logger.info("***************************************")
+
                 # Calculate session expiration (10 hours from now)
                 session_created_at = datetime.now()
                 session_expires_at = session_created_at + timedelta(hours=10)
@@ -133,18 +136,18 @@ class AuthManager:
                 session_id = str(uuid.uuid4())
                 session['session_id'] = session_id
                 session.permanent = True
-                session['user'] = {
-                    'username': userinfo.get('preferred_username'),
-                    'email': userinfo.get('email'),
-                    'name': userinfo.get('name'),
-                    'sub': userinfo.get('sub'),
-                    'session_created_at': session_created_at.timestamp(),
-                    'session_expires_at': session_expires_at.timestamp(),
-                    'token_expires_at': token.get('expires_at', 0)
-                }
-                session['access_token'] = token.get('access_token')
-                session['refresh_token'] = token.get('refresh_token')
-                session['token_expires_at'] = token.get('expires_at', 0)
+                # session['user'] = {
+                #     'username': userinfo.get('preferred_username'),
+                #     'email': userinfo.get('email'),
+                #     'name': userinfo.get('name'),
+                #     'sub': userinfo.get('sub'),
+                #     'session_created_at': session_created_at.timestamp(),
+                #     'session_expires_at': session_expires_at.timestamp(),
+                #     'token_expires_at': token.get('expires_at', 0)
+                # }
+                # session['access_token'] = token.get('access_token')
+                # session['refresh_token'] = token.get('refresh_token')
+                # session['token_expires_at'] = token.get('expires_at', 0)
                 session_data = {
                     'username': userinfo.get('preferred_username'),
                     'email': userinfo.get('email'),
@@ -212,7 +215,6 @@ class AuthManager:
         
         @self.app.route('/api/auth/user')
         def get_current_user():
-            user = {}
             """Get current user information"""
             if not self.is_authenticated():
                 return jsonify({'error': 'Not authenticated'}), 401
@@ -307,7 +309,7 @@ class AuthManager:
         return is_expired
     
     def _should_refresh_token(self):
-        """Check if access token should be refreshed (expires in next 5 minutes)"""
+        """Check if access token should be refreshed (expires in next 1 minute)"""
         session_data = self._get_server_session()
         token_expires_at = (session_data or {}).get('token_expires_at', 0)
         if not token_expires_at:
