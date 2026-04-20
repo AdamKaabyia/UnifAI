@@ -17,14 +17,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     }
   }, [isLoading, isAuthenticated, setLocation]);
 
+  // Show loading spinner while checking authentication
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
+  // If not authenticated, redirect to login
   if (!isAuthenticated) {
     return <LoadingSpinner message="Redirecting to login..." />;
   }
 
+  // If authenticated, render the protected content
   return <>{children}</>;
 };
 
