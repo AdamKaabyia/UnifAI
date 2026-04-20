@@ -51,14 +51,14 @@ jobs:
           ref: main
           token: ${{ secrets.UNIFAI_SECRETS_TOKEN }}
           persist-credentials: false
-          path: ui/genie-cred-data
+          path: ui/UnifAI-secrets
           
 
       - name: check repo exist
         if: ${{ matrix.component == 'ui' }}
         run: |
-          ls -la ui | grep genie-cred-data
-          ls -la ui/genie-cred-data 
+          ls -la ui | grep UnifAI-secrets
+          ls -la ui/UnifAI-secrets 
       
       - name: Build image for ${{ matrix.component }}
         run: |

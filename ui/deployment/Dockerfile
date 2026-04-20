@@ -43,7 +43,7 @@ RUN chmod -R 7777 /opt/app-root/src/
 RUN chown default:root /opt/app-root/src/
 
 #copy certificate files from the cred repo
-COPY ui/genie-cred-data/certificates/* /etc/nginx/ssl/
+COPY ui/UnifAI-secrets/certificates/* /etc/nginx/ssl/
 
 COPY --from=build /ui/build /usr/share/nginx/html
 RUN chown -R default:root /usr/share/nginx/html && chmod -R 775 /usr/share/nginx/html

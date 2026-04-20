@@ -16,6 +16,8 @@ ui:
   env:
     NGINX_PORT: "8443"
     VERSION: ""
+    TEAM_MEMBERS: "Lina Abu Yousef,Maya Carmi,Nir Rashti,Odai Odeh,Omri Sabach,Saar Fireshtein,Shani Tzvi,Yosi Habushi"
+    SUPPORT_LINK: "https://redhat-internal.slack.com/app_redirect?channel=forum-unifai"
 
   image:
     repository: images.paas.redhat.com/unifai/ui
