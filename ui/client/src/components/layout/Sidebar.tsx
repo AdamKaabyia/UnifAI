@@ -5,7 +5,7 @@ import {
   FaTachometerAlt, FaCogs, FaFileAlt, 
   FaChartLine, FaUserShield, FaCog, FaSignOutAlt,
   FaRobot, FaFile, FaChevronLeft, FaChevronRight,
-  FaInfoCircle, FaBook, FaComment, FaPuzzlePiece,
+  FaInfoCircle, FaBook, FaComment, FaPuzzlePiece
 } from "react-icons/fa";
 import { FaSlack, FaBars } from "react-icons/fa";
 import { motion } from "framer-motion";
@@ -27,6 +27,14 @@ export default function Sidebar() {
 
   const { user, logout } = useAuth();
   const { isAdmin } = useAdminAccess();
+
+  const getInitials = (name: string): string => {
+    return name
+      .split(' ')                         // Split by spaces
+      .filter(Boolean)                    // Remove empty parts
+      .map(part => part[0].toUpperCase()) // Take first letter of each part and capitalize
+      .join('');                          // Join into a string
+  }
 
   return (
     <div 
@@ -251,6 +259,39 @@ export default function Sidebar() {
           />
         </ul>
       </nav>
+
+      {/* User Profile */}
+      {/* <div className="px-4 py-3 border-t border-gray-800 mt-auto">
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-accent to-primary flex items-center justify-center flex-shrink-0">
+            <span className="text-sm font-medium text-white">{getInitials(user?.name || '')}</span>
+          </div>
+          {!isCollapsed && (
+            <motion.div 
+              initial={false}
+              animate={{ opacity: isCollapsed ? 0 : 1 }}
+              transition={{ duration: 0.2 }}
+              className="flex-grow"
+            >
+              <h4 className="text-sm font-medium">{user?.name}</h4>
+              <p className="text-xs text-gray-400">Administrator</p>
+            </motion.div>
+          )}
+          {!isCollapsed && (
+            <motion.div
+              initial={false}
+              animate={{ opacity: isCollapsed ? 0 : 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SimpleTooltip content={<p>Sign out</p>}>
+                <button className="text-gray-400 hover:text-white">
+                  <FaSignOutAlt />
+                </button>
+              </SimpleTooltip>
+            </motion.div>
+          )}
+        </div>
+      </div> */}
     </div>
   );
 }

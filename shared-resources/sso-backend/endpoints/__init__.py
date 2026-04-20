@@ -1,13 +1,12 @@
 from endpoints.protected_routes import protected_bp
 from endpoints.health import health_bp
-from endpoints.directory_routes import directory_bp
 
 
 def register_all_endpoints(app):
     backend_blueprints = [
         {"bp": protected_bp, "parent": 'protected', "route": ''},
         {"bp": health_bp, "parent": 'health', "route": ''},
-        {"bp": directory_bp, "parent": 'directory', "route": ''},
+
     ]
     
     # register all other blueprints in the app

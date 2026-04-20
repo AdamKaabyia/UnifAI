@@ -6,6 +6,3 @@ PyJWT
 python-dotenv
 pydantic
 pydantic-settings
-bcrypt
-pymongo
-ldap3
