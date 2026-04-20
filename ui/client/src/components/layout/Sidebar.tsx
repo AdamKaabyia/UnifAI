@@ -247,7 +247,7 @@ export default function Sidebar() {
             isActive={location === '/settings'}
             status={null}
             isCollapsed={isCollapsed}
-            disabled={false}
+            disabled={true}
           />
         </ul>
       </nav>

@@ -12,7 +12,6 @@ import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
-import Settings from "@/pages/Settings";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -66,7 +65,6 @@ function AppRoutes() {
       <Route path="/configuration" component={Configuration} />
       <Route path="/guides" component={GuidesPage} />
       <Route path="/analytics" component={Analytics} />
-      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
