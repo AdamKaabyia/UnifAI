@@ -8,7 +8,6 @@ export interface User {
   name: string;
   sub: string;
   token_expires_at: number;
-  auth_provider?: 'local' | 'keycloak';
   is_admin?: boolean;
 }
 
@@ -17,9 +16,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLoggedOut: boolean;
-  authProvider: 'local' | 'keycloak' | null;
   login: () => void;
-  loginWithCredentials: (identifier: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -37,8 +34,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoggedOut, setIsLoggedOut] = useState(() => {
     return localStorage.getItem('unifai_logged_out') === 'true';
   });
-  const [authProvider, setAuthProvider] = useState<'local' | 'keycloak' | null>(null);
-
   // Load analytics after authentication
   loadAnalytics(isAuthenticated, user);
 
@@ -63,17 +58,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.data.authenticated && response.data.user) {
         setUser(response.data.user);
         setIsAuthenticated(true);
-        setAuthProvider(response.data.user.auth_provider || 'keycloak');
       } else {
         setUser(null);
         setIsAuthenticated(false);
-        setAuthProvider(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       setUser(null);
       setIsAuthenticated(false);
-      setAuthProvider(null);
     } finally {
       setIsLoading(false);
     }
@@ -95,23 +87,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     window.location.href = `${api.defaults.baseURL}/auth/login?state=${encodeURIComponent(encodedState)}${promptParam}`;
   }, [isLoggedOut]);
 
-  const loginWithCredentials = useCallback(async (identifier: string, password: string): Promise<boolean> => {
-    try {
-      const response = await api.post('/auth/local/login', { identifier, password });
-      if (response.data.authenticated && response.data.user) {
-        setUser(response.data.user);
-        setIsAuthenticated(true);
-        setAuthProvider('local');
-        window.location.href = '/';
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Local login failed:', error);
-      return false;
-    }
-  }, []);
-
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -122,7 +97,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(false);
       setIsLoggedOut(true);
       localStorage.setItem('unifai_logged_out', 'true');
-      setAuthProvider(null);
       window.location.href = '/login';
     }
   }, []);
@@ -217,9 +191,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     isLoading,
     isLoggedOut,
-    authProvider,
     login,
-    loginWithCredentials,
     logout,
     checkAuthStatus,
   };

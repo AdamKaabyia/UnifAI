@@ -12,7 +12,6 @@ import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
-import Signup from "@/pages/Signup";
 import Settings from "@/pages/Settings";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -96,23 +95,15 @@ const AuthRoute: React.FC<{ component: React.ComponentType }> = ({ component: Co
   return <Component />;
 };
 
-// Public auth paths that don't need ProtectedRoute
-const PUBLIC_AUTH_PATHS = ['/login', '/signup'];
-
 function AppContent() {
   const [location] = useLocation();
-  
-  // Check if current path is a public auth route
-  const isPublicAuthRoute = PUBLIC_AUTH_PATHS.includes(location);
-  
-  if (isPublicAuthRoute) {
+
+  // Login is outside ProtectedRoute so unauthenticated users can reach it
+  if (location === '/login') {
     return (
       <Switch>
         <Route path="/login">
           <AuthRoute component={Login} />
-        </Route>
-        <Route path="/signup">
-          <AuthRoute component={Signup} />
         </Route>
       </Switch>
     );
