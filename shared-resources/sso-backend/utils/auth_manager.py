@@ -63,15 +63,12 @@ class AuthManager:
         # Register auth routes
         self._register_auth_routes()
         
-        # Set up session configuration (Secure + SameSite=None only works over
-        # HTTPS; in development we fall back to Lax so the browser actually
-        # persists the session cookie over plain HTTP).
-        is_production = self.backend_env == 'production'
+        # Set up session configuration
         app.config.update({
-            'SESSION_COOKIE_SECURE': is_production,
+            'SESSION_COOKIE_SECURE': True,  # Required for SameSite=None
             'SESSION_COOKIE_HTTPONLY': True,
-            'SESSION_COOKIE_SAMESITE': 'None' if is_production else 'Lax',
-            'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)
+            'SESSION_COOKIE_SAMESITE': 'None',  # Must be 'None' for cross-origin
+            'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
         })
 
     def _get_server_session(self):
@@ -113,12 +110,7 @@ class AuthManager:
             
             # Pass the client-provided state through to Keycloak
             # Keycloak will echo it back in the callback
-            extra_params = {}
-            prompt = request.args.get('prompt')
-            if prompt:
-                extra_params['prompt'] = prompt
-
-            return self.keycloak_client.authorize_redirect(redirect_uri, state=client_state, **extra_params)
+            return self.keycloak_client.authorize_redirect(redirect_uri, state=client_state)
 
         @self.app.route('/api/auth/callback')
         def auth_callback():
@@ -178,7 +170,7 @@ class AuthManager:
         
         @self.app.route('/api/auth/logout', methods=['POST'])
         def logout():
-            """Logout user: revoke Keycloak refresh token, drop server session, clear cookie."""
+            """Logout user and clear session (revokes refresh token at Keycloak when available)."""
             data = self._get_server_session()
             username = (data or {}).get('user', {}).get('username', 'Unknown')
             refresh_token_val = (data or {}).get('refresh_token') if data else None
@@ -238,7 +230,7 @@ class AuthManager:
         
         @self.app.route('/api/auth/refresh', methods=['POST'])
         def refresh_token():
-            """Refresh access token (Keycloak SSO, server-side session)."""
+            """Refresh access token"""
             data = self._get_server_session()
             if not data or not data.get('refresh_token'):
                 return jsonify({'error': 'No refresh token available'}), 401
@@ -290,7 +282,7 @@ class AuthManager:
         return is_expired
     
     def _should_refresh_token(self):
-        """Check if access token should be refreshed (expires within 1 minute)."""
+        """Check if access token should be refreshed (expires in next 5 minutes)"""
         data = self._get_server_session()
         token_expires_at = (data or {}).get('token_expires_at', 0)
         if not token_expires_at:
