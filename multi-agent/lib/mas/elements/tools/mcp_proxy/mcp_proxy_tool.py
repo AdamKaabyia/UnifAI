@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Type, Any, Dict, TYPE_CHECKING
+from typing import Callable, Optional, Type, Any, Dict
 from pydantic import BaseModel, HttpUrl
 from global_utils.utils.util import validate_arguments
 from global_utils.utils.async_bridge import get_async_bridge
@@ -8,9 +8,6 @@ from mas.elements.providers.mcp_server_client.mcp_server_client import McpServer
 from mas.elements.providers.mcp_server_client.transport.enums import McpTransportType
 from mas.elements.tools.common.base_tool import BaseTool
 from global_utils.utils.util import json_schema_model
-
-if TYPE_CHECKING:
-    from mas.core.auth.credentials.credential import AuthCredential
 
 
 class McpProxyToolError(Exception):
@@ -31,14 +28,14 @@ class McpProxyTool(BaseTool):
             mcp_url: HttpUrl,
             headers: Optional[Dict[str, str]] = None,
             transport_type: McpTransportType = McpTransportType.STREAMABLE_HTTP,
-            auth: Optional[AuthCredential] = None,
+            header_provider: Optional[Callable[..., Dict[str, str]]] = None,
     ):
         self.name = mcp_tool_name
         self.mcp_tool_name = mcp_tool_name
         self.mcp_url = mcp_url
         self.headers = headers or {}
         self.transport_type = transport_type
-        self._auth = auth
+        self._header_provider = header_provider
         self._tool_info = None
         self._schema_initialized = False
 
@@ -79,16 +76,14 @@ class McpProxyTool(BaseTool):
             )
 
     def _get_current_headers(self) -> Dict[str, str]:
+        """Get headers for the current request.
+
+        Delegates to the provider's header_provider if available,
+        otherwise falls back to static headers.
         """
-        Get current auth headers, refreshing token if managed OAuth is configured.
-        Falls back to static headers if no auth credential is set.
-        """
-        if self._auth:
-            try:
-                return self._auth.get_headers()
-            except Exception:
-                pass
-        return self.headers
+        if self._header_provider:
+            return self._header_provider()
+        return dict(self.headers) if self.headers else {}
 
     async def arun(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -118,7 +113,7 @@ class McpProxyTool(BaseTool):
             try:
                 result = await client.call_tool(self.mcp_tool_name, mcp_args)
             except Exception as e:
-                if "401" in str(e) and self._auth:
+                if "401" in str(e) and self._header_provider:
                     return await self._retry_with_fresh_token(mcp_args)
                 raise McpProxyToolError(f"Failed to call '{self.mcp_tool_name}': {e}")
 
@@ -126,26 +121,13 @@ class McpProxyTool(BaseTool):
 
     async def _retry_with_fresh_token(self, mcp_args: Dict[str, Any]) -> Any:
         """Force-refresh credentials and retry the tool call once."""
-        try:
-            self._auth.force_refresh()
-        except Exception as exc:
-            raise McpProxyToolError(
-                f"Token expired and refresh failed for '{self.mcp_tool_name}': {exc}"
-            )
-
-        fresh_headers = self._get_current_headers()
-        retry_client = McpServerClient(
+        fresh_headers = self._header_provider(force_refresh=True)
+        async with McpServerClient(
             mcp_url=self.mcp_url,
             headers=fresh_headers,
             transport_type=self.transport_type,
-        )
-        async with retry_client:
-            try:
-                result = await retry_client.call_tool(self.mcp_tool_name, mcp_args)
-            except Exception as e:
-                raise McpProxyToolError(
-                    f"Retry after token refresh failed for '{self.mcp_tool_name}': {e}"
-                )
+        ) as client:
+            result = await client.call_tool(self.mcp_tool_name, mcp_args)
         return self._extract_result_content(result)
 
     def _prepare_arguments(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -287,7 +269,7 @@ class McpProxyTool(BaseTool):
         tool_info,
         headers: Optional[Dict[str, str]] = None,
         transport_type: McpTransportType = McpTransportType.STREAMABLE_HTTP,
-        auth: Optional[AuthCredential] = None,
+        header_provider: Optional[Callable[..., Dict[str, str]]] = None,
     ) -> McpProxyTool:
         """
         Create tool with pre-cached schema (no connection needed).
@@ -296,7 +278,7 @@ class McpProxyTool(BaseTool):
         tool = cls(
             mcp_tool_name, mcp_url,
             headers=headers, transport_type=transport_type,
-            auth=auth,
+            header_provider=header_provider,
         )
 
         tool._tool_info = tool_info

@@ -88,7 +88,7 @@ class OAuth2Protocol(AuthProtocol):
             async with AsyncOAuth2Client(
                 client_id=cfg.client_id,
                 client_secret=cfg.client_secret,
-                token_endpoint_auth_method="client_secret_post",
+                token_endpoint_auth_method=cfg.token_endpoint_auth_method,
             ) as client:
                 token = await client.fetch_token(
                     cfg.token_endpoint,
@@ -113,7 +113,7 @@ class OAuth2Protocol(AuthProtocol):
             async with AsyncOAuth2Client(
                 client_id=cfg.client_id,
                 client_secret=cfg.client_secret,
-                token_endpoint_auth_method="client_secret_post",
+                token_endpoint_auth_method=cfg.token_endpoint_auth_method,
             ) as client:
                 token = await client.fetch_token(
                     cfg.token_endpoint,
@@ -164,13 +164,14 @@ class OAuth2Protocol(AuthProtocol):
         registration_endpoint: str,
         client_name: str = "UnifAI",
         redirect_uris: Optional[List[str]] = None,
+        token_endpoint_auth_method: str = "none",
     ) -> Dict[str, Any]:
         """RFC 7591 Dynamic Client Registration."""
         body: Dict[str, Any] = {
             "client_name": client_name,
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
-            "token_endpoint_auth_method": "client_secret_post",
+            "token_endpoint_auth_method": token_endpoint_auth_method,
         }
         if redirect_uris:
             body["redirect_uris"] = redirect_uris

@@ -1,5 +1,8 @@
 """
 Factory that builds :class:`OAuthClientInstance` from validated config.
+
+Auth elements are UI widgets for login — they don't produce runtime
+credentials for providers.  Providers get tokens directly from AuthService.
 """
 
 from __future__ import annotations
@@ -28,17 +31,7 @@ class OAuthClientFactory(BaseFactory[OAuthClientConfig, OAuthClientInstance]):
 
     def create(self, cfg: OAuthClientConfig, **kwargs: Any) -> OAuthClientInstance:
         try:
-            deps = kwargs.get("deps")
-            auth_service = getattr(deps, "auth_service", None) if deps else None
-            exec_ctx = getattr(deps, "execution_ctx", None) if deps else None
-
-            if auth_service and exec_ctx and cfg.server_identifier:
-                cred = auth_service.bind_lazy(exec_ctx, cfg.server_identifier)
-                if cred:
-                    return cred
-
             return OAuthClientInstance()
-
         except Exception as e:
             raise PluginConfigurationError(
                 f"OAuthClientFactory.create() failed: {e}",

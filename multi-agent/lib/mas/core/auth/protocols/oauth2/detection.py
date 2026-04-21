@@ -107,10 +107,18 @@ class OAuth2DetectionStrategy(DetectionStrategy):
         http_client: HttpClient,
     ) -> Optional[Dict[str, Any]]:
         issuer = issuer.rstrip("/")
-        for url in [
+        parsed = urlparse(issuer)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        path = parsed.path.rstrip("/")
+
+        urls = [
+            f"{origin}/.well-known/oauth-authorization-server{path}",
             f"{issuer}/.well-known/oauth-authorization-server",
+            f"{origin}/.well-known/openid-configuration{path}",
             f"{issuer}/.well-known/openid-configuration",
-        ]:
+        ]
+
+        for url in urls:
             try:
                 resp = await http_client.get(url, timeout=5.0)
                 if resp.status_code == 200 and resp.body:

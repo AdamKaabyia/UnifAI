@@ -18,6 +18,7 @@ class OAuth2Config(BaseModel):
     client_secret: Optional[str] = None
     authorization_endpoint: str
     token_endpoint: str
+    token_endpoint_auth_method: str = "client_secret_post"
     scopes: List[str] = Field(default_factory=list)
     resource_uri: Optional[str] = None
     extra_authorize_params: Dict[str, str] = Field(default_factory=dict)

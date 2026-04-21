@@ -26,13 +26,16 @@ class McpProviderConfig(ProviderBaseConfig):
                 "mcp_url": "mcp_url",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
-                "server_identifier": "server_identifier",
             }
         ).to_hints()
     )
     auth: Optional[AuthRef] = Field(
         default=None,
-        description="Reference to an auth element for authenticated connections",
+        description="Auth element for authenticated connections",
+        json_schema_extra={
+            "category": "auths",
+            "description": "Select an auth element to sign in with",
+        },
     )
     server_identifier: str = Field(
         default="",

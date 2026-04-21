@@ -56,7 +56,11 @@ class BoundCredential:
             return uid
         return uid.user_id
 
-    def get_headers(self) -> Dict[str, str]:
+    def get_headers(self, *, force_refresh: bool = False) -> Dict[str, str]:
+        if force_refresh:
+            self._svc.force_refresh(
+                self._user_id, self._server_id, self._config,
+            )
         return self._svc.get_headers(
             self._user_id, self._server_id, self._config,
         )
@@ -68,11 +72,6 @@ class BoundCredential:
         if not token:
             raise TokenExpiredError("No valid token")
         return token
-
-    def force_refresh(self) -> None:
-        self._svc.force_refresh(
-            self._user_id, self._server_id, self._config,
-        )
 
 
 class AuthService:
@@ -129,6 +128,13 @@ class AuthService:
         2. If expired, resolve config if not provided, then attempt a refresh.
         """
         cred = self.get_credential(user_id, server_identifier)
+        if cred:
+            from datetime import datetime, timezone
+            print(
+                "Token check: user=%s server=%s status=%s expires_at=%s now=%s is_valid=%s",
+                user_id, server_identifier, cred.status, cred.expires_at,
+                datetime.now(timezone.utc), cred.is_valid(),
+            )
         if cred and cred.is_valid():
             return cred.access_token
         if cred:
@@ -198,13 +204,105 @@ class AuthService:
         server_identifier: str,
         config: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
-        """Build an OAuth login URL for the given user + server."""
+        """Build an OAuth login URL for the given user + server.
+
+        1. Check client_configs for an existing client_id.
+        2. If none, run discovery to find the registration_endpoint.
+        3. If available, auto-register (RFC 7591) and save.
+        4. Build the login URL.
+        """
         if not self._login:
             return None
+
         resolved = config or self._resolve_config(user_id, server_identifier)
-        if not resolved:
+
+        if not resolved.get("client_id"):
+            resolved = await self._try_auto_register(
+                user_id, server_identifier, resolved,
+            )
+
+        if not resolved or not resolved.get("client_id"):
             return None
+
         return await self._login.build_login_url(user_id, server_identifier, resolved)
+
+    async def _try_auto_register(
+        self,
+        user_id: str,
+        server_identifier: str,
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Attempt RFC 7591 Dynamic Client Registration.
+
+        Checks client_configs first — if a client_id already exists
+        (e.g. from a concurrent registration), uses it instead of
+        registering again.
+        """
+        existing = self.get_client_config(user_id, server_identifier)
+        if existing and existing.client_id:
+            return existing.model_dump()
+
+        reg_endpoint = config.get("registration_endpoint")
+
+        if not reg_endpoint and self._detector:
+            http_client = getattr(self._detector, '_http_client', None)
+            if http_client:
+                from .protocols.oauth2.detection import OAuth2DetectionStrategy
+                as_meta = await OAuth2DetectionStrategy._fetch_as_metadata(
+                    server_identifier, http_client,
+                )
+                if as_meta:
+                    config = {**config, **as_meta}
+                    reg_endpoint = config.get("registration_endpoint")
+
+        if not reg_endpoint:
+            return config
+
+        callback_url = getattr(self._login, '_callback_url', None) if self._login else None
+        redirect_uris = [callback_url] if callback_url else None
+
+        supported_methods = config.get("token_endpoint_auth_methods_supported", [])
+        auth_method = supported_methods[0] if supported_methods else "none"
+
+        try:
+            result = await self._protocol.register_client(
+                registration_endpoint=reg_endpoint,
+                redirect_uris=redirect_uris,
+                token_endpoint_auth_method=auth_method,
+            )
+
+            client_id = result.get("client_id")
+            if not client_id:
+                return config
+
+            new_config = {
+                **config,
+                "client_id": client_id,
+                "client_secret": result.get("client_secret"),
+                "server_identifier": server_identifier,
+            }
+
+            if self._configs:
+                self._configs.save(user_id, ClientConfig(
+                    client_id=client_id,
+                    client_secret=result.get("client_secret"),
+                    authorization_endpoint=config.get("authorization_endpoint", ""),
+                    token_endpoint=config.get("token_endpoint", ""),
+                    token_endpoint_auth_method=auth_method,
+                    scopes=config.get("scopes_supported", []),
+                    resource_uri=config.get("resource_uri"),
+                    server_identifier=server_identifier,
+                ))
+                logger.info(
+                    "Auto-registered OAuth client for server=%s client_id=%s",
+                    server_identifier, client_id,
+                )
+
+            return new_config
+
+        except Exception as exc:
+            logger.warning("Dynamic client registration failed: %s", exc)
+            return config
 
     # ── Binding ───────────────────────────────────────────────────────
 

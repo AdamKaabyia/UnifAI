@@ -63,14 +63,22 @@ class McpProvider:
 
         self._tool_registry = ProviderToolRegistry()
 
-    def _get_current_headers(self) -> Dict[str, str]:
-        """Merge static headers with live auth headers."""
-        current = dict(self.headers) if self.headers else {}
+    def _get_current_headers(self, *, force_refresh: bool = False) -> Dict[str, str]:
+        """Merge static headers with live auth headers.
+
+        Auth headers go first, static headers (additional_headers)
+        overlay so custom headers like X-MCP-Realm are never lost.
+        When *force_refresh* is True, forces a token refresh before
+        building the auth headers (used on 401 retry).
+        """
+        current = {}
         if self._auth:
             try:
-                current = {**self._auth.get_headers(), **current}
+                current.update(self._auth.get_headers(force_refresh=force_refresh))
             except Exception:
                 pass
+        if self.headers:
+            current.update(self.headers)
         return current
 
     async def _initialize_tools(self) -> None:
@@ -111,7 +119,7 @@ class McpProvider:
                     tool_name, self.mcp_url, cached_tool_info,
                     headers=self.headers,
                     transport_type=self.transport_type,
-                    auth=self._auth,
+                    header_provider=self._get_current_headers,
                 )
                 self._tools.append(tool)
             else:

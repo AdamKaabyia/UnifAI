@@ -180,6 +180,8 @@ class AppContainer(metaclass=SingletonMeta):
             callback_url=cfg.sso_callback_url,
         )
 
+        self.client_config_store = client_config_store
+
         # AuthService — single service for the full auth lifecycle
         auth_service = AuthService(
             token_store=self.token_store,

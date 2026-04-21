@@ -1,13 +1,13 @@
 from endpoints.protected_routes import protected_bp
 from endpoints.health import health_bp
-from endpoints.mcp_auth import mcp_auth_bp
+from endpoints.credentials_callback import credentials_bp
 
 
 def register_all_endpoints(app):
     backend_blueprints = [
         {"bp": protected_bp, "parent": 'protected', "route": ''},
         {"bp": health_bp, "parent": 'health', "route": ''},
-        {"bp": mcp_auth_bp, "parent": 'mcp-auth', "route": ''},
+        {"bp": credentials_bp, "parent": 'credentials', "route": ''},
     ]
     
     # register all other blueprints in the app
