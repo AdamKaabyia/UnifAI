@@ -11,6 +11,8 @@ from mas.elements.providers.mcp_server_client.mcp_server_client import McpServer
 from .provider_tool_registry import ProviderToolRegistry
 from .transport.enums import McpTransportType
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from mas.core.auth.credentials.credential import AuthCredential
 
@@ -63,20 +65,18 @@ class McpProvider:
 
         self._tool_registry = ProviderToolRegistry()
 
-    def _get_current_headers(self, *, force_refresh: bool = False) -> Dict[str, str]:
+    async def _get_current_headers(self) -> Dict[str, str]:
         """Merge static headers with live auth headers.
 
         Auth headers go first, static headers (additional_headers)
         overlay so custom headers like X-MCP-Realm are never lost.
-        When *force_refresh* is True, forces a token refresh before
-        building the auth headers (used on 401 retry).
         """
         current = {}
         if self._auth:
             try:
-                current.update(self._auth.get_headers(force_refresh=force_refresh))
-            except Exception:
-                pass
+                current.update(await self._auth.get_headers())
+            except Exception as exc:
+                logger.warning("Failed to get auth headers: %s", exc)
         if self.headers:
             current.update(self.headers)
         return current
@@ -93,7 +93,7 @@ class McpProvider:
         if self._initialized:
             return
 
-        init_headers = self._get_current_headers()
+        init_headers = await self._get_current_headers()
         async with McpServerClient(
             mcp_url=self.mcp_url,
             headers=init_headers,
@@ -112,7 +112,6 @@ class McpProvider:
 
         self._tools = []
         for tool_name in self.tool_names:
-            # Get cached tool info
             cached_tool_info = self._tool_registry.get_cached_tool_by_name(tool_name)
             if cached_tool_info:
                 tool = McpProxyTool.create_with_cached_schema(
@@ -120,6 +119,7 @@ class McpProvider:
                     headers=self.headers,
                     transport_type=self.transport_type,
                     header_provider=self._get_current_headers,
+                    auth_credential=self._auth,
                 )
                 self._tools.append(tool)
             else:

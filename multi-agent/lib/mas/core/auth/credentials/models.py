@@ -1,11 +1,12 @@
 """
-Auth-layer models — protocol-agnostic.
+Auth-layer models — scheme-agnostic.
 
 All credential, token, and client-config models live here.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -29,7 +30,7 @@ class TokenStatus(str, Enum):
 
 
 class TokenSet(BaseModel):
-    """Fresh credential set produced by any auth protocol."""
+    """Fresh credential set produced by any auth scheme."""
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "Bearer"
@@ -42,7 +43,7 @@ class TokenSet(BaseModel):
 
 class StoredCredential(BaseModel):
     """
-    Persisted per-user, per-auth-server credential.
+    Persisted per-user, per-server credential.
 
     Lookup key: ``(user_id, server_identifier)``.
     """
@@ -55,9 +56,10 @@ class StoredCredential(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "Bearer"
-    expires_at: datetime
+    expires_at: Optional[datetime] = None
     scopes: List[str] = Field(default_factory=list)
     status: TokenStatus = TokenStatus.ACTIVE
+    scheme_type: str = "oauth2"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -68,7 +70,7 @@ class StoredCredential(BaseModel):
 
 
 class ClientConfig(BaseModel):
-    """Client credentials for an auth server (OAuth app registration)."""
+    """Client config for an auth server (OAuth app registration, etc.)."""
     client_id: str
     client_secret: Optional[str] = None
     authorization_endpoint: str = ""
@@ -79,3 +81,12 @@ class ClientConfig(BaseModel):
     extra_authorize_params: Dict[str, str] = Field(default_factory=dict)
     protocol_type: str = "oauth2"
     server_identifier: str = ""
+
+
+@dataclass(frozen=True)
+class RecoveryResult:
+    """Outcome of an attempt_recovery call."""
+    recovered: bool
+    should_retry: bool
+    reason: str
+    new_token_set: Optional[TokenSet] = None

@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from mas.core.auth.protocols.oauth2.models import PendingAuth, PendingStore
+from mas.core.auth.schemes.oauth2.models import PendingAuth, PendingStore
 
 logger = logging.getLogger(__name__)
 

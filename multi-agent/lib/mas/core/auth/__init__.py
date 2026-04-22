@@ -1,10 +1,10 @@
 """
-Auth layer — protocol-agnostic authentication infrastructure.
+Auth layer — scheme-agnostic authentication infrastructure.
 
 Subpackages:
-  credentials/   — token storage, retrieval, refresh, presentation
+  credentials/   — token storage, retrieval, presentation
   discovery/     — detect what auth a server requires
-  protocols/     — concrete protocol implementations (oauth2, ...)
+  schemes/       — concrete scheme implementations (oauth2, api_key, ...)
 
 Consumers depend only on :class:`credentials.AuthCredential`.
 """

@@ -1,7 +1,7 @@
 """
 OAuth2-specific configuration value object.
 
-This is the *protocol-level* config — what the OAuth2 adapter needs to
+This is the *scheme-level* config — what the OAuth2 adapter needs to
 operate.  It is derived from an auth element's stored config at runtime.
 """
 
@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 
 class OAuth2Config(BaseModel):
-    """Everything the OAuth 2.x protocol layer needs."""
+    """Everything the OAuth 2.x scheme layer needs."""
     client_id: str
     client_secret: Optional[str] = None
     authorization_endpoint: str

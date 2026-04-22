@@ -1,9 +1,10 @@
 """
 Auth-layer ports — abstract contracts that define the hexagonal boundary.
 
-:class:`AuthProtocol`  — what any authentication protocol must do.
-:class:`LoginContext`   — protocol-agnostic login redirect data.
-:class:`HttpClient`     — async HTTP I/O used by protocol adapters.
+:class:`AuthScheme`            — what ANY auth mechanism must do.
+:class:`InteractiveAuthScheme` — schemes that also have a user-facing acquisition flow.
+:class:`LoginContext`          — protocol-agnostic login redirect data.
+:class:`HttpClient`            — async HTTP I/O used by scheme adapters.
 """
 
 from __future__ import annotations
@@ -11,15 +12,42 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from .credentials.models import TokenSet
+from .credentials.models import StoredCredential, TokenSet, RecoveryResult
 
 
-class AuthProtocol(ABC):
-    """What any authentication protocol must be able to do."""
+class AuthScheme(ABC):
+    """What any authentication scheme must be able to do."""
 
     @property
     @abstractmethod
-    def protocol_type(self) -> str: ...
+    def scheme_type(self) -> str: ...
+
+    @abstractmethod
+    def build_headers(self, credential: StoredCredential) -> Dict[str, str]:
+        """Return HTTP headers for an authenticated request."""
+        ...
+
+    @abstractmethod
+    async def validate(self, credential: StoredCredential, server_url: str) -> bool:
+        """Probe *server_url* with the credential; ``True`` if accepted."""
+        ...
+
+    @abstractmethod
+    async def attempt_recovery(
+        self,
+        credential: StoredCredential,
+        config: Dict[str, Any],
+    ) -> RecoveryResult:
+        """The credential was rejected. Try to self-heal.
+
+        For OAuth: attempt a token refresh.
+        For API key: return not-recoverable.
+        """
+        ...
+
+
+class InteractiveAuthScheme(AuthScheme):
+    """Schemes that require a multi-step user-facing acquisition flow."""
 
     @abstractmethod
     async def build_login_context(
@@ -42,36 +70,9 @@ class AuthProtocol(ABC):
         """Turn whatever the provider sent back into tokens."""
         ...
 
-    @abstractmethod
-    async def refresh(
-        self,
-        config: Dict[str, Any],
-        refresh_token: str,
-    ) -> TokenSet:
-        """Get a fresh token set using a refresh artifact."""
-        ...
-
-    @abstractmethod
-    async def validate_token(
-        self,
-        access_token: str,
-        server_url: str,
-    ) -> bool:
-        """Check whether *access_token* is accepted by *server_url*.
-
-        Makes a real connection to the server (e.g. a lightweight probe)
-        and returns ``True`` if the token is valid, ``False`` otherwise.
-        """
-        ...
-
-    @abstractmethod
-    def build_headers(self, access_token: str) -> Dict[str, str]:
-        """Return HTTP headers for an authenticated request."""
-        ...
-
 
 class LoginContext:
-    """Protocol-agnostic: what the caller needs to redirect the user."""
+    """What the caller needs to redirect the user."""
 
     __slots__ = ("url", "state", "code_verifier")
 

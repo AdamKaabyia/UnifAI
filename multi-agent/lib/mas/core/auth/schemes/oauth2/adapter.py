@@ -1,8 +1,7 @@
 """
-OAuth2Protocol — the ONE public class in the oauth2 package.
+OAuth2Scheme — implements InteractiveAuthScheme.
 
-Implements :class:`AuthProtocol` using authlib for all OAuth 2.1 mechanics
-(PKCE, authorization URLs, token exchange, refresh).
+All protocol mechanics are delegated to authlib.
 """
 
 from __future__ import annotations
@@ -15,8 +14,10 @@ from typing import Any, Dict, List, Optional
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
-from mas.core.auth.ports import AuthProtocol, LoginContext
-from mas.core.auth.credentials.models import TokenSet
+from mas.core.auth.ports import InteractiveAuthScheme, LoginContext
+from mas.core.auth.credentials.models import (
+    StoredCredential, TokenSet, RecoveryResult,
+)
 from mas.core.auth.errors import (
     AuthNotConfiguredError,
     ClientRegistrationError,
@@ -29,16 +30,74 @@ from .config import OAuth2Config
 logger = logging.getLogger(__name__)
 
 
-class OAuth2Protocol(AuthProtocol):
-    """
-    OAuth 2.1 — Authorization Code + PKCE.
-
-    All protocol mechanics are delegated to authlib.
-    """
+class OAuth2Scheme(InteractiveAuthScheme):
+    """OAuth 2.1 — Authorization Code + PKCE."""
 
     @property
-    def protocol_type(self) -> str:
+    def scheme_type(self) -> str:
         return "oauth2"
+
+    # ── AuthScheme (universal) ────────────────────────────────────────
+
+    def build_headers(self, credential: StoredCredential) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {credential.access_token}"}
+
+    async def validate(self, credential: StoredCredential, server_url: str) -> bool:
+        """Probe *server_url* with the Bearer token; ``True`` if 2xx."""
+        headers = {"Authorization": f"Bearer {credential.access_token}"}
+        headers.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        })
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    server_url,
+                    json={
+                        "jsonrpc": "2.0", "id": 1,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "unifai-probe", "version": "1.0"},
+                        },
+                    },
+                    headers=headers,
+                )
+                return 200 <= resp.status_code < 300
+        except Exception as exc:
+            logger.debug("Token validation probe failed for %s: %s", server_url, exc)
+            return False
+
+    async def attempt_recovery(
+        self,
+        credential: StoredCredential,
+        config: Dict[str, Any],
+    ) -> RecoveryResult:
+        if not credential.refresh_token:
+            return RecoveryResult(
+                recovered=False,
+                should_retry=False,
+                reason="No refresh token available; re-authentication required",
+            )
+
+        try:
+            new_tokens = await self._refresh(config, credential.refresh_token)
+        except TokenRefreshError as exc:
+            return RecoveryResult(
+                recovered=False,
+                should_retry=False,
+                reason=f"Token refresh failed: {exc}",
+            )
+
+        return RecoveryResult(
+            recovered=True,
+            should_retry=True,
+            reason="Token refreshed successfully",
+            new_token_set=new_tokens,
+        )
+
+    # ── InteractiveAuthScheme ─────────────────────────────────────────
 
     async def build_login_context(
         self,
@@ -102,62 +161,7 @@ class OAuth2Protocol(AuthProtocol):
 
         return _to_token_set(token)
 
-    async def refresh(
-        self,
-        config: Dict[str, Any],
-        refresh_token: str,
-    ) -> TokenSet:
-        cfg = OAuth2Config.from_dict(config)
-
-        try:
-            async with AsyncOAuth2Client(
-                client_id=cfg.client_id,
-                client_secret=cfg.client_secret,
-                token_endpoint_auth_method=cfg.token_endpoint_auth_method,
-            ) as client:
-                token = await client.fetch_token(
-                    cfg.token_endpoint,
-                    grant_type="refresh_token",
-                    refresh_token=refresh_token,
-                )
-        except Exception as exc:
-            raise TokenRefreshError(f"Refresh failed: {exc}") from exc
-
-        return _to_token_set(token)
-
-    async def validate_token(
-        self,
-        access_token: str,
-        server_url: str,
-    ) -> bool:
-        """Probe *server_url* with the Bearer token; ``True`` if 2xx."""
-        headers = self.build_headers(access_token)
-        headers.update({
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        })
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(
-                    server_url,
-                    json={
-                        "jsonrpc": "2.0", "id": 1,
-                        "method": "initialize",
-                        "params": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {},
-                            "clientInfo": {"name": "unifai-probe", "version": "1.0"},
-                        },
-                    },
-                    headers=headers,
-                )
-                return 200 <= resp.status_code < 300
-        except Exception as exc:
-            logger.debug("Token validation probe failed for %s: %s", server_url, exc)
-            return False
-
-    def build_headers(self, access_token: str) -> Dict[str, str]:
-        return {"Authorization": f"Bearer {access_token}"}
+    # ── RFC 7591 Dynamic Client Registration ──────────────────────────
 
     async def register_client(
         self,
@@ -166,7 +170,6 @@ class OAuth2Protocol(AuthProtocol):
         redirect_uris: Optional[List[str]] = None,
         token_endpoint_auth_method: str = "none",
     ) -> Dict[str, Any]:
-        """RFC 7591 Dynamic Client Registration."""
         body: Dict[str, Any] = {
             "client_name": client_name,
             "grant_types": ["authorization_code", "refresh_token"],
@@ -199,6 +202,25 @@ class OAuth2Protocol(AuthProtocol):
         if "client_id" not in data:
             raise ClientRegistrationError("DCR response missing client_id")
         return data
+
+    # ── Internal ──────────────────────────────────────────────────────
+
+    async def _refresh(self, config: Dict[str, Any], refresh_token: str) -> TokenSet:
+        cfg = OAuth2Config.from_dict(config)
+        try:
+            async with AsyncOAuth2Client(
+                client_id=cfg.client_id,
+                client_secret=cfg.client_secret,
+                token_endpoint_auth_method=cfg.token_endpoint_auth_method,
+            ) as client:
+                token = await client.fetch_token(
+                    cfg.token_endpoint,
+                    grant_type="refresh_token",
+                    refresh_token=refresh_token,
+                )
+        except Exception as exc:
+            raise TokenRefreshError(f"Refresh failed: {exc}") from exc
+        return _to_token_set(token)
 
 
 def _to_token_set(token: dict) -> TokenSet:

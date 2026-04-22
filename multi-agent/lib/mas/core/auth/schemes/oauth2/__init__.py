@@ -1,5 +1,5 @@
 """
-OAuth 2.1 protocol implementation.
+OAuth 2.1 scheme implementation.
 
 Handles:
   - Authorization Code + PKCE (S256)
@@ -9,9 +9,9 @@ Handles:
   - OAuth Authorization Server Metadata (.well-known)
 
 Public API:
-  - :class:`OAuth2Protocol` — the adapter (the only public class)
+  - :class:`OAuth2Scheme` — the adapter (the only public class)
 """
 
-from .adapter import OAuth2Protocol
+from .adapter import OAuth2Scheme
 
-__all__ = ["OAuth2Protocol"]
+__all__ = ["OAuth2Scheme"]

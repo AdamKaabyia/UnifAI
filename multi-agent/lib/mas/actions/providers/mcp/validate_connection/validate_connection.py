@@ -2,7 +2,7 @@
 MCP validate_connection action.
 
 Tests a real MCP connection via the factory.
-On 401: uses AuthService for discovery and login URL.
+On 401: uses AuthDetector for discovery and OAuth2LoginService for login URL.
 """
 
 from __future__ import annotations
@@ -59,10 +59,14 @@ class ValidateConnectionAction(BaseAction):
         self,
         factory: Optional[McpProviderFactory] = None,
         auth_service: Optional[AuthService] = None,
+        oauth2_login_service: Optional[Any] = None,
+        detector: Optional[Any] = None,
     ):
         super().__init__()
         self._factory = factory or McpProviderFactory()
         self._auth = auth_service
+        self._login = oauth2_login_service
+        self._detector = detector
 
     def execute_sync(self, input_data, context=None):
         try:
@@ -129,11 +133,11 @@ class ValidateConnectionAction(BaseAction):
 
         from global_utils.utils.async_bridge import get_async_bridge
 
-        if not server_id and self._auth:
+        if not server_id and self._detector:
             try:
                 with get_async_bridge() as bridge:
                     detection = bridge.run(
-                        self._auth.discover(str(input_data.mcp_url))
+                        self._detector.detect(str(input_data.mcp_url))
                     )
                     if detection:
                         server_id = detection.server_identifier
@@ -142,7 +146,16 @@ class ValidateConnectionAction(BaseAction):
                 logger.debug("Auth discovery failed: %s", exc)
 
         if server_id and user_id and self._auth:
-            token = self._auth.get_valid_token(user_id, server_id)
+            try:
+                with get_async_bridge() as bridge:
+                    token = bridge.run(self._auth.get_valid_token(user_id, server_id))
+            except Exception as exc:
+                logger.warning("Token lookup/refresh failed: %s", exc)
+                token = None
+            logger.info(
+                "Auth retry: user=%s server=%s token_found=%s",
+                user_id, server_id, bool(token),
+            )
             if token:
                 updated_input = input_data.model_copy(
                     update={"server_identifier": server_id}
@@ -151,29 +164,41 @@ class ValidateConnectionAction(BaseAction):
                     with get_async_bridge() as bridge:
                         return bridge.run(self.execute(updated_input))
                 except Exception as exc:
-                    logger.debug("Authenticated retry failed: %s", exc)
-
-            try:
-                with get_async_bridge() as bridge:
-                    url = bridge.run(
-                        self._auth.build_login_url(user_id, server_id)
+                    logger.error(
+                        "Authenticated retry FAILED for server=%s: %s",
+                        server_id, exc, exc_info=True,
                     )
-                    if url:
-                        client_cfg = self._auth.get_client_config(user_id, server_id)
-                        return ValidateConnectionOutput(
-                            success=True, message="Sign in required",
-                            status="requires_consent", is_reachable=True,
-                            auth_required=True, server_identifier=server_id,
-                            authorization_url=url,
-                            scopes=client_cfg.scopes if client_cfg else scopes,
+                    return ValidateConnectionOutput(
+                        success=False,
+                        message=f"Authenticated but server rejected the request: {exc}",
+                        status="auth_error",
+                        is_reachable=True,
+                        authenticated=True,
+                        auth_required=False,
+                        server_identifier=server_id,
+                    )
+
+            if self._login:
+                try:
+                    client_cfg = self._auth.get_client_config(user_id, server_id)
+                    login_config = client_cfg.model_dump() if client_cfg else {}
+                    with get_async_bridge() as bridge:
+                        url = bridge.run(
+                            self._login.build_login_url(user_id, server_id, login_config)
                         )
-            except Exception as exc:
-                logger.debug("Login URL build failed: %s", exc)
+                        if url:
+                            return ValidateConnectionOutput(
+                                success=True, message="Sign in required",
+                                status="requires_consent", is_reachable=True,
+                                auth_required=True, server_identifier=server_id,
+                                authorization_url=url,
+                                scopes=client_cfg.scopes if client_cfg else scopes,
+                            )
+                except Exception as exc:
+                    logger.error("Login URL build failed: %s", exc, exc_info=True)
 
         return ValidateConnectionOutput(
             success=True, message="Authentication required",
             status="auth_required", is_reachable=True, auth_required=True,
             server_identifier=server_id, scopes=scopes,
         )
-
-

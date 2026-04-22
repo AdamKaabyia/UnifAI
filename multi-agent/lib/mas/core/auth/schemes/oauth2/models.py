@@ -2,7 +2,7 @@
 OAuth2-specific flow models.
 
 These only exist because OAuth2 uses redirect-based auth (authorization URLs,
-PKCE, pending state). Other protocols (API key, bearer) don't need them.
+PKCE, pending state). Other schemes (API key, bearer) don't need them.
 """
 
 from __future__ import annotations

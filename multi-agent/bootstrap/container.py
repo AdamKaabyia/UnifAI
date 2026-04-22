@@ -31,13 +31,14 @@ from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
 
 # Auth layer
-from mas.core.auth.service import AuthService
+from mas.core.auth.service import AuthService, SchemeRegistry
 from mas.core.auth.discovery import AuthDetector
-from mas.core.auth.protocols.oauth2.login_service import OAuth2LoginService
-from mas.core.auth.protocols.oauth2.adapter import OAuth2Protocol
-from mas.core.auth.protocols.oauth2.detection import OAuth2DetectionStrategy
-from mas.core.auth.protocols.oauth2.state_manager import OAuthStateManager
-from mas.core.auth.protocols.oauth2.exchange_service import OAuth2ExchangeService
+from mas.core.auth.schemes.oauth2.adapter import OAuth2Scheme
+from mas.core.auth.schemes.oauth2.login_service import OAuth2LoginService
+from mas.core.auth.schemes.oauth2.detection import OAuth2DetectionStrategy
+from mas.core.auth.schemes.oauth2.state_manager import OAuthStateManager
+from mas.core.auth.schemes.oauth2.exchange_service import OAuth2ExchangeService
+from mas.core.auth.schemes.api_key.adapter import ApiKeyScheme
 from outbound.mongo.client_config_repository import MongoClientConfigStore
 from mas.actions.auth.authenticate.action import AuthenticateAction
 from mas.actions.providers.mcp.validate_connection.validate_connection import ValidateConnectionAction
@@ -145,7 +146,13 @@ class AppContainer(metaclass=SingletonMeta):
             redis_client = redis_lib.Redis.from_url(redis_url)
             pending_store = RedisPendingStore(redis_client=redis_client)
 
-        oauth2_protocol = OAuth2Protocol()
+        # Scheme registry
+        oauth2_scheme = OAuth2Scheme()
+        api_key_scheme = ApiKeyScheme()
+
+        scheme_registry = SchemeRegistry()
+        scheme_registry.register(oauth2_scheme)
+        scheme_registry.register(api_key_scheme)
 
         # Detection
         oauth2_detection = OAuth2DetectionStrategy()
@@ -170,32 +177,35 @@ class AppContainer(metaclass=SingletonMeta):
             state_manager=state_manager,
             pending_store=pending_store,
             token_store=self.token_store,
-            protocol=oauth2_protocol,
+            scheme=oauth2_scheme,
         )
 
-        login_service = OAuth2LoginService(
-            protocol=oauth2_protocol,
+        self.oauth2_login_service = OAuth2LoginService(
+            scheme=oauth2_scheme,
             pending_store=pending_store,
             state_manager=state_manager,
             callback_url=cfg.sso_callback_url,
+            client_config_store=client_config_store,
+            detector=detector,
         )
 
         self.client_config_store = client_config_store
 
-        # AuthService — single service for the full auth lifecycle
+        # AuthService — thin, scheme-agnostic
         auth_service = AuthService(
             token_store=self.token_store,
-            protocol=oauth2_protocol,
+            scheme_registry=scheme_registry,
             client_config_store=client_config_store,
-            detector=detector,
-            login_service=login_service,
         )
 
         self.actions_service.register_instance(AuthenticateAction(
             auth_service=auth_service,
+            oauth2_login_service=self.oauth2_login_service,
         ))
         self.actions_service.register_instance(ValidateConnectionAction(
             auth_service=auth_service,
+            oauth2_login_service=self.oauth2_login_service,
+            detector=detector,
         ))
         self.actions_service.register_instance(GetToolsNamesAction(
             auth_service=auth_service,

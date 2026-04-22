@@ -51,9 +51,14 @@ class AuthenticateAction(BaseAction):
         (ResourceCategory.AUTH.value, "jira_oauth"),
     }
 
-    def __init__(self, auth_service: Optional[AuthService] = None):
+    def __init__(
+        self,
+        auth_service: Optional[AuthService] = None,
+        oauth2_login_service: Optional[Any] = None,
+    ):
         super().__init__()
         self._auth = auth_service
+        self._login = oauth2_login_service
 
     def execute_sync(self, input_data, context=None):
         try:
@@ -79,7 +84,7 @@ class AuthenticateAction(BaseAction):
             )
 
         if self._auth:
-            token = self._auth.get_valid_token(user_id, server_id)
+            token = await self._auth.get_valid_token(user_id, server_id)
             if token:
                 return AuthenticateOutput(
                     success=True, message="Authenticated",
@@ -94,8 +99,10 @@ class AuthenticateAction(BaseAction):
                 status="not_configured",
             )
 
-        if self._auth:
-            url = await self._auth.build_login_url(user_id, server_id)
+        if self._login:
+            url = await self._login.build_login_url(
+                user_id, server_id, config.model_dump(),
+            )
             if url:
                 return AuthenticateOutput(
                     success=True, message="Sign in required",
