@@ -23,4 +23,4 @@ html-to-markdown
 safehttpx
 anyio
 typing-inspection
-a2a-sdk[all]
+a2a-sdk[all]<1.0
