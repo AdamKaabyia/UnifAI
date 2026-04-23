@@ -27,5 +27,5 @@ class WebFetchTool(BaseTool):
             return WebFetchResponse(success=False, url=url, error=str(exc)).model_dump()
 
         result = convert(response.text)
-        content = result if isinstance(result, str) else getattr(result, "markdown", str(result))
+        content = result if isinstance(result, str) else result.content
         return WebFetchResponse(success=True, url=url, content=content).model_dump()
