@@ -123,13 +123,14 @@ def updateDeployerEnv() {
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
         sso_env_file = "./UnifAI-secrets/production/.env_sso"
+        redis_env_file = "./UnifAI-secrets/production/.env_redis"
     } else if (params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
         sso_env_file = "./UnifAI-secrets/staging/.env_sso"
+        redis_env_file = "./UnifAI-secrets/staging/.env_redis"
     }
-    echo("sso env file: ${sso_env_file}")
     echo("✅ Deployer env updated successfully")
-    return sso_env_file
+    return sso_env_file, redis_env_file
 }
 
 
@@ -293,9 +294,9 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            def sso_env_file = updateDeployerEnv()
+                            def (sso_env_file, redis_env_file) = updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=../shared-resources/redis/.env_redis --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=${redis_env_file} --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {
