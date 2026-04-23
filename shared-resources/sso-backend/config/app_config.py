@@ -21,5 +21,5 @@ class AppConfig(SharedConfig):
 
     # Multi-agent connection
     multiagent_host: str = "l`ocalhost"
-    multiagent_port: str = "8002"`
+    multiagent_port: str = "8002"
 
