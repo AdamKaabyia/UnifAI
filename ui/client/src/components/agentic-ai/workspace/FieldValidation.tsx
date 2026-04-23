@@ -28,6 +28,7 @@ interface FieldValidationProps {
   /** All current config field values, used to resolve dependencies for validation actions */
   configValues?: Record<string, any>;
   onValidationChange: (fieldName: string, isValid: boolean, itemResults?: ItemValidationResult[]) => void;
+  onInputChange?: (field: string, value: any) => void;
 }
 
 // Auth-related response statuses
@@ -44,7 +45,8 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
   selectedElementType,
   isRequired = false,
   configValues = {},
-  onValidationChange
+  onValidationChange,
+  onInputChange,
 }) => {
   const { user } = useAuth();
   const userId = user?.username || "";
@@ -198,6 +200,10 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
 
       const fieldMapping = validationHint.field_mapping || 'success';
 
+      if (onInputChange && responseData.server_identifier) {
+        onInputChange('server_identifier', responseData.server_identifier);
+      }
+
       // ── Auth-aware response handling ──
       if (responseData.status && AUTH_STATUSES.has(responseData.status)) {
         lastValidatedKeyRef.current = validationKey;
@@ -287,7 +293,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
   // Listen for OAuth callback postMessage from popup
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'mcp_auth_callback') {
+      if (event.data?.type === 'credentials_callback') {
         if (popupRef.current) {
           popupRef.current.close();
           popupRef.current = null;

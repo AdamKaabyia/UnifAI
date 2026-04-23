@@ -27,17 +27,7 @@ def exchange_code(code, state):
     Exchange an authorization code for tokens.
 
     Called by the SSO pod after receiving the OAuth callback.
-    Protected by internal service token validation.
     """
-    internal_token = request.headers.get("X-Internal-Service-Token", "")
-    expected_token = getattr(current_app.container, "internal_service_token", "")
-
-    if not expected_token:
-        return jsonify({"error": "Internal service token not configured"}), 500
-
-    if internal_token != expected_token:
-        return jsonify({"error": "Unauthorized — invalid internal service token"}), 403
-
     try:
         svc = current_app.container.auth_exchange_service
         with get_async_bridge() as bridge:

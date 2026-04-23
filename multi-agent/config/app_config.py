@@ -22,5 +22,4 @@ class AppConfig(SharedConfig):
     redis_stream_batch_size: int = 50
     # MCP Auth
     mcp_auth_state_secret: str = ""
-    sso_callback_url: str = "http://localhost:13456/api/mcp-auth/callback"
-    internal_service_token: str = "unifai-dev-internal-token"  # TODO: move to env var / secrets manager for production
+    sso_backend_host: str = "http://localhost:13456"

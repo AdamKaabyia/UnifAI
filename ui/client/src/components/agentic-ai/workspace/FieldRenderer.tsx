@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldValidation, ItemValidationResult } from "./FieldValidation";
 import { FieldPopulation } from "./FieldPopulation";
+import { AuthSelector } from "./AuthSelector";
 import { AgentCardVisualization } from "./AgentCardVisualization";
 import { ElementType } from "../../../types/workspace";
 import { maskSecretValue } from "../../../utils/maskSecretFields";
@@ -490,6 +491,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -575,6 +577,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -593,6 +596,23 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           />
         )}
       </div>
+    );
+  }
+
+  // Handle auth category fields with dedicated AuthSelector component
+  if (fieldSchema.category === 'auths') {
+    const authOptions = (refOptions['auths'] || [])
+      .filter((option: any) => option.rid && option.rid.trim() !== "");
+
+    return (
+      <AuthSelector
+        fieldName={fieldName}
+        value={value}
+        refOptions={authOptions}
+        onInputChange={onInputChange}
+        isRequired={isRequired}
+        description={fieldSchema.description}
+      />
     );
   }
 
@@ -685,6 +705,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
               isRequired={isRequired}
               configValues={formData}
               onValidationChange={onValidationChange}
+              onInputChange={onInputChange}
             />
           )}
 
@@ -865,6 +886,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           isRequired={isRequired}
           configValues={formData}
           onValidationChange={onValidationChange}
+          onInputChange={onInputChange}
         />
       )}
       {populateHint && (
@@ -942,6 +964,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
         isRequired={isRequired}
         configValues={formData}
         onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
       />
     )}
     {populateHint && (

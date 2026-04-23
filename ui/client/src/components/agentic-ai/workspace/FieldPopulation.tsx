@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Loader2, RefreshCw, ChevronDown, Check, CheckCheck, X } from 'lucide-react';
 import axios from "../../../http/axiosAgentConfig";
+import { useAuth } from "@/contexts/AuthContext";
 import { OptionItem, normalizeOptions } from './fieldPopulationUtils';
 
 // Type guard to check if hint is an ApiHint (has endpoint) vs ActionHint (has action_uid)
@@ -56,6 +57,9 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
   hideUI = false,
   currentValue = []
 }) => {
+  const { user } = useAuth();
+  const userId = user?.username || "";
+
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [populatedOptions, setPopulatedOptions] = useState<OptionItem[]>([]);
@@ -307,7 +311,8 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
 
     const response = await axios.post('/actions/action.execute', {
       uid: populateAction.uid,
-      inputData
+      inputData,
+      userId,
     });
 
     return response.data;

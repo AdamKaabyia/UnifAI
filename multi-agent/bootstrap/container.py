@@ -128,7 +128,6 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         # ── Auth layer ────────────────────────────────────────────────
-        self.internal_service_token = cfg.internal_service_token
 
         # Outbound adapters
         http_client = HttpxAuthClient()
@@ -184,7 +183,7 @@ class AppContainer(metaclass=SingletonMeta):
             scheme=oauth2_scheme,
             pending_store=pending_store,
             state_manager=state_manager,
-            callback_url=cfg.sso_callback_url,
+            callback_url=f"{cfg.sso_backend_host.rstrip('/')}/api/credentials/callback",
             client_config_store=client_config_store,
             detector=detector,
         )

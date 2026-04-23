@@ -89,18 +89,12 @@ def credentials_callback():
             "error": "Missing code or state",
         })
 
-    multi_agent_url = config.get(
-        "multi_agent_exchange_url",
-        "http://localhost:8002/api/mcp-auth/exchange",
-    )
-    internal_token = config.get("internal_service_token", "")
-
+    multi_agent_url = f"http://{config.multiagent_host}:{config.multiagent_port}/api/credentials/exchange"
     try:
         resp = requests.post(
             multi_agent_url,
             json={"code": code, "state": state},
             headers={
-                "X-Internal-Service-Token": internal_token,
                 "Content-Type": "application/json",
             },
             timeout=15,
