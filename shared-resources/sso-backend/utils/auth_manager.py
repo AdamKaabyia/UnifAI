@@ -180,7 +180,7 @@ class AuthManager:
                     keycloak_base_url = config.keycloak_base_url
                     realm = config.get('keycloak_realm', 'master')
                     logout_url = f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/logout"
-                    http_requests.post(
+                    resp = http_requests.post(
                         logout_url,
                         data={
                             'client_id': config.client_id,
@@ -189,7 +189,16 @@ class AuthManager:
                         },
                         timeout=10,
                     )
-                    logger.info(f"Keycloak session revoked for user {username}")
+                    # Keycloak returns 204 No Content (or 200) on successful token revocation
+                    if resp.ok:
+                        logger.info(f"Keycloak session revoked for user {username}")
+                    else:
+                        body_preview = (resp.text or '')[:500]
+                        logger.warning(
+                            f"Keycloak logout returned {resp.status_code} for {username}; "
+                            f"local session cleared but server may still accept the refresh token. "
+                            f"Body: {body_preview}"
+                        )
                 except Exception as e:
                     logger.warning(f"Failed to revoke Keycloak session for {username}: {e}")
 
