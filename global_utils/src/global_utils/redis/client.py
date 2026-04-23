@@ -1,38 +1,34 @@
 """
 Redis client factory for shared services.
 
-Uses :class:`~global_utils.config.config.SharedConfig` for connection settings.
-The default entry point :func:`build_redis_client` returns a **single shared**
-:class:`redis.Redis` instance per process (see implementation note below).
+Uses :class:`~global_utils.config.config.SharedConfig` for host, port, password,
+and ``decode_responses``. :func:`build_redis_client` returns a process-wide
+**cached** :class:`redis.Redis` per distinct ``db`` (see the function docstring);
+call ``build_redis_client.cache_clear()`` in tests to reset.
 """
 from __future__ import annotations
 
 import functools
-
+from typing import Optional
 from redis import Redis
-
 from global_utils.config.config import SharedConfig
 
 
-@functools.lru_cache(maxsize=1)
-def build_redis_client() -> Redis:
+@functools.lru_cache(maxsize=10)
+def build_redis_client(db: Optional[int] = None) -> Redis:
     """
-    Return a shared :class:`redis.Redis` client for this process.
-
-    ``functools.lru_cache(maxsize=1)`` ensures the first call constructs the
-    client and later calls return the **same** instance — a simple singleton
-    without a custom class. For tests or reload scenarios you can call
-    ``build_redis_client.cache_clear()`` before building again.
-
-    Connection parameters come from :class:`~global_utils.config.config.SharedConfig`:
-    ``redis_ip``, ``redis_port``, ``redis_db``, ``redis_password``,
-    ``redis_decode_responses``.
+    Return a shared :class:`redis.Redis` for this process for the given ``db``.
+    * ``db is None`` → use ``SharedConfig.get_instance().redis_db`` (backward compatible).
+    * ``db=0`` and ``db=1`` (etc.) each get their **own** cached client — two logical DBs
+      ⇒ two :class:`redis.Redis` instances, as intended for multi-agent.
+    Tests: ``build_redis_client.cache_clear()`` to rebuild after config/mocks change.
     """
     config = SharedConfig.get_instance()
+    db_index = config.redis_db if db is None else int(db)
     return Redis(
         host=config.redis_ip,
         port=int(config.redis_port),
-        db=config.redis_db,
+        db=db_index,
         password=config.redis_password,
         decode_responses=config.redis_decode_responses,
     )
