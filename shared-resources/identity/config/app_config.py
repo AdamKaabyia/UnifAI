@@ -9,10 +9,10 @@ class AppConfig(SharedConfig):
     port: str = "13456"
 
     # Keycloak Configuration
-    keycloak_base_url: str = "https://auth.redhat.com/auth"
-    client_id: str = "TAG-001"
-    client_secret: str = "e7CLFJT6mRhzAYa1G87wpgYKYjmrfqXK"
-    keycloak_realm: str = "EmployeeIDP"
+    keycloak_base_url: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    keycloak_realm: str = ""
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
 
@@ -20,9 +20,9 @@ class AppConfig(SharedConfig):
     backend_env: str = "development"
 
     # Redis Configuration
-    redis_ip: str = "redis"
-    redis_port: int = 6379
-    redis_db: int = 1
-    redis_password: str = 'Mc10vin!!'
-    redis_decode_responses: bool = True
-    redis_session_ttl: int = 3600
+    # redis_ip: str = "redis"
+    # redis_port: int = 6379
+    # redis_db: int = 1
+    # redis_password: str = 'Mc10vin!!'
+    # redis_decode_responses: bool = True
+    # redis_session_ttl: int = 3600
