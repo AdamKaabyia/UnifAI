@@ -120,6 +120,7 @@ def updateValuesYaml(String filePath , String version) {
 def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
     def sso_env_file = null
+    def redis_env_file = null
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
         sso_env_file = "./UnifAI-secrets/production/.env_sso"
@@ -130,7 +131,7 @@ def updateDeployerEnv() {
         redis_env_file = "./UnifAI-secrets/staging/.env_redis"
     }
     echo("✅ Deployer env updated successfully")
-    return sso_env_file, redis_env_file
+    return [sso_env_file, redis_env_file]
 }
 
 
