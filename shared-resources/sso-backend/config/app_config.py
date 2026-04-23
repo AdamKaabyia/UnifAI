@@ -17,9 +17,9 @@ class AppConfig(SharedConfig):
     frontend_url: str = "http://localhost:5000"    # session_cookie_secure=True
     backend_env: str = "development"
 
-    redirect_url: str = "http://127.0.0.1:13456/api/credentials/callback"
+    redirect_url: str = "http://127.0.0.1:13456/api/auth/callback"
 
     # Multi-agent connection
-    multiagent_host: str = "l`ocalhost"
+    multiagent_host: str = "localhost"
     multiagent_port: str = "8002"
 
