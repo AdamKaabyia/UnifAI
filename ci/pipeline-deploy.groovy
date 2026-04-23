@@ -24,10 +24,10 @@ def buildParams = [
     MainRepoProject    : "redhat-community-ai-tools/UnifAI",
     MainRepoBranch     : "${params.BRANCH}",
     CredentialsId      : "github-unifai-token",
-    CredMainRepoURL    : "gitlab.cee.redhat.com",
-    CredMainRepoProject: "ai_tools/genie-cred-data", 
+    CredMainRepoURL    : "github.com",
+    CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "gitlab-genie",
+    CredCredentialsId  : "jenkins_agent_deploy_key",
 
     NodeToRun          : "tag-slave",
     DevRoot            : "/root/workspace/${env.JOB_NAME}",
@@ -119,13 +119,17 @@ def updateValuesYaml(String filePath , String version) {
 
 def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
+    def sso_env_file = null
     if (params.deploy_location == 'PRODUCTION') {
-        updateEnvFile("./genie-cred-data/.env", "umami_website_name", "unifai-production")
-    } else if(params.deploy_location == 'STAGING') {
-        updateEnvFile("./genie-cred-data/.env", "umami_website_name", "unifai-staging")
+        updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
+        sso_env_file = "./UnifAI-secrets/production/.env_sso"
+    } else if (params.deploy_location == 'STAGING') {
+        updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
+        sso_env_file = "./UnifAI-secrets/staging/.env_sso"
     }
-
-    echo "✅ Deployer env updated successfully"
+    echo("sso env file: ${sso_env_file}")
+    echo("✅ Deployer env updated successfully")
+    return sso_env_file
 }
 
 
@@ -236,7 +240,7 @@ pipeline {
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredentialsId}",
-                            url: "https://${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
+                            url: "git@${buildParams.MainRepoURL}:${buildParams.MainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -245,11 +249,11 @@ pipeline {
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
                         //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/genie-cred-data/"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/UnifAI-secrets/"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
-                            url: "https://${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
+                            url: "git@${buildParams.CredMainRepoURL}:${buildParams.CredMainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -289,9 +293,9 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            updateDeployerEnv()
+                            def sso_env_file = updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=./genie-cred-data/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {

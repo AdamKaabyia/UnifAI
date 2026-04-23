@@ -64,6 +64,7 @@ class StressTestConfig:
     
     # Timeout Configuration
     UPLOAD_TIMEOUT = 300  # 5 minutes per upload
+    UPLOAD_MAX_RETRIES = int(os.getenv("UPLOAD_MAX_RETRIES", "3"))
     CELERY_MONITOR_TIMEOUT = 1800  # 30 minutes for all celery tasks
     CELERY_POLL_INTERVAL = 5  # Poll every 5 seconds
     
@@ -336,6 +337,7 @@ class StressTestRunner:
     
     def __init__(self, config: StressTestConfig):
         self.config = config
+        self.run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         self.upload_stats = UploadStats()
         self.embedding_stats = EmbeddingStats()
         self.celery_monitor = CeleryMonitor(config)
@@ -349,50 +351,55 @@ class StressTestRunner:
         filename: str,
         pdf_bytes: bytes
     ) -> Tuple[bool, float, Optional[str]]:
-        """Upload a single document to the API"""
-        start_time = time.time()
-        
-        try:
-            # Convert to base64
-            base64_content = base64.b64encode(pdf_bytes).decode('utf-8')
-            
-            # Prepare payload
-            payload = {
-                'files': [
-                    {
-                        'name': filename,
-                        'content': base64_content
-                    }
-                ]
-            }
-            
-            # Make API call
-            async with session.post(
-                self.config.UPLOAD_ENDPOINT,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.UPLOAD_TIMEOUT)
-            ) as response:
-                duration = time.time() - start_time
-                
-                if response.status == 200:
-                    logger.info(f"✓ Document {doc_id} ({filename}) uploaded successfully in {duration:.2f}s")
-                    return True, duration, None
-                else:
+        """Upload a single document to the API with retry and exponential backoff."""
+        base64_content = base64.b64encode(pdf_bytes).decode('utf-8')
+        payload = {
+            'files': [
+                {
+                    'name': filename,
+                    'content': base64_content
+                }
+            ]
+        }
+
+        max_retries = getattr(self.config, 'UPLOAD_MAX_RETRIES', 3)
+        last_error = None
+
+        for attempt in range(1, max_retries + 1):
+            start_time = time.time()
+            try:
+                async with session.post(
+                    self.config.UPLOAD_ENDPOINT,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=self.config.UPLOAD_TIMEOUT)
+                ) as response:
+                    duration = time.time() - start_time
+
+                    if response.status == 200:
+                        if attempt > 1:
+                            logger.info(f"✓ Document {doc_id} ({filename}) uploaded on attempt {attempt} in {duration:.2f}s")
+                        else:
+                            logger.info(f"✓ Document {doc_id} ({filename}) uploaded successfully in {duration:.2f}s")
+                        return True, duration, None
+
                     error_text = await response.text()
-                    error_msg = f"HTTP {response.status}: {error_text}"
-                    logger.error(f"✗ Document {doc_id} ({filename}) upload failed: {error_msg}")
-                    return False, duration, error_msg
-                    
-        except asyncio.TimeoutError:
-            duration = time.time() - start_time
-            error_msg = "Upload timeout"
-            logger.error(f"✗ Document {doc_id} ({filename}) upload timeout after {duration:.2f}s")
-            return False, duration, error_msg
-        except Exception as e:
-            duration = time.time() - start_time
-            error_msg = str(e)
-            logger.error(f"✗ Document {doc_id} ({filename}) upload error: {error_msg}")
-            return False, duration, error_msg
+                    last_error = f"HTTP {response.status}: {error_text}"
+
+            except asyncio.TimeoutError:
+                last_error = "Upload timeout"
+            except Exception as e:
+                last_error = str(e)
+
+            if attempt < max_retries:
+                backoff = 2 ** (attempt - 1)
+                logger.warning(f"⟳ Document {doc_id} ({filename}) attempt {attempt}/{max_retries} failed: {last_error}. Retrying in {backoff}s...")
+                await asyncio.sleep(backoff)
+            else:
+                duration = time.time() - start_time
+                logger.error(f"✗ Document {doc_id} ({filename}) failed after {max_retries} attempts: {last_error}")
+                return False, duration, last_error
+
+        return False, 0, last_error
     
     async def upload_batch(
         self,
@@ -572,7 +579,7 @@ class StressTestRunner:
         logger.info("Generating PDF documents...")
         documents = []
         for i in range(1, self.config.NUM_DOCUMENTS + 1):
-            filename = f"stress_test_doc_{i:03d}.pdf"
+            filename = f"stress_test_{self.run_id}_{i:03d}.pdf"
             self.document_filenames.append(filename)
             
             logger.info(f"Generating document {i}/{self.config.NUM_DOCUMENTS}: {filename}")

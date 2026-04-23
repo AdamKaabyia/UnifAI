@@ -789,7 +789,7 @@ export default function ExecutionTab({
         {/* Available Chats Sidebar - Dynamic width */}
         <div className="flex-shrink-0" style={{ width: `${chatSidebarWidth}%` }}>
           <Card className="bg-background-card shadow-card border-gray-800 h-full flex flex-col mr-0">
-            <CardHeader className="py-3 px-4 border-b border-gray-800 overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b border-gray-800 overflow-hidden flex-shrink-0">
               <div className="flex justify-between items-center min-w-0 w-full max-w-full">
                 <CardTitle className="text-sm font-medium truncate flex-1 min-w-0 mr-2">
                   Available Chats ({chatSessions.length})
@@ -834,13 +834,13 @@ export default function ExecutionTab({
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0 flex-grow">
+            <CardContent className="p-0 flex-grow min-h-0 overflow-hidden">
               {chatSessions.length === 0 ? (
                 <div className="p-4 text-center text-gray-400 text-sm">
                   No chat sessions available
                 </div>
               ) : (
-                <div className="h-full max-h-[75vh] overflow-y-auto py-2">
+                <div className="h-full overflow-y-auto py-2">
                   {chatSessions.map((session) => (
                     <motion.div
                       key={session.id}
@@ -1106,7 +1106,7 @@ export default function ExecutionTab({
             <DialogTitle className="text-lg">Add New Chat from Flow</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
-            <div key={`new-chat-graph-${showAddFlowModal}`}>
+            <div key={`new-chat-graph-${showAddFlowModal}`} className="h-full">
               <WorkflowsPanel
                 selectedFlow={selectedFlowForModal}
                 onFlowSelect={handleFlowSelect}
