@@ -208,7 +208,7 @@ class AuthManager:
             session_data = self._get_server_session()
             username = (session_data or {}).get('username', 'Unknown')  
             if session.get('session_id'):      
-                self.redis_store.hdel(session.get('session_id'))
+                self.redis_store.delete(session.get('session_id'))
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})
@@ -221,9 +221,10 @@ class AuthManager:
             
             # Check if session has expired (requires re-authentication)
             if self._is_session_expired():
-                self.redis_store.hdel(session.get('session_id'))
-                session.clear()
-                return jsonify({'error': 'Session expired'}), 401
+                if session.get('session_id'):
+                    self.redis_store.delete(session.get('session_id'))
+                    session.clear()
+                    return jsonify({'error': 'Session expired'}), 401
             
             # Check if access token needs refresh (but session is still valid)
             if self._should_refresh_token():
@@ -257,9 +258,10 @@ class AuthManager:
             
             # Check if session has expired first
             if self._is_session_expired():
-                self.redis_store.hdel(session.get('session_id'))
-                session.clear()
-                return jsonify({'error': 'Session expired'}), 401
+                if session.get('session_id'):
+                    self.redis_store.delete(session.get('session_id'))
+                    session.clear()
+                    return jsonify({'error': 'Session expired'}), 401
             
             if self._refresh_access_token():
                 return jsonify({'message': 'Token refreshed successfully'})

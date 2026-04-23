@@ -86,16 +86,16 @@ def _register_blueprints(app: Flask) -> None:
     register_all_endpoints(app)
 
 
+app = create_app()
 # ══════════════════════════════════════════════════════════════════════════════
 # Development Entry Point
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     config = AppConfig.get_instance()
-    application = create_app()
-    application.run(
+    app.run(
         host=config.hostname_local,
-        port=config.port,
+        port=int(config.port),
         debug=True,
     )
 
