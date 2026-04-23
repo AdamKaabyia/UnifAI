@@ -8,6 +8,7 @@ backend:
     ROLE: "flask"
     BACKEND_ENV: "production"
     VERSION: ""
+    PORT: 13456
 
   service:
     name: sso-backend
