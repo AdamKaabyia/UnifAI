@@ -5,7 +5,7 @@ A few notes:
 2. currently we only used directly a flask server with the auth manager.
 
 
-![Alt text](unifai_sso.png "unifai SSO flow")
+![Alt text](unifai_authentication "unifai Authentication flow")
 
 
 the flow chart was created using the site [sequencediagram](https://sequencediagram.org/)
@@ -13,19 +13,19 @@ the chart text is below:
 
 
 ```
-title Unifai SSO process
+title Unifai Authentication process
 
 User->Nginx: get UI client files (frontend_url)
 Nginx->User: send UI client files
 note over User,Nginx:Client automaticaly send API call to start login process
 User->Nginx: frontend_url/api3/auth/login
-Nginx->User: redirect to sso-be-url/api/auth/login
-User->sso-be: sso-be-url/api/auth/login
-sso-be->User: redirect to RH-SSO
-note over User,sso-be:redirect url: sso-be/api/callback
-User->RH-sso: login process
-RH-sso->User: redirect to sso-be/api/callback
-sso-be->User: redirect to frontend_url?auth=success
+Nginx->User: redirect to identity-be-url/api/auth/login
+User->identity-be: identity-be-url/api/auth/login
+identity-be->User: redirect to RH-SSO
+note over User,identity-be:redirect url: identity-be/api/callback
+User->RH-SSO: login process
+RH-SSO->User: redirect to identity-be/api/callback
+identity-be->User: redirect to frontend_url?auth=success
 User->Nginx: browse pages (frontend_url/api1 | frontend_url/api2)
 ```
 
