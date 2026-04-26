@@ -26,7 +26,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5000, // Or whatever port Vite is running on by default
+    port: 5173, // Or whatever port Vite is running on by default
     proxy: {
       // Proxy for api1
       '/api1': {
