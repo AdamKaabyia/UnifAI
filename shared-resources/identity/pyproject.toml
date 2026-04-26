@@ -25,10 +25,23 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bootstrap*", "ports*", "adapters*", "config*", "utils*"]
+include = ["bootstrap*", "adapters*", "config*", "utils*"]
 
-#[project.scripts]
-#identity = "identity.__main__:main"   
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../../global_utils/src"]
+markers = [
+  "unit: Isolated unit tests (fast, no external services)",
+  "integration: Tests that exercise multiple components",
+  "smoke: Optional tests against a running service (set IDENTITY_SMOKE_URL)",
+  "fast: Sub-second unit tests",
+]
 
 
 

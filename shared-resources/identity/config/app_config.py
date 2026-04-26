@@ -19,10 +19,3 @@ class AppConfig(SharedConfig):
     frontend_url: str = "http://localhost:5000"    # session_cookie_secure=True
     backend_env: str = "development"
 
-    # Redis Configuration
-    # redis_ip: str = "redis"
-    # redis_port: int = 6379
-    # redis_db: int = 1
-    # redis_password: str = 'Mc10vin!!'
-    # redis_decode_responses: bool = True
-    # redis_session_ttl: int = 3600
