@@ -30,12 +30,10 @@ storage:
 
 env:
   RI_APP_HOST: "0.0.0.0"
-  RI_APP_PORT: 5540
   #REDISINSIGHT_DB_0_NAME: "workflows"
   RI_REDIS_HOST: "redis"
-  RI_REDIS_PORT: 6379
-  RI_REDIS_USERNAME: "default"
-  RI_REDIS_PASSWORD: 'Mc10vin!!'
+
+redisConfigMapName: redis-config
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   # Specifies whether a service account should be created

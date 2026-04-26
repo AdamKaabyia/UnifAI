@@ -36,6 +36,11 @@ spec:
           - name: "{{ $key }}"
             value: "{{ $value }}"
           {{- end }}
+          {{- if .Values.redisConfigMapName }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.redisConfigMapName | quote }}
+          {{- end }}
           ports:
           - containerPort: {{ .Values.service.port }} 
             protocol: TCP
