@@ -211,7 +211,7 @@ const axiosAgentConfig = axios.create({
   timeout: 300000  // 5 minutes for long-running workflows
 });
 
-// api3 - SSO Service
+// api3 - Identity Service
 const authClient = axios.create({
   baseURL: '/api3',
   timeout: 20000,
