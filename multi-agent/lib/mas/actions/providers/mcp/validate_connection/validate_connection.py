@@ -2,7 +2,7 @@
 MCP validate_connection action.
 
 Tests a real MCP connection via the factory.
-On 401: uses AuthDetector for discovery and OAuth2LoginService for login URL.
+On 401: uses AuthService.discover() + AuthService.initiate() for login.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ class ValidateConnectionOutput(BaseActionOutput):
     authorization_url: Optional[str] = None
     scopes: List[str] = Field(default_factory=list)
     response_time_ms: float = 0.0
+    challenge: Optional[Dict[str, Any]] = None
 
 
 class ValidateConnectionAction(BaseAction):
@@ -51,7 +52,7 @@ class ValidateConnectionAction(BaseAction):
     action_type = ActionType.VALIDATION
     input_schema = ValidateConnectionInput
     output_schema = ValidateConnectionOutput
-    version = "4.0.0"
+    version = "6.0.0"
     tags = {"mcp", "validation", "connectivity"}
     elements = {(ResourceCategory.PROVIDER.value, Identifier.TYPE)}
 
@@ -59,14 +60,10 @@ class ValidateConnectionAction(BaseAction):
         self,
         factory: Optional[McpProviderFactory] = None,
         auth_service: Optional[AuthService] = None,
-        oauth2_login_service: Optional[Any] = None,
-        detector: Optional[Any] = None,
     ):
         super().__init__()
         self._factory = factory or McpProviderFactory()
         self._auth = auth_service
-        self._login = oauth2_login_service
-        self._detector = detector
 
     def execute_sync(self, input_data, context=None):
         try:
@@ -126,18 +123,18 @@ class ValidateConnectionAction(BaseAction):
     def _handle_auth_required_sync(
         self, input_data: ValidateConnectionInput,
     ) -> ValidateConnectionOutput:
-        """Handle 401: discover auth server, build login URL if possible (sync)."""
+        """Handle 401: discover auth via AuthService, initiate if possible (sync)."""
         server_id = input_data.server_identifier
         user_id = input_data.user_id
         scopes: List[str] = []
 
         from global_utils.utils.async_bridge import get_async_bridge
 
-        if not server_id and self._detector:
+        if not server_id and self._auth:
             try:
                 with get_async_bridge() as bridge:
                     detection = bridge.run(
-                        self._detector.detect(str(input_data.mcp_url))
+                        self._auth.discover(str(input_data.mcp_url))
                     )
                     if detection:
                         server_id = detection.server_identifier
@@ -157,45 +154,64 @@ class ValidateConnectionAction(BaseAction):
                 user_id, server_id, bool(token),
             )
             if token:
-                updated_input = input_data.model_copy(
-                    update={"server_identifier": server_id}
+                auth_cred = self._auth.bind(user_id, server_id)
+                config = McpProviderConfig(
+                    mcp_url=input_data.mcp_url,
+                    transport_type=input_data.transport_type,
+                    additional_headers=input_data.additional_headers,
                 )
                 try:
+                    start = time.time()
                     with get_async_bridge() as bridge:
-                        return bridge.run(self.execute(updated_input))
+                        bridge.run(
+                            self._factory.create_async(config, auth_credential=auth_cred)
+                        )
+                    elapsed = (time.time() - start) * 1000
+                    return ValidateConnectionOutput(
+                        success=True, message=f"Connected ({elapsed:.0f}ms)",
+                        is_reachable=True, authenticated=True,
+                        status="authenticated",
+                        server_identifier=server_id,
+                        response_time_ms=elapsed,
+                    )
                 except Exception as exc:
-                    logger.error(
-                        "Authenticated retry FAILED for server=%s: %s",
-                        server_id, exc, exc_info=True,
+                    logger.warning(
+                        "Authenticated retry failed for server=%s: %s",
+                        server_id, exc,
                     )
                     return ValidateConnectionOutput(
                         success=False,
-                        message=f"Authenticated but server rejected the request: {exc}",
-                        status="auth_error",
+                        message="Authenticated, but the server still rejected the request. "
+                                "Check that all required headers are configured in 'Additional Headers'.",
+                        status="authenticated_but_rejected",
                         is_reachable=True,
                         authenticated=True,
                         auth_required=False,
                         server_identifier=server_id,
                     )
 
-            if self._login:
-                try:
-                    client_cfg = self._auth.get_client_config(user_id, server_id)
-                    login_config = client_cfg.model_dump() if client_cfg else {}
-                    with get_async_bridge() as bridge:
-                        url = bridge.run(
-                            self._login.build_login_url(user_id, server_id, login_config)
+            try:
+                client_cfg = self._auth.get_client_config(user_id, server_id)
+                login_config = client_cfg.model_dump() if client_cfg else {}
+                with get_async_bridge() as bridge:
+                    challenge = bridge.run(
+                        self._auth.initiate(
+                            user_id, server_id,
+                            scheme_type="oauth2",
+                            config=login_config,
                         )
-                        if url:
-                            return ValidateConnectionOutput(
-                                success=True, message="Sign in required",
-                                status="requires_consent", is_reachable=True,
-                                auth_required=True, server_identifier=server_id,
-                                authorization_url=url,
-                                scopes=client_cfg.scopes if client_cfg else scopes,
-                            )
-                except Exception as exc:
-                    logger.error("Login URL build failed: %s", exc, exc_info=True)
+                    )
+                    resp = challenge.to_response()
+                    return ValidateConnectionOutput(
+                        success=True, message="Sign in required",
+                        status="requires_consent", is_reachable=True,
+                        auth_required=True, server_identifier=server_id,
+                        authorization_url=resp.get("authorization_url"),
+                        scopes=resp.get("scopes", scopes),
+                        challenge=resp,
+                    )
+            except Exception as exc:
+                logger.error("Auth initiation failed: %s", exc, exc_info=True)
 
         return ValidateConnectionOutput(
             success=True, message="Authentication required",

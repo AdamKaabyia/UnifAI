@@ -1,5 +1,5 @@
 """
-MongoTokenStore — implements :class:`TokenStore` using MongoDB.
+MongoCredentialStore — implements :class:`CredentialStore` using MongoDB.
 
 Index:
     - For server lookup: ``(user_id, server_identifier)``
@@ -14,19 +14,19 @@ from typing import Optional
 from pymongo import MongoClient, ASCENDING
 
 from mas.core.auth.credentials.models import StoredCredential, TokenStatus
-from mas.core.auth.credentials.ports import TokenStore
+from mas.core.auth.credentials.ports import CredentialStore
 
 logger = logging.getLogger(__name__)
 
 
-class MongoTokenStore(TokenStore):
+class MongoCredentialStore(CredentialStore):
 
     def __init__(
         self,
         mongodb_ip: str = "127.0.0.1",
         mongodb_port: int = 27017,
         db_name: str = "unifai",
-        coll_name: str = "auth_tokens",
+        coll_name: str = "credentials",
     ):
         client = MongoClient(f"mongodb://{mongodb_ip}:{mongodb_port}/")
         db = client[db_name]

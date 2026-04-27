@@ -1,7 +1,13 @@
 """
-OAuth2Scheme — implements InteractiveAuthScheme.
+OAuth2Strategy — self-contained OAuth 2.1 auth strategy.
 
-All protocol mechanics are delegated to authlib.
+Handles the full lifecycle:
+  - Runtime: build_headers, attempt_recovery (token refresh)
+  - Onboarding: initiate (build login URL + store pending), complete (code exchange)
+  - DCR: RFC 7591 Dynamic Client Registration
+
+All redirect-flow state (PKCE, HMAC-signed state param, pending store)
+is internal to this strategy — no external login/exchange services needed.
 """
 
 from __future__ import annotations
@@ -14,60 +20,55 @@ from typing import Any, Dict, List, Optional
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
-from mas.core.auth.ports import InteractiveAuthScheme, LoginContext
+from mas.core.auth.ports import AuthStrategy, AuthChallenge, CompletionResult
 from mas.core.auth.credentials.models import (
     StoredCredential, TokenSet, RecoveryResult,
 )
 from mas.core.auth.errors import (
     AuthNotConfiguredError,
     ClientRegistrationError,
+    InvalidStateError,
+    FlowStateNotFoundError,
     TokenEndpointError,
     TokenRefreshError,
 )
 
 from .config import OAuth2Config
+from .state_manager import OAuthStateManager
+from .models import FlowState, FlowStateStore
 
 logger = logging.getLogger(__name__)
 
 
-class OAuth2Scheme(InteractiveAuthScheme):
-    """OAuth 2.1 — Authorization Code + PKCE."""
+class OAuth2Strategy(AuthStrategy):
+    """OAuth 2.1 — Authorization Code + PKCE.
+
+    Self-contained: owns login URL construction, pending-state management,
+    code exchange, token refresh, and optional DCR.
+    """
+
+    def __init__(
+        self,
+        pending_store: Optional[FlowStateStore] = None,
+        state_manager: Optional[OAuthStateManager] = None,
+        callback_url: str = "",
+        client_config_store: Optional[Any] = None,
+        detector: Optional[Any] = None,
+    ):
+        self._pending = pending_store
+        self._state_mgr = state_manager
+        self._callback_url = callback_url
+        self._configs = client_config_store
+        self._detector = detector
 
     @property
     def scheme_type(self) -> str:
         return "oauth2"
 
-    # ── AuthScheme (universal) ────────────────────────────────────────
+    # ── Runtime ──────────────────────────────────────────────────────
 
     def build_headers(self, credential: StoredCredential) -> Dict[str, str]:
         return {"Authorization": f"Bearer {credential.access_token}"}
-
-    async def validate(self, credential: StoredCredential, server_url: str) -> bool:
-        """Probe *server_url* with the Bearer token; ``True`` if 2xx."""
-        headers = {"Authorization": f"Bearer {credential.access_token}"}
-        headers.update({
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        })
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(
-                    server_url,
-                    json={
-                        "jsonrpc": "2.0", "id": 1,
-                        "method": "initialize",
-                        "params": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {},
-                            "clientInfo": {"name": "unifai-probe", "version": "1.0"},
-                        },
-                    },
-                    headers=headers,
-                )
-                return 200 <= resp.status_code < 300
-        except Exception as exc:
-            logger.debug("Token validation probe failed for %s: %s", server_url, exc)
-            return False
 
     async def attempt_recovery(
         self,
@@ -97,17 +98,39 @@ class OAuth2Scheme(InteractiveAuthScheme):
             new_token_set=new_tokens,
         )
 
-    # ── InteractiveAuthScheme ─────────────────────────────────────────
+    # ── Onboarding: initiate ─────────────────────────────────────────
 
-    async def build_login_context(
+    async def initiate(
         self,
+        user_id: str,
+        server_identifier: str,
         config: Dict[str, Any],
-        redirect_uri: str,
-        state: str,
-    ) -> LoginContext:
+    ) -> AuthChallenge:
+        """Build an OAuth2 login URL with PKCE + signed state.
+
+        Also handles auto-registration (DCR) if no client_id is present.
+        The strategy owns state creation and pending-store writes.
+        """
+        if not config.get("client_id"):
+            config = await self._try_auto_register(user_id, server_identifier, config)
+
+        if not config or not config.get("client_id"):
+            raise AuthNotConfiguredError(
+                "No client_id available and dynamic registration failed"
+            )
+
         cfg = OAuth2Config.from_dict(config)
         if not cfg.authorization_endpoint:
             raise AuthNotConfiguredError("No authorization_endpoint in config")
+
+        if self._state_mgr:
+            state = self._state_mgr.create_state({
+                "user_id": user_id,
+                "server_identifier": server_identifier,
+                "protocol_type": "oauth2",
+            })
+        else:
+            state = secrets.token_urlsafe(32)
 
         code_verifier = secrets.token_urlsafe(48)
 
@@ -125,22 +148,65 @@ class OAuth2Scheme(InteractiveAuthScheme):
         url, _ = client.create_authorization_url(
             cfg.authorization_endpoint,
             state=state,
-            redirect_uri=redirect_uri,
+            redirect_uri=self._callback_url,
             scope=" ".join(cfg.scopes) if cfg.scopes else None,
             code_verifier=code_verifier,
             **extra,
         )
         await client.aclose()
 
-        return LoginContext(url=url, state=state, code_verifier=code_verifier)
+        if self._pending:
+            self._pending.save(FlowState(
+                state_hash=OAuthStateManager.hash_state(state),
+                user_id=user_id,
+                server_identifier=server_identifier,
+                redirect_uri=self._callback_url,
+                code_verifier=code_verifier,
+                protocol_type="oauth2",
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+                extra={k: v for k, v in config.items() if k in (
+                    "client_id", "client_secret", "token_endpoint",
+                    "authorization_endpoint", "scopes", "resource_uri",
+                )},
+            ))
 
-    async def exchange_credentials(
+        return AuthChallenge.consent(
+            url=url,
+            flow_id=state,
+            scopes=cfg.scopes,
+            server_identifier=server_identifier,
+        )
+
+    # ── Onboarding: complete ─────────────────────────────────────────
+
+    async def complete(
         self,
-        config: Dict[str, Any],
-        code: str,
-        code_verifier: Optional[str],
-        redirect_uri: str,
-    ) -> TokenSet:
+        raw_callback_data: Dict[str, Any],
+    ) -> CompletionResult:
+        """Validate state, consume pending flow, exchange code for tokens.
+
+        The strategy fully owns callback handling — no service-level
+        knowledge of OAuth2 internals is needed.
+        """
+        code = raw_callback_data["code"]
+        state = raw_callback_data["state"]
+
+        if self._state_mgr:
+            try:
+                self._state_mgr.validate_state(state)
+            except ValueError as exc:
+                raise InvalidStateError(f"Invalid state: {exc}") from exc
+
+        if not self._pending:
+            raise AuthNotConfiguredError("No pending store configured")
+
+        pending = self._pending.consume(OAuthStateManager.hash_state(state))
+        if pending is None:
+            raise FlowStateNotFoundError(
+                "No pending auth for this state (already consumed or expired)"
+            )
+
+        config = {**pending.extra, "protocol_type": pending.protocol_type}
         cfg = OAuth2Config.from_dict(config)
 
         try:
@@ -153,13 +219,21 @@ class OAuth2Scheme(InteractiveAuthScheme):
                     cfg.token_endpoint,
                     grant_type="authorization_code",
                     code=code,
-                    redirect_uri=redirect_uri,
-                    code_verifier=code_verifier,
+                    redirect_uri=pending.redirect_uri,
+                    code_verifier=pending.code_verifier,
                 )
         except Exception as exc:
             raise TokenEndpointError(f"Code exchange failed: {exc}") from exc
 
-        return _to_token_set(token)
+        token_set = _to_token_set(token)
+
+        return CompletionResult(
+            token_set=token_set,
+            user_id=pending.user_id,
+            server_identifier=pending.server_identifier,
+            scheme_type="oauth2",
+            scopes=token_set.scope.split() if token_set.scope else [],
+        )
 
     # ── RFC 7591 Dynamic Client Registration ──────────────────────────
 
@@ -221,6 +295,79 @@ class OAuth2Scheme(InteractiveAuthScheme):
         except Exception as exc:
             raise TokenRefreshError(f"Refresh failed: {exc}") from exc
         return _to_token_set(token)
+
+    async def _try_auto_register(
+        self,
+        user_id: str,
+        server_identifier: str,
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Attempt RFC 7591 Dynamic Client Registration."""
+        if self._configs and server_identifier:
+            existing = self._configs.find_by_server(user_id, server_identifier)
+            if existing and existing.client_id:
+                return existing.model_dump()
+
+        reg_endpoint = config.get("registration_endpoint")
+
+        if not reg_endpoint and self._detector:
+            http_client = getattr(self._detector, '_http_client', None)
+            if http_client:
+                from .detection import OAuth2DetectionStrategy
+                as_meta = await OAuth2DetectionStrategy._fetch_as_metadata(
+                    server_identifier, http_client,
+                )
+                if as_meta:
+                    config = {**config, **as_meta}
+                    reg_endpoint = config.get("registration_endpoint")
+
+        if not reg_endpoint:
+            return config
+
+        redirect_uris = [self._callback_url] if self._callback_url else None
+        supported_methods = config.get("token_endpoint_auth_methods_supported", [])
+        auth_method = supported_methods[0] if supported_methods else "none"
+
+        try:
+            result = await self.register_client(
+                registration_endpoint=reg_endpoint,
+                redirect_uris=redirect_uris,
+                token_endpoint_auth_method=auth_method,
+            )
+
+            client_id = result.get("client_id")
+            if not client_id:
+                return config
+
+            new_config = {
+                **config,
+                "client_id": client_id,
+                "client_secret": result.get("client_secret"),
+                "server_identifier": server_identifier,
+            }
+
+            if self._configs and server_identifier:
+                from mas.core.auth.credentials.models import ClientConfig
+                self._configs.save(user_id, ClientConfig(
+                    client_id=client_id,
+                    client_secret=result.get("client_secret"),
+                    authorization_endpoint=config.get("authorization_endpoint", ""),
+                    token_endpoint=config.get("token_endpoint", ""),
+                    token_endpoint_auth_method=auth_method,
+                    scopes=config.get("scopes_supported", []),
+                    resource_uri=config.get("resource_uri"),
+                    server_identifier=server_identifier,
+                ))
+                logger.info(
+                    "Auto-registered OAuth client for server=%s client_id=%s",
+                    server_identifier, client_id,
+                )
+
+            return new_config
+
+        except Exception as exc:
+            logger.warning("Dynamic client registration failed: %s", exc)
+            return config
 
 
 def _to_token_set(token: dict) -> TokenSet:

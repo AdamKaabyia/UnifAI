@@ -27,11 +27,13 @@ def exchange_code(code, state):
     Exchange an authorization code for tokens.
 
     Called by the SSO pod after receiving the OAuth callback.
+    Delegates to AuthService.complete() which handles state validation,
+    pending-flow consumption, and token persistence.
     """
     try:
-        svc = current_app.container.auth_exchange_service
+        auth_service = current_app.container.auth_service
         with get_async_bridge() as bridge:
-            result = bridge.run(svc.exchange(code=code, state=state))
+            result = bridge.run(auth_service.complete({"code": code, "state": state}))
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -45,7 +47,7 @@ def exchange_code(code, state):
 def token_status(user_id, server_identifier):
     """Check whether a user has a valid credential for an auth server."""
     try:
-        store = current_app.container.token_store
+        store = current_app.container.credential_store
         cred = store.find_by_server(user_id=user_id, server_identifier=server_identifier)
         if cred and cred.is_valid():
             return jsonify({
@@ -90,7 +92,7 @@ def save_client_config(
             server_identifier=server_identifier,
         )
 
-        store = current_app.container.client_config_store
+        store = current_app.container.server_config_store
         store.save(user_id="", config=config)
         return jsonify(config.model_dump()), 201
 
@@ -105,7 +107,7 @@ def save_client_config(
 def get_client_config(server_identifier):
     """Get OAuth client config for an auth server (secret is masked)."""
     try:
-        store = current_app.container.client_config_store
+        store = current_app.container.server_config_store
         config = store.find_by_server(user_id="", server_identifier=server_identifier)
         if not config:
             return jsonify({"error": "Client config not found"}), 404

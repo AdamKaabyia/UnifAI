@@ -34,8 +34,8 @@ class InvalidStateError(AuthError):
     """OAuth state parameter is invalid, tampered with, or expired."""
 
 
-class PendingAuthNotFoundError(AuthError):
-    """No pending auth record for the given state hash (consumed or expired)."""
+class FlowStateNotFoundError(AuthError):
+    """No pending flow state for the given state hash (consumed or expired)."""
 
 
 class ClientRegistrationError(AuthError):

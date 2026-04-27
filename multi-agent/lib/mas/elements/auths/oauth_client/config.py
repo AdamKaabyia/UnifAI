@@ -3,7 +3,7 @@ OAuthClientConfig — generic auth element.
 
 The auth element is a simple selector: "I want to authenticate with this server."
 Client credentials (client_id, secret, endpoints) are stored separately
-in the ClientConfigStore.
+in the ServerConfigStore.
 """
 
 from typing import Literal, Optional

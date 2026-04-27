@@ -10,7 +10,7 @@ from typing import Optional
 from .models import StoredCredential, ClientConfig
 
 
-class TokenStore(ABC):
+class CredentialStore(ABC):
     """Persist and retrieve :class:`StoredCredential` objects."""
 
     @abstractmethod
@@ -26,7 +26,7 @@ class TokenStore(ABC):
     def update_status(self, user_id: str, server_identifier: str, status: str) -> None: ...
 
 
-class ClientConfigStore(ABC):
+class ServerConfigStore(ABC):
     """Persist and retrieve :class:`ClientConfig` objects."""
 
     @abstractmethod

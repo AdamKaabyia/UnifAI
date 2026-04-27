@@ -1,12 +1,12 @@
 """
-API Key scheme implementation.
+API Key strategy implementation.
 
 Static credential — no acquisition flow, no refresh.
 
 Public API:
-  - :class:`ApiKeyScheme` — the adapter
+  - :class:`ApiKeyStrategy` — the adapter
 """
 
-from .adapter import ApiKeyScheme
+from .adapter import ApiKeyStrategy
 
-__all__ = ["ApiKeyScheme"]
+__all__ = ["ApiKeyStrategy"]

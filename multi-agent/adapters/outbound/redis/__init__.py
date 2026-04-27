@@ -1,3 +1,3 @@
-from .auth_pending_store import RedisPendingStore
+from .auth_pending_store import RedisFlowStateStore
 
-__all__ = ["RedisPendingStore"]
+__all__ = ["RedisFlowStateStore"]

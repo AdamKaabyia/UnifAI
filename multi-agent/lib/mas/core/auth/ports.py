@@ -1,35 +1,38 @@
 """
 Auth-layer ports — abstract contracts that define the hexagonal boundary.
 
-:class:`AuthScheme`            — what ANY auth mechanism must do.
-:class:`InteractiveAuthScheme` — schemes that also have a user-facing acquisition flow.
-:class:`LoginContext`          — protocol-agnostic login redirect data.
-:class:`HttpClient`            — async HTTP I/O used by scheme adapters.
+:class:`AuthStrategy`  — unified interface for ANY auth mechanism.
+:class:`AuthChallenge` — scheme-agnostic response returned when credentials
+                         must be acquired (consent redirect, form input, etc.).
+:class:`HttpClient`    — async HTTP I/O used by strategy adapters.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from .credentials.models import StoredCredential, TokenSet, RecoveryResult
 
 
-class AuthScheme(ABC):
-    """What any authentication scheme must be able to do."""
+# ── Strategy port ─────────────────────────────────────────────────────
+
+class AuthStrategy(ABC):
+    """Unified contract for any authentication scheme.
+
+    Every strategy implements all four core methods.
+    """
 
     @property
     @abstractmethod
     def scheme_type(self) -> str: ...
 
+    # ── Runtime (using credentials) ──────────────────────────────────
+
     @abstractmethod
     def build_headers(self, credential: StoredCredential) -> Dict[str, str]:
         """Return HTTP headers for an authenticated request."""
-        ...
-
-    @abstractmethod
-    async def validate(self, credential: StoredCredential, server_url: str) -> bool:
-        """Probe *server_url* with the credential; ``True`` if accepted."""
         ...
 
     @abstractmethod
@@ -38,53 +41,124 @@ class AuthScheme(ABC):
         credential: StoredCredential,
         config: Dict[str, Any],
     ) -> RecoveryResult:
-        """The credential was rejected. Try to self-heal.
+        """Credential was rejected — try to self-heal (e.g. token refresh)."""
+        ...
 
-        For OAuth: attempt a token refresh.
-        For API key: return not-recoverable.
+    # ── Onboarding (acquiring credentials) ───────────────────────────
+
+    @abstractmethod
+    async def initiate(
+        self,
+        user_id: str,
+        server_identifier: str,
+        config: Dict[str, Any],
+    ) -> AuthChallenge:
+        """Start the credential-acquisition flow.
+
+        The strategy owns state creation, pending-store writes, and
+        everything else needed to produce an :class:`AuthChallenge`.
+        """
+        ...
+
+    @abstractmethod
+    async def complete(
+        self,
+        raw_callback_data: Dict[str, Any],
+    ) -> "CompletionResult":
+        """Finish the credential-acquisition flow.
+
+        The strategy owns state validation, pending-store consumption,
+        and token exchange. Returns a :class:`CompletionResult` with
+        the tokens and metadata the service needs to persist.
         """
         ...
 
 
-class InteractiveAuthScheme(AuthScheme):
-    """Schemes that require a multi-step user-facing acquisition flow."""
+# ── CompletionResult ─────────────────────────────────────────────────
 
-    @abstractmethod
-    async def build_login_context(
-        self,
-        config: Dict[str, Any],
-        redirect_uri: str,
-        state: str,
-    ) -> LoginContext:
-        """Return a URL + metadata the caller needs to redirect the user."""
-        ...
-
-    @abstractmethod
-    async def exchange_credentials(
-        self,
-        config: Dict[str, Any],
-        code: str,
-        code_verifier: Optional[str],
-        redirect_uri: str,
-    ) -> TokenSet:
-        """Turn whatever the provider sent back into tokens."""
-        ...
+@dataclass
+class CompletionResult:
+    """What a strategy returns after completing the auth flow."""
+    token_set: TokenSet
+    user_id: str
+    server_identifier: str
+    scheme_type: str
+    scopes: List[str] = field(default_factory=list)
 
 
-class LoginContext:
-    """What the caller needs to redirect the user."""
+# ── AuthChallenge — scheme-agnostic onboarding responses ─────────────
 
-    __slots__ = ("url", "state", "code_verifier")
+@dataclass(frozen=True)
+class AuthChallenge:
+    """What the auth layer sends to the UI when credentials must be acquired.
 
-    def __init__(
-        self,
+    The ``challenge_type`` discriminator tells the UI how to present it:
+      - ``"consent"``  → open redirect URL (OAuth2, SAML)
+      - ``"collect"``  → render input form (API key, basic auth)
+      - ``"device"``   → show device code + verification URI (future)
+    """
+
+    challenge_type: str
+    flow_id: str = ""
+    url: Optional[str] = None
+    fields: List[Dict[str, Any]] = field(default_factory=list)
+    device_code: Optional[str] = None
+    verification_uri: Optional[str] = None
+    scopes: List[str] = field(default_factory=list)
+    server_identifier: str = ""
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+    def to_response(self) -> Dict[str, Any]:
+        """Serialize for the action's HTTP response."""
+        resp: Dict[str, Any] = {
+            "challenge_type": self.challenge_type,
+            "flow_id": self.flow_id,
+        }
+        if self.url:
+            resp["authorization_url"] = self.url
+        if self.fields:
+            resp["fields"] = self.fields
+        if self.device_code:
+            resp["device_code"] = self.device_code
+        if self.verification_uri:
+            resp["verification_uri"] = self.verification_uri
+        if self.scopes:
+            resp["scopes"] = self.scopes
+        if self.server_identifier:
+            resp["server_identifier"] = self.server_identifier
+        if self.extra:
+            resp.update(self.extra)
+        return resp
+
+    @classmethod
+    def consent(
+        cls,
         url: str,
-        state: str,
-        code_verifier: Optional[str] = None,
-    ):
-        self.url = url
-        self.state = state
-        self.code_verifier = code_verifier
+        flow_id: str = "",
+        scopes: Optional[List[str]] = None,
+        server_identifier: str = "",
+    ) -> AuthChallenge:
+        return cls(
+            challenge_type="consent",
+            url=url,
+            flow_id=flow_id,
+            scopes=scopes or [],
+            server_identifier=server_identifier,
+        )
+
+    @classmethod
+    def collect(
+        cls,
+        fields: List[Dict[str, Any]],
+        flow_id: str = "",
+        server_identifier: str = "",
+    ) -> AuthChallenge:
+        return cls(
+            challenge_type="collect",
+            fields=fields,
+            flow_id=flow_id,
+            server_identifier=server_identifier,
+        )
 
 
 # ── HTTP I/O port ────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 OAuth2DetectionStrategy — recognises OAuth 2.x from server responses.
 
 Self-contained: performs RFC 9728 / RFC 8414 discovery directly
-using the HttpClient port. Does not depend on OAuth2Scheme.
+using the HttpClient port. Does not depend on OAuth2Strategy.
 """
 
 from __future__ import annotations

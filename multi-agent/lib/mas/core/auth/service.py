@@ -1,15 +1,12 @@
 """
-AuthService — thin credential-lifecycle service.
+AuthService — single owner of the credential lifecycle.
 
-Owns: lookup, header building, validation, recovery.
-Does NOT own: login flows, code exchange, DCR — those are scheme-specific
-and live in their respective scheme packages.
+Owns: lookup, header building, recovery, onboarding (initiate / complete),
+and auth discovery.
+Strategies own their protocol-specific logic; this service orchestrates.
 
-All I/O methods (get_headers, get_valid_token, attempt_recovery) are async
-because they may need to call external token endpoints. 
-
-Also contains :class:`BoundCredential`, the handle that elements
-receive at build time so they can call ``get_headers()`` with no args.
+Also contains :class:`AuthHandle`, the handle that elements receive
+at build time so they can call ``get_headers()`` with no args.
 """
 
 from __future__ import annotations
@@ -21,35 +18,36 @@ from .errors import TokenExpiredError
 from .credentials.models import (
     StoredCredential, TokenStatus, RecoveryResult, ClientConfig,
 )
-from .credentials.ports import TokenStore, ClientConfigStore
-from .ports import AuthScheme
+from .credentials.ports import CredentialStore, ServerConfigStore
+from .credentials.credential import AuthCredential
+from .ports import AuthStrategy, AuthChallenge
 
 if TYPE_CHECKING:
-    from .credentials.credential import AuthCredential
+    from .discovery.detector import AuthDetector
 
 logger = logging.getLogger(__name__)
 
 
-class SchemeRegistry:
-    """Maps scheme_type strings to AuthScheme instances."""
+class AuthStrategyRegistry:
+    """Maps scheme_type strings to AuthStrategy instances."""
 
     def __init__(self) -> None:
-        self._schemes: Dict[str, AuthScheme] = {}
+        self._strategies: Dict[str, AuthStrategy] = {}
 
-    def register(self, scheme: AuthScheme) -> None:
-        self._schemes[scheme.scheme_type] = scheme
+    def register(self, strategy: AuthStrategy) -> None:
+        self._strategies[strategy.scheme_type] = strategy
 
-    def get(self, scheme_type: str) -> AuthScheme:
+    def get(self, scheme_type: str) -> AuthStrategy:
         try:
-            return self._schemes[scheme_type]
+            return self._strategies[scheme_type]
         except KeyError:
             raise ValueError(f"Unknown auth scheme: {scheme_type!r}")
 
 
-class BoundCredential:
+class AuthHandle:
     """Binds AuthService to a specific (user, server) pair.
 
-    Satisfies :class:`AuthCredential` so consumers can call
+    Explicitly implements :class:`AuthCredential` so consumers can call
     ``await get_headers()`` / ``await get_token()`` /
     ``await attempt_recovery()`` without passing user_id and
     server_identifier every time.
@@ -101,13 +99,15 @@ class AuthService:
 
     def __init__(
         self,
-        token_store: TokenStore,
-        scheme_registry: SchemeRegistry,
-        client_config_store: Optional[ClientConfigStore] = None,
+        credential_store: CredentialStore,
+        strategy_registry: AuthStrategyRegistry,
+        server_config_store: Optional[ServerConfigStore] = None,
+        detector: Optional[AuthDetector] = None,
     ):
-        self._store = token_store
-        self._schemes = scheme_registry
-        self._configs = client_config_store
+        self._store = credential_store
+        self._strategies = strategy_registry
+        self._configs = server_config_store
+        self._detector = detector
 
     # ── Credential CRUD (sync — pure DB, no external I/O) ────────────
 
@@ -177,23 +177,8 @@ class AuthService:
                     f"Credential expired and recovery failed for server={server_identifier}"
                 )
 
-        scheme = self._schemes.get(cred.scheme_type)
-        return scheme.build_headers(cred)
-
-    # ── Validation ────────────────────────────────────────────────────
-
-    async def is_token_valid(
-        self,
-        user_id: str,
-        server_identifier: str,
-        url: str,
-    ) -> bool:
-        """Real connection check — probe *url* with the stored token."""
-        cred = self.get_credential(user_id, server_identifier)
-        if not cred or not cred.is_valid():
-            return False
-        scheme = self._schemes.get(cred.scheme_type)
-        return await scheme.validate(cred, url)
+        strategy = self._strategies.get(cred.scheme_type)
+        return strategy.build_headers(cred)
 
     # ── Recovery (async — calls external token endpoint) ──────────────
 
@@ -203,7 +188,7 @@ class AuthService:
         server_identifier: str,
         config: Optional[Dict[str, Any]] = None,
     ) -> RecoveryResult:
-        """Delegate recovery to the appropriate scheme and persist the result."""
+        """Delegate recovery to the appropriate strategy and persist the result."""
         cred = self.get_credential(user_id, server_identifier)
         if not cred:
             return RecoveryResult(
@@ -211,11 +196,11 @@ class AuthService:
                 reason="No credential found",
             )
 
-        scheme = self._schemes.get(cred.scheme_type)
+        strategy = self._strategies.get(cred.scheme_type)
         resolved = config or self._resolve_config(user_id, server_identifier)
 
         try:
-            result = await scheme.attempt_recovery(cred, resolved)
+            result = await strategy.attempt_recovery(cred, resolved)
         except Exception as exc:
             logger.info("Recovery failed for server=%s: %s", server_identifier, exc)
             return RecoveryResult(
@@ -244,24 +229,77 @@ class AuthService:
 
         return result
 
+    # ── Onboarding — fully scheme-agnostic ────────────────────────────
+
+    async def initiate(
+        self,
+        user_id: str,
+        server_identifier: str,
+        scheme_type: str,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> AuthChallenge:
+        """Start credential acquisition — delegates entirely to the strategy."""
+        strategy = self._strategies.get(scheme_type)
+        resolved = config or self._resolve_config(user_id, server_identifier)
+        return await strategy.initiate(user_id, server_identifier, resolved)
+
+    async def complete(
+        self,
+        raw_callback_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Complete the credential-acquisition flow.
+
+        Delegates entirely to the strategy. The strategy validates state,
+        consumes the pending flow, and exchanges for tokens. The service
+        just persists the result.
+        """
+        scheme_type = raw_callback_data.get("scheme_type", "oauth2")
+        strategy = self._strategies.get(scheme_type)
+
+        result = await strategy.complete(raw_callback_data)
+
+        self._store.upsert(StoredCredential(
+            user_id=result.user_id,
+            server_identifier=result.server_identifier,
+            access_token=result.token_set.access_token,
+            refresh_token=result.token_set.refresh_token,
+            token_type=result.token_set.token_type,
+            expires_at=result.token_set.expires_at,
+            scopes=result.scopes,
+            status=TokenStatus.ACTIVE,
+            scheme_type=result.scheme_type,
+        ))
+
+        logger.info(
+            "Token stored for user=%s server=%s",
+            result.user_id, result.server_identifier,
+        )
+        return {"success": True, "server_identifier": result.server_identifier}
+
+    # ── Discovery ─────────────────────────────────────────────────────
+
+    async def discover(
+        self,
+        url: str,
+        response_headers: Optional[Dict[str, str]] = None,
+    ) -> Optional[Any]:
+        """Detect what auth a server requires. Returns DetectionResult or None."""
+        if not self._detector:
+            return None
+        return await self._detector.detect(url, response_headers)
+
     # ── Binding ───────────────────────────────────────────────────────
 
     def bind(
         self, user_id: str, server_identifier: str,
     ) -> Optional[AuthCredential]:
-        """Create a credential handle for a specific user + server.
-
-        Returns a :class:`BoundCredential` whose ``get_headers()`` always
-        returns fresh headers (recovering transparently if needed).
-        Returns ``None`` if no stored credential exists.
-        """
         if not user_id or not server_identifier:
             return None
         if not self.get_credential(user_id, server_identifier):
             return None
 
         config = self._resolve_config(user_id, server_identifier)
-        return BoundCredential(
+        return AuthHandle(
             auth_service=self,
             user_id=user_id,
             server_identifier=server_identifier,
@@ -273,17 +311,12 @@ class AuthService:
         ctx_holder: Any,
         server_identifier: str,
     ) -> Optional[AuthCredential]:
-        """Create a credential handle with deferred user_id resolution.
-
-        Like :meth:`bind`, but accepts an ``ExecutionContextHolder``
-        instead of a ``user_id`` string.  The holder is read at runtime
-        (when ``get_headers()`` is called), not at construction time.
-        """
+        """Create a credential handle with deferred user_id resolution."""
         if not server_identifier:
             return None
 
         config = self._resolve_config("", server_identifier)
-        return BoundCredential(
+        return AuthHandle(
             auth_service=self,
             user_id=ctx_holder,
             server_identifier=server_identifier,

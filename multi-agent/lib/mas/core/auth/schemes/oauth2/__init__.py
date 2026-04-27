@@ -1,5 +1,5 @@
 """
-OAuth 2.1 scheme implementation.
+OAuth 2.1 strategy implementation.
 
 Handles:
   - Authorization Code + PKCE (S256)
@@ -9,9 +9,9 @@ Handles:
   - OAuth Authorization Server Metadata (.well-known)
 
 Public API:
-  - :class:`OAuth2Scheme` — the adapter (the only public class)
+  - :class:`OAuth2Strategy` — the self-contained strategy
 """
 
-from .adapter import OAuth2Scheme
+from .adapter import OAuth2Strategy
 
-__all__ = ["OAuth2Scheme"]
+__all__ = ["OAuth2Strategy"]

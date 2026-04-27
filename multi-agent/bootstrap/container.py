@@ -31,15 +31,13 @@ from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
 
 # Auth layer
-from mas.core.auth.service import AuthService, SchemeRegistry
+from mas.core.auth.service import AuthService, AuthStrategyRegistry
 from mas.core.auth.discovery import AuthDetector
-from mas.core.auth.schemes.oauth2.adapter import OAuth2Scheme
-from mas.core.auth.schemes.oauth2.login_service import OAuth2LoginService
+from mas.core.auth.schemes.oauth2.adapter import OAuth2Strategy
 from mas.core.auth.schemes.oauth2.detection import OAuth2DetectionStrategy
 from mas.core.auth.schemes.oauth2.state_manager import OAuthStateManager
-from mas.core.auth.schemes.oauth2.exchange_service import OAuth2ExchangeService
-from mas.core.auth.schemes.api_key.adapter import ApiKeyScheme
-from outbound.mongo.client_config_repository import MongoClientConfigStore
+from mas.core.auth.schemes.api_key.adapter import ApiKeyStrategy
+from outbound.mongo.client_config_repository import MongoServerConfigStore
 from mas.actions.auth.authenticate.action import AuthenticateAction
 from mas.actions.providers.mcp.validate_connection.validate_connection import ValidateConnectionAction
 from mas.actions.providers.mcp.get_tools_names.get_tools_names import GetToolsNamesAction
@@ -54,8 +52,8 @@ from outbound.mongo import (
     MongoTemplateRepository,
 )
 # Auth layer — adapters
-from outbound.mongo.auth_token_repository import MongoTokenStore
-from outbound.redis.auth_pending_store import RedisPendingStore
+from outbound.mongo.auth_token_repository import MongoCredentialStore
+from outbound.redis.auth_pending_store import RedisFlowStateStore
 from outbound.auth.http_oauth_client import HttpxAuthClient
 
 from global_utils.utils.singleton import SingletonMeta
@@ -129,13 +127,12 @@ class AppContainer(metaclass=SingletonMeta):
 
         # ── Auth layer ────────────────────────────────────────────────
 
-        # Outbound adapters
         http_client = HttpxAuthClient()
-        self.token_store = MongoTokenStore(
+        self.credential_store = MongoCredentialStore(
             mongodb_ip=cfg.mongodb_ip,
             mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.auth_tokens_coll,
+            coll_name=cfg.credentials_coll,
         )
 
         redis_url = get_redis_url()
@@ -143,15 +140,7 @@ class AppContainer(metaclass=SingletonMeta):
         if redis_url:
             import redis as redis_lib
             redis_client = redis_lib.Redis.from_url(redis_url)
-            pending_store = RedisPendingStore(redis_client=redis_client)
-
-        # Scheme registry
-        oauth2_scheme = OAuth2Scheme()
-        api_key_scheme = ApiKeyScheme()
-
-        scheme_registry = SchemeRegistry()
-        scheme_registry.register(oauth2_scheme)
-        scheme_registry.register(api_key_scheme)
+            pending_store = RedisFlowStateStore(redis_client=redis_client)
 
         # Detection
         oauth2_detection = OAuth2DetectionStrategy()
@@ -160,61 +149,55 @@ class AppContainer(metaclass=SingletonMeta):
             http_client=http_client,
         )
 
-        # Client config store (separate collection for client credentials)
-        client_config_store = MongoClientConfigStore(
+        # Server config store
+        self.server_config_store = MongoServerConfigStore(
             mongodb_ip=cfg.mongodb_ip,
             mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name="client_configs",
+            coll_name="server_configs",
         )
 
-        # OAuth2 state + exchange (callback handler)
+        # OAuth2 state manager
         state_secret = cfg.mcp_auth_state_secret or "dev-only-change-me"
         state_manager = OAuthStateManager(secret=state_secret)
 
-        self.auth_exchange_service = OAuth2ExchangeService(
-            state_manager=state_manager,
-            pending_store=pending_store,
-            token_store=self.token_store,
-            scheme=oauth2_scheme,
-        )
-
-        self.oauth2_login_service = OAuth2LoginService(
-            scheme=oauth2_scheme,
+        # Strategy registry — self-contained strategies
+        oauth2_strategy = OAuth2Strategy(
             pending_store=pending_store,
             state_manager=state_manager,
             callback_url=f"{cfg.sso_backend_host.rstrip('/')}/api/credentials/callback",
-            client_config_store=client_config_store,
+            client_config_store=self.server_config_store,
             detector=detector,
         )
+        api_key_strategy = ApiKeyStrategy()
 
-        self.client_config_store = client_config_store
+        strategy_registry = AuthStrategyRegistry()
+        strategy_registry.register(oauth2_strategy)
+        strategy_registry.register(api_key_strategy)
 
-        # AuthService — thin, scheme-agnostic
-        auth_service = AuthService(
-            token_store=self.token_store,
-            scheme_registry=scheme_registry,
-            client_config_store=client_config_store,
+        # AuthService — single owner of the credential lifecycle
+        self.auth_service = AuthService(
+            credential_store=self.credential_store,
+            strategy_registry=strategy_registry,
+            server_config_store=self.server_config_store,
+            detector=detector,
         )
 
         self.actions_service.register_instance(AuthenticateAction(
-            auth_service=auth_service,
-            oauth2_login_service=self.oauth2_login_service,
+            auth_service=self.auth_service,
         ))
         self.actions_service.register_instance(ValidateConnectionAction(
-            auth_service=auth_service,
-            oauth2_login_service=self.oauth2_login_service,
-            detector=detector,
+            auth_service=self.auth_service,
         ))
         self.actions_service.register_instance(GetToolsNamesAction(
-            auth_service=auth_service,
+            auth_service=self.auth_service,
         ))
 
         # ── Session factory ───────────────────────────────────────────
         self.session_factory = WorkflowSessionFactory(
             element_registry=self.element_registry,
             engine_name=cfg.engine_name,
-            auth_service=auth_service,
+            auth_service=self.auth_service,
         )
         self.session_repo = MongoSessionRepository(
             mongodb_port=cfg.mongodb_port,

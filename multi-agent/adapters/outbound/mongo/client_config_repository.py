@@ -1,5 +1,5 @@
 """
-MongoClientConfigStore — stores client credentials in a dedicated collection.
+MongoServerConfigStore — stores auth server configs in a dedicated collection.
 
 Collection: client_configs
 Index: unique on server_identifier
@@ -13,19 +13,19 @@ from typing import Optional
 from pymongo import MongoClient, ASCENDING
 
 from mas.core.auth.credentials.models import ClientConfig
-from mas.core.auth.credentials.ports import ClientConfigStore
+from mas.core.auth.credentials.ports import ServerConfigStore
 
 logger = logging.getLogger(__name__)
 
 
-class MongoClientConfigStore(ClientConfigStore):
+class MongoServerConfigStore(ServerConfigStore):
 
     def __init__(
         self,
         mongodb_ip: str = "127.0.0.1",
         mongodb_port: int = 27017,
         db_name: str = "unifai",
-        coll_name: str = "client_configs",
+        coll_name: str = "server_configs",
     ):
         client = MongoClient(f"mongodb://{mongodb_ip}:{mongodb_port}/")
         db = client[db_name]

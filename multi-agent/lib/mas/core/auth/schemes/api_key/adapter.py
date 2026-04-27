@@ -1,23 +1,22 @@
 """
-ApiKeyScheme — static credential, no acquisition flow.
+ApiKeyStrategy — static credential, no interactive acquisition flow.
 """
 
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Any, Dict
 
-import httpx
-
-from mas.core.auth.ports import AuthScheme
-from mas.core.auth.credentials.models import StoredCredential, RecoveryResult
+from mas.core.auth.ports import AuthStrategy, AuthChallenge, CompletionResult
+from mas.core.auth.credentials.models import StoredCredential, TokenSet, RecoveryResult
 
 from .config import ApiKeyConfig
 
 logger = logging.getLogger(__name__)
 
 
-class ApiKeyScheme(AuthScheme):
+class ApiKeyStrategy(AuthStrategy):
 
     @property
     def scheme_type(self) -> str:
@@ -28,33 +27,6 @@ class ApiKeyScheme(AuthScheme):
         value = f"{cfg.header_prefix}{credential.access_token}" if cfg.header_prefix else credential.access_token
         return {cfg.header_name: value}
 
-    async def validate(self, credential: StoredCredential, server_url: str) -> bool:
-        """Probe *server_url* with the API key; ``True`` if 2xx."""
-        headers = self.build_headers(credential)
-        headers.update({
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        })
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(
-                    server_url,
-                    json={
-                        "jsonrpc": "2.0", "id": 1,
-                        "method": "initialize",
-                        "params": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {},
-                            "clientInfo": {"name": "unifai-probe", "version": "1.0"},
-                        },
-                    },
-                    headers=headers,
-                )
-                return 200 <= resp.status_code < 300
-        except Exception as exc:
-            logger.debug("API key validation probe failed for %s: %s", server_url, exc)
-            return False
-
     async def attempt_recovery(
         self,
         credential: StoredCredential,
@@ -64,4 +36,28 @@ class ApiKeyScheme(AuthScheme):
             recovered=False,
             should_retry=False,
             reason="API key was rejected; verify the key or generate a new one",
+        )
+
+    async def initiate(
+        self,
+        user_id: str,
+        server_identifier: str,
+        config: Dict[str, Any],
+    ) -> AuthChallenge:
+        return AuthChallenge.collect(
+            fields=[{"name": "api_key", "label": "API Key", "secret": True}],
+            flow_id=secrets.token_urlsafe(16),
+            server_identifier=server_identifier,
+        )
+
+    async def complete(
+        self,
+        raw_callback_data: Dict[str, Any],
+    ) -> CompletionResult:
+        api_key = raw_callback_data.get("api_key", "")
+        return CompletionResult(
+            token_set=TokenSet(access_token=api_key, token_type="ApiKey"),
+            user_id=raw_callback_data.get("user_id", ""),
+            server_identifier=raw_callback_data.get("server_identifier", ""),
+            scheme_type="api_key",
         )

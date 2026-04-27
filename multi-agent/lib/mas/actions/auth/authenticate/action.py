@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class AuthenticateInput(BaseActionInput):
     server_identifier: str = Field(default="", description="Auth server issuer URL")
     user_id: str = Field(default="")
+    scheme_type: str = Field(default="oauth2", description="Auth scheme to use")
 
 
 class AuthenticateOutput(BaseActionOutput):
@@ -33,6 +34,7 @@ class AuthenticateOutput(BaseActionOutput):
     authenticated: bool = False
     authorization_url: Optional[str] = None
     scopes: List[str] = Field(default_factory=list)
+    challenge: Optional[Dict[str, Any]] = None
 
 
 class AuthenticateAction(BaseAction):
@@ -42,7 +44,7 @@ class AuthenticateAction(BaseAction):
     action_type = ActionType.VALIDATION
     input_schema = AuthenticateInput
     output_schema = AuthenticateOutput
-    version = "2.0.0"
+    version = "3.0.0"
     tags = {"auth", "validation"}
     elements = {
         (ResourceCategory.AUTH.value, "oauth_client"),
@@ -54,11 +56,9 @@ class AuthenticateAction(BaseAction):
     def __init__(
         self,
         auth_service: Optional[AuthService] = None,
-        oauth2_login_service: Optional[Any] = None,
     ):
         super().__init__()
         self._auth = auth_service
-        self._login = oauth2_login_service
 
     def execute_sync(self, input_data, context=None):
         try:
@@ -83,15 +83,19 @@ class AuthenticateAction(BaseAction):
                 success=False, message="Missing server_identifier", status="not_configured",
             )
 
-        if self._auth:
-            token = await self._auth.get_valid_token(user_id, server_id)
-            if token:
-                return AuthenticateOutput(
-                    success=True, message="Authenticated",
-                    status="authenticated", authenticated=True,
-                )
+        if not self._auth:
+            return AuthenticateOutput(
+                success=False, message="Auth service not configured", status="error",
+            )
 
-        config = self._auth.get_client_config(user_id, server_id) if self._auth else None
+        token = await self._auth.get_valid_token(user_id, server_id)
+        if token:
+            return AuthenticateOutput(
+                success=True, message="Authenticated",
+                status="authenticated", authenticated=True,
+            )
+
+        config = self._auth.get_client_config(user_id, server_id)
         if not config:
             return AuthenticateOutput(
                 success=False,
@@ -99,18 +103,25 @@ class AuthenticateAction(BaseAction):
                 status="not_configured",
             )
 
-        if self._login:
-            url = await self._login.build_login_url(
-                user_id, server_id, config.model_dump(),
+        try:
+            challenge = await self._auth.initiate(
+                user_id, server_id,
+                scheme_type=input_data.scheme_type,
+                config=config.model_dump(),
             )
-            if url:
-                return AuthenticateOutput(
-                    success=True, message="Sign in required",
-                    status="requires_consent",
-                    authorization_url=url, scopes=config.scopes,
-                )
-
-        return AuthenticateOutput(
-            success=False, message="Unable to initiate authentication",
-            status="not_configured",
-        )
+            resp = challenge.to_response()
+            return AuthenticateOutput(
+                success=True,
+                message="Sign in required",
+                status="requires_consent",
+                authorization_url=resp.get("authorization_url"),
+                scopes=resp.get("scopes", []),
+                challenge=resp,
+            )
+        except Exception as exc:
+            logger.warning("Failed to initiate auth: %s", exc)
+            return AuthenticateOutput(
+                success=False,
+                message=f"Unable to initiate authentication: {exc}",
+                status="not_configured",
+            )

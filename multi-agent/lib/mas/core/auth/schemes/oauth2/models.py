@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
-class PendingAuth(BaseModel):
+class FlowState(BaseModel):
     """Short-lived data stored while waiting for an OAuth callback."""
     state_hash: str
     user_id: str
@@ -26,13 +26,13 @@ class PendingAuth(BaseModel):
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 
-class PendingStore(ABC):
+class FlowStateStore(ABC):
     """Short-lived storage for in-flight OAuth handshakes (PKCE state, …)."""
 
     @abstractmethod
-    def save(self, pending: PendingAuth) -> None: ...
+    def save(self, flow_state: FlowState) -> None: ...
 
     @abstractmethod
-    def consume(self, state_hash: str) -> Optional[PendingAuth]:
+    def consume(self, state_hash: str) -> Optional[FlowState]:
         """Atomically read-and-delete. Returns ``None`` if not found."""
         ...
