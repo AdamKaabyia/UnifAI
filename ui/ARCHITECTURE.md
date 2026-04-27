@@ -1417,7 +1417,7 @@ location /api2/ {
 }
 
 location /api3/ {
-  proxy_pass http://sso_backend:port/api/;
+  proxy_pass http://identity:port/api/;
 }
 
 location / {

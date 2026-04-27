@@ -121,7 +121,7 @@ backend:
     tag: "latest"
     pullPolicy: Always
   service:
-    name:identity
+    name: identity
     port: 5555
   type: ClusterIP
 
