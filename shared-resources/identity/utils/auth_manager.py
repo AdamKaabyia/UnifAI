@@ -4,6 +4,7 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
+from typing import Any
 import os, uuid, logging
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
@@ -124,30 +125,16 @@ class AuthManager:
                 # Process the OAuth callback - exchange authorization code for tokens
                 token = self.keycloak_client.authorize_access_token()
                 userinfo = self.keycloak_client.userinfo()
-                logger.info("***************************************")
-                logger.info(f"userinfo: {userinfo}")
-                logger.info("***************************************")
 
                 # Calculate session expiration (10 hours from now)
                 session_created_at = datetime.now()
                 session_expires_at = session_created_at + timedelta(hours=10)
                 
-                # Store user info in session
+                # Store session_id in session cookie and user info in redis
                 session_id = str(uuid.uuid4())
                 session['session_id'] = session_id
                 session.permanent = True
-                # session['user'] = {
-                #     'username': userinfo.get('preferred_username'),
-                #     'email': userinfo.get('email'),
-                #     'name': userinfo.get('name'),
-                #     'sub': userinfo.get('sub'),
-                #     'session_created_at': session_created_at.timestamp(),
-                #     'session_expires_at': session_expires_at.timestamp(),
-                #     'token_expires_at': token.get('expires_at', 0)
-                # }
-                # session['access_token'] = token.get('access_token')
-                # session['refresh_token'] = token.get('refresh_token')
-                # session['token_expires_at'] = token.get('expires_at', 0)
+
                 session_data = {
                     'username': userinfo.get('preferred_username'),
                     'email': userinfo.get('email'),
@@ -160,34 +147,10 @@ class AuthManager:
                     'refresh_token': token.get('refresh_token')
                 }
 
-                # session_data = {
-                #     'user': {
-                #         'username': userinfo.get('preferred_username'),
-                #         'email': userinfo.get('email'),
-                #         'name': userinfo.get('name'),
-                #         'sub': userinfo.get('sub'),
-                #         'session_created_at': session_created_at.timestamp(),
-                #         'session_expires_at': session_expires_at.timestamp(),
-                #         'token_expires_at': token.get('expires_at', 0),
-                #     },
-                #     'access_token': token.get('access_token'),
-                #     'refresh_token': token.get('refresh_token'),
-                #     'token_expires_at': token.get('expires_at', 0),
-                # }
-                # logger.info(f"user: {session['user'].get('username')}")
-                # logger.info(f"refresh_token: {session['refresh_token']}")
-                # logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
-
-                # logger.info(f"session_id: {session_id}")
-                # logger.info(f"saving session {session_id} to redis")
-                # logger.info(f"#########################")
-                # logger.info(f"session: {session}")
-                # logger.info(f"#########################")
                 ttl_seconds = self._ttl_seconds_until_session_expires(
                     session_expires_at.timestamp()
                 )
                 self.redis_store.hset(session_id, session_data, ttl_seconds=ttl_seconds)
-                # logger.info(f"saved session {session_id} to redis")
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""
@@ -233,12 +196,10 @@ class AuthManager:
                     return jsonify({'error': 'Token refresh failed'}), 401
             
             # Get user and add permissions
-            #session_data = self._get_server_session()
+
             user = self.get_user_info()
             if not user:
                 return jsonify({'error': 'No user information available'}), 401
-            # username = session_data.get('username')
-            # user['user'] = username
             
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
@@ -293,7 +254,7 @@ class AuthManager:
         user['session_created_at'] = session_data.get('session_created_at')
         user['session_expires_at'] = session_data.get('session_expires_at')
         user['token_expires_at'] = session_data.get('token_expires_at')
-        return dict(user) if user else None
+        return dict[str, Any](user) if user else None
     
     def _is_session_expired(self):
         """Check if the user session has expired (requires re-authentication)"""
@@ -345,7 +306,6 @@ class AuthManager:
             
             # Update token expiration (but keep session expiration unchanged)
             session_data['token_expires_at'] = token.get('expires_at', 0)
-            # session_data['user']['token_expires_at'] = token.get('expires_at', 0)
             ttl_seconds = self._ttl_seconds_until_session_expires(
                 session_data.get('session_expires_at')
             )
