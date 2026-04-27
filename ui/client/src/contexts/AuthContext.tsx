@@ -133,7 +133,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       checkAuthStatus();
     }
   }, []);
- 
 
   // Set up token refresh and expiration checking
   useEffect(() => {
