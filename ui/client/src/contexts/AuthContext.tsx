@@ -133,18 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       checkAuthStatus();
     }
   }, []);
-
-  async function refreshToken() {
-    try {
-      await api.post('/auth/refresh');
-      await checkAuthStatus();
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      setUser(null);
-      setIsAuthenticated(false);
-      window.location.href = '/login';
-    }
-  }
+ 
 
   // Set up token refresh and expiration checking
   useEffect(() => {
