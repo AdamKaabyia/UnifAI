@@ -184,7 +184,7 @@ vim values/global-config.yaml
 # Update:
 env:
   FRONTEND_URL: "https://unifai.prod.example.com"
-  IDENTITY_BACKEND_HOST: "https://identity.prod.example.com"
+  IDENTITY_HOST: "https://identity.prod.example.com"
 
 # 4. Login to production cluster
 oc login https://api.prod-cluster.example.com:6443 --token=<prod-token>

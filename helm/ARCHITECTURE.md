@@ -594,7 +594,7 @@ env:
   DATAPIPELINEHUB_PORT: "13456"
   MULTIAGENT_HOST: "unifai-multiagent-be"
   MULTIAGENT_PORT: "8003"
-  IDENTITY_BACKEND_HOST: "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
+  IDENTITY_HOST: "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com"
 ```
 
 **Usage in Helmfile:**
