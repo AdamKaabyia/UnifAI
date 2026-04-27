@@ -1,5 +1,5 @@
-import { Route, Switch, useLocation, useRoute } from "wouter";
 import React, { useEffect } from "react";
+import { Route, Switch, useRoute } from "wouter";
 import RagOverview from "@/pages/RagOverview";
 import AgenticOverview from "@/pages/AgenticOverview";
 import Configuration from "@/pages/Configuration";
@@ -70,49 +70,45 @@ function AppRoutes() {
   );
 }
 
-const AuthRoute: React.FC<{ component: React.ComponentType }> = ({ component: Component }) => {
+/** /login outside ProtectedRoute; use full navigation (no wouter setLocation) to match app routing convention. */
+function LoginRouteContent() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  
+
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      setLocation('/');
+      window.location.replace('/');
     }
-  }, [isAuthenticated, isLoading, setLocation]);
+  }, [isAuthenticated, isLoading]);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-    </div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
+      </div>
+    );
   }
 
   if (isAuthenticated) {
     return null;
   }
 
-  return <Component />;
-};
+  return <Login />;
+}
 
 function AppContent() {
-  const [location] = useLocation();
-
-  // Login is outside ProtectedRoute so unauthenticated users can reach it
-  if (location === '/login') {
-    return (
-      <Switch>
-        <Route path="/login">
-          <AuthRoute component={Login} />
-        </Route>
-      </Switch>
-    );
-  }
-  
   return (
-    <ProtectedRoute>
-      <TermsApproval>
-        <AppRoutes />
-      </TermsApproval>
-    </ProtectedRoute>
+    <Switch>
+      <Route path="/login">
+        <LoginRouteContent />
+      </Route>
+      <Route>
+        <ProtectedRoute>
+          <TermsApproval>
+            <AppRoutes />
+          </TermsApproval>
+        </ProtectedRoute>
+      </Route>
+    </Switch>
   );
 }
 

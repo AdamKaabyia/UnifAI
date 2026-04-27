@@ -1,41 +1,6 @@
 import { api } from '@/http/authClient';
-import React, { createContext, useContext, useCallback, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { loadAnalytics } from '@/components/shared/LoadAnalytics';
-
-/** State passed through OAuth `state` (base64 JSON) so we can return the user to the same path. */
-interface AuthLoginState {
-  originalUrl: string;
-  forcePrompt: boolean;
-}
-
-function pathForLoginReturn(): string {
-  const path = window.location.pathname + window.location.search;
-  return path || '/';
-}
-
-function encodeAuthLoginState(state: AuthLoginState): string {
-  return encodeURIComponent(btoa(JSON.stringify(state)));
-}
-
-function decodeAuthLoginState(stateParam: string): AuthLoginState | null {
-  try {
-    const decoded = JSON.parse(atob(decodeURIComponent(stateParam))) as Record<string, unknown>;
-    const originalUrl =
-      typeof decoded.originalUrl === 'string' && decoded.originalUrl.length > 0
-        ? decoded.originalUrl
-        : '/';
-    const forcePrompt = decoded.forcePrompt === true;
-    return { originalUrl, forcePrompt };
-  } catch {
-    return null;
-  }
-}
-
-function authLoginRedirectUrl(state: AuthLoginState): string {
-  const encodedState = encodeAuthLoginState(state);
-  const promptParam = state.forcePrompt ? '&prompt=login' : '';
-  return `${api.defaults.baseURL}/auth/login?state=${encodedState}${promptParam}`;
-}
 
 export interface User {
   username: string;
@@ -43,14 +8,13 @@ export interface User {
   name: string;
   sub: string;
   token_expires_at: number;
-  is_admin?: boolean;
+  is_admin?: boolean;  // Admin access (based on admin_allowed_users config)
 }
 
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  isLoggedOut: boolean;
   login: () => void;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
@@ -66,28 +30,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoggedOut, setIsLoggedOut] = useState(() => {
-    return localStorage.getItem('unifai_logged_out') === 'true';
-  });
+
   // Load analytics after authentication
   loadAnalytics(isAuthenticated, user);
 
-  // Sync logout state across tabs via the storage event
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key !== 'unifai_logged_out') return;
-      const loggedOut = e.newValue === 'true';
-      setIsLoggedOut(loggedOut);
-      if (loggedOut) {
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  const checkAuthStatus = useCallback(async () => {
+  // Check authentication status
+  const checkAuthStatus = async () => {
     try {
       const response = await api.get('/auth/user');
       if (response.data.authenticated && response.data.user) {
@@ -104,23 +52,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  const login = useCallback(() => {
-    // If coming back from logout, force Keycloak to show the login form
-    // instead of silently re-authenticating via Kerberos
-    const forcePrompt = isLoggedOut;
+  // Initiate login by redirecting to backend auth endpoint
+  const login = () => {
+    const path = window.location.pathname + window.location.search;
+    // After SSO, return to the app root instead of the login screen
+    const originalUrl =
+      path === '/login' || path.startsWith('/login?') ? '/' : path || '/';
+    const stateData = { originalUrl };
+    const encodedState = btoa(JSON.stringify(stateData));
+    window.location.href = `${api.defaults.baseURL}/auth/login?state=${encodeURIComponent(encodedState)}`;
+  };
 
-    setIsLoggedOut(false);
-    localStorage.removeItem('unifai_logged_out');
-
-    window.location.href = authLoginRedirectUrl({
-      originalUrl: pathForLoginReturn(),
-      forcePrompt,
-    });
-  }, [isLoggedOut]);
-
-  const logout = useCallback(async () => {
+  const logout = async () => {
     try {
       await api.post('/auth/logout');
     } catch (error) {
@@ -128,34 +73,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
-      setIsLoggedOut(true);
-      localStorage.setItem('unifai_logged_out', 'true');
       window.location.href = '/login';
     }
-  }, []);
+  };
 
-  // Handle authentication callback from URL params on mount
+  // Handle authentication callback from URL params
   useEffect(() => {
-    if (isLoggedOut) {
-      setIsLoading(false);
-      return;
-    }
-
     const urlParams = new URLSearchParams(window.location.search);
     const authStatus = urlParams.get('auth');
     const stateParam = urlParams.get('state');
-
+    
     if (authStatus === 'success') {
-      const decoded = stateParam ? decodeAuthLoginState(stateParam) : null;
-      const originalUrl = decoded?.originalUrl ?? '/';
-      if (stateParam && !decoded) {
-        console.error('Failed to decode state parameter');
+      // Extract original URL from state parameter
+      let originalUrl = '/';
+      if (stateParam) {
+        try {
+          const decodedState = JSON.parse(atob(decodeURIComponent(stateParam)));
+          originalUrl = decodedState.originalUrl || '/';
+        } catch (error) {
+          console.error('Failed to decode state parameter:', error);
+        }
       }
-
+      
       // Remove auth params from URL (normalize pathname to avoid protocol-relative URL issues)
       const cleanPath = window.location.pathname.replace(/^\/+/, '/') || '/';
       window.history.replaceState({}, document.title, cleanPath);
-
+      
       // Check auth status after successful login
       checkAuthStatus().then(() => {
         // Restore the original URL after authentication is confirmed
@@ -165,14 +108,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     } else if (authStatus === 'error') {
       // On error, try to preserve the original URL from state and retry login
-      const decoded = stateParam ? decodeAuthLoginState(stateParam) : null;
-      if (decoded) {
-        console.log('Authentication failed, retrying with preserved URL:', decoded.originalUrl);
-        window.location.href = authLoginRedirectUrl(decoded);
-        return; // Don't set loading to false yet, we're redirecting
-      }
       if (stateParam) {
-        console.error('Failed to decode state parameter on error');
+        try {
+          const decodedState = JSON.parse(atob(decodeURIComponent(stateParam)));
+          const originalUrl = decodedState.originalUrl || '/';
+          console.log('Authentication failed, retrying with preserved URL:', originalUrl);
+          
+          // Re-encode state and retry login
+          const stateData = { originalUrl };
+          const encodedState = btoa(JSON.stringify(stateData));
+          window.location.href = `${api.defaults.baseURL}/auth/login?state=${encodeURIComponent(encodedState)}`;
+          return; // Don't set loading to false yet, we're redirecting
+        } catch (error) {
+          console.error('Failed to decode state parameter on error:', error);
+        }
       }
       // Remove auth params from URL (normalize pathname to avoid protocol-relative URL issues)
       const cleanPath = window.location.pathname.replace(/^\/+/, '/') || '/';
@@ -183,21 +132,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Initial load - check if user is already authenticated
       checkAuthStatus();
     }
-  }, [isLoggedOut, checkAuthStatus]);
+  }, []);
 
-  // Periodically refresh access token before it expires
+  async function refreshToken() {
+    try {
+      await api.post('/auth/refresh');
+      await checkAuthStatus();
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      window.location.href = '/login';
+    }
+  }
+
+  // Set up token refresh and expiration checking
   useEffect(() => {
-    if (!isAuthenticated || !user || isLoggedOut) return;
+    if (!isAuthenticated || !user) return;
 
     const checkTokenExpiration = () => {
-      const timeUntilExpiry = user.token_expires_at - Date.now() / 1000;
+      const now = Date.now() / 1000;
+      const expiresAt = user.token_expires_at;
+      const timeUntilExpiry = expiresAt - now;
+
       if (timeUntilExpiry < 60) {
-        api.post('/auth/refresh')
-          .then(() => checkAuthStatus())
-          .catch((error) => {
-            console.error('Token refresh failed:', error);
-            logout();
-          });
+        void refreshToken();
       }
     };
 
@@ -205,13 +164,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkTokenExpiration();
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, user, isLoggedOut, checkAuthStatus, logout]);
+  }, [isAuthenticated, user]);
 
   const value: AuthContextType = {
     user,
     isAuthenticated,
     isLoading,
-    isLoggedOut,
     login,
     logout,
     checkAuthStatus,
