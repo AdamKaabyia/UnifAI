@@ -160,7 +160,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
+    async function refreshToken() {
+    try {
+        await api.post('/auth/refresh');
+        await checkAuthStatus();
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        setUser(null);
+        setIsAuthenticated(false);
+        window.location.href = '/login';
+      }
+    }
+
+    // Check token expiration every 10 minutes
     const interval = setInterval(checkTokenExpiration, 600000);
+
+    // Initial check
     checkTokenExpiration();
 
     return () => clearInterval(interval);

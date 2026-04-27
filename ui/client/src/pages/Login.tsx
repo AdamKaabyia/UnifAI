@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { FaBuilding } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
@@ -33,7 +32,7 @@ export default function Login() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 mb-4 shadow-lg shadow-purple-500/25"
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 mb-4"
           >
             <HiSparkles className="w-8 h-8 text-white" />
           </motion.div>
@@ -41,20 +40,18 @@ export default function Login() {
           <p className="text-gray-400">Sign in to continue to your dashboard</p>
         </div>
 
-        <Card className="border-0 bg-[#1C2128]/80 backdrop-blur-xl shadow-2xl">
-          <CardContent>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 bg-[#2A303C] border-[#3D4450] hover:bg-[#353D4A] hover:border-purple-500/50 text-white transition-all duration-200"
-              onClick={handleSSOLogin}
-              disabled={authLoading}
-            >
-              <FaBuilding className="mr-2 h-4 w-4 text-purple-400" />
-              Login using SSO
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="w-full">
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full h-12 border-0 bg-[#21262d] text-white shadow-none hover:bg-[#30363d]"
+            onClick={handleSSOLogin}
+            disabled={authLoading}
+          >
+            <FaBuilding className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+            Login using SSO
+          </Button>
+        </div>
       </motion.div>
     </div>
   );
