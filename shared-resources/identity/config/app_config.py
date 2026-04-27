@@ -16,6 +16,11 @@ class AppConfig(SharedConfig):
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
 
-    frontend_url: str = "http://localhost:5000"    # session_cookie_secure=True
+    frontend_url: str = "http://localhost:5000"    
     backend_env: str = "development"
 
+    # Session Configuration
+    session_cookie_secure: bool = True
+    session_cookie_http_only: bool = True
+    session_cookie_samesite: str = "None"
+    permanent_session_lifetime: int = 10

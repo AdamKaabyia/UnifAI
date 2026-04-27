@@ -39,6 +39,18 @@ class AuthManager:
         self.oauth = OAuth(app)
         
         # Register Keycloak client
+        self._setup_keycloak()
+        
+        # Set up Redis
+        self._setup_redis(redis_store)
+        
+        # Register auth routes
+        self._register_auth_routes()
+        
+        # Set up session configuration
+        self._setup_session_configuration(app)
+
+    def _setup_keycloak(self):
         keycloak_base_url = config.keycloak_base_url
         client_id = config.client_id
         client_secret = config.client_secret
@@ -55,21 +67,20 @@ class AuthManager:
                 'scope': 'openid email profile',
             }
         )
-        
+
+    def _setup_redis(self, redis_store):
         self.redis_store = redis_store
         if not self.redis_store.ping():
             raise ValueError("Failed to connect to Redis")
-        if self.redis_store.ping():
+        else:
             logger.info("Connected to Redis")
-        # Register auth routes
-        self._register_auth_routes()
-        
-        # Set up session configuration
+
+    def _setup_session_configuration(self, app):
         app.config.update({
-            'SESSION_COOKIE_SECURE': True,  # Required for SameSite=None
-            'SESSION_COOKIE_HTTPONLY': True,
-            'SESSION_COOKIE_SAMESITE': 'None',  # Must be 'None' for cross-origin
-            'PERMANENT_SESSION_LIFETIME': timedelta(hours=10)  # 10 hour sessions to match OIDC
+            'SESSION_COOKIE_SECURE': config.session_cookie_secure,
+            'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,
+            'SESSION_COOKIE_SAMESITE': config.session_cookie_samesite,
+            'PERMANENT_SESSION_LIFETIME': timedelta(hours=config.permanent_session_lifetime)
         })
 
     def _get_server_session(self):
@@ -126,9 +137,9 @@ class AuthManager:
                 token = self.keycloak_client.authorize_access_token()
                 userinfo = self.keycloak_client.userinfo()
 
-                # Calculate session expiration (10 hours from now)
+                # Calculate session expiration (configurable via the config for permanent session lifetime)
                 session_created_at = datetime.now()
-                session_expires_at = session_created_at + timedelta(hours=10)
+                session_expires_at = session_created_at + timedelta(hours=config.permanent_session_lifetime)
                 
                 # Store session_id in session cookie and user info in redis
                 session_id = str(uuid.uuid4())
