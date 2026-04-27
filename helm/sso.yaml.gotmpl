@@ -1,7 +1,7 @@
 environments:
   default:
     values:
-      - ./values/sso-values.yaml
+      - ./values/identity-values.yaml
 ---
 
 helmDefaults:
@@ -10,8 +10,8 @@ helmDefaults:
 
 releases:
 
-  - name: unifai-sso
-    chart: ./shared-resources/sso
+  - name: unifai-identity
+    chart: ./shared-resources/identity
     wait: true
     values:
       - {{- toYaml .Values | nindent 8 }}
@@ -21,4 +21,4 @@ releases:
         showlogs: true
         command: bash
         args:
-        - "./scripts/sso-presync.sh"
+        - "./scripts/identity-presync.sh"

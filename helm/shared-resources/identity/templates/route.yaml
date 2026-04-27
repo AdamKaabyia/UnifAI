@@ -4,8 +4,8 @@ metadata:
   annotations:
     openshift.io/host.generated: "true"
   labels:
-    {{- include "sso.labels" . | nindent 4 }}
-  name: {{ include "sso.fullname" . }}-backend
+    {{- include "identity.labels" . | nindent 4 }}
+  name: {{ include "identity.fullname" . }}-backend
 spec:
   host: 
   port:

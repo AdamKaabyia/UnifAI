@@ -2,7 +2,7 @@
 
 set -x  # Print each command
 set +e  # Disable immediate exit on error
-echo "Starting sso-presync hook..."
+echo "Starting redis-presync hook..."
 # Source common functions
 source "$(dirname "$0")/postsync-lib.sh"
 
