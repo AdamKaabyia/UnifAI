@@ -10,6 +10,8 @@ backend:
     VERSION: ""
     PORT: 13456
     LOG_LEVEL: debug
+    PYTHONFAULTHANDLER: 1
+    PYTHONUNBUFFERED: 1
 
   service:
     name: identity
