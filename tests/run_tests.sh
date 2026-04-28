@@ -128,7 +128,7 @@ case "$SUITE" in
   identity-unit)
     echo ">>> Running Identity unit tests..."
     cd "$HOME_DIR/shared-resources/identity"
-    pytest tests/smoke/ -v --tb=short --color=yes $LOG_ARGS $REPORT_ARGS $EXTRA_ARGS || TEST_EXIT=$?
+    pytest tests/unit/ -v --tb=short --color=yes $LOG_ARGS $REPORT_ARGS $EXTRA_ARGS || TEST_EXIT=$?
     ;;
 
   all)
@@ -159,7 +159,7 @@ case "$SUITE" in
     if [ -n "$REPORTS_DIR" ] && [ -d "$REPORTS_DIR" ]; then
       IDENTITY_REPORT_ARGS="--html=${REPORTS_DIR}/report_identity_${TIMESTAMP}.html --self-contained-html --junitxml=${REPORTS_DIR}/junit_identity_${TIMESTAMP}.xml"
     fi
-    pytest tests/ -v --tb=short --color=yes $LOG_ARGS $MA_REPORT_ARGS $EXTRA_ARGS || MA_EXIT=$?
+    pytest tests/ -v --tb=short --color=yes $LOG_ARGS $IDENTITY_REPORT_ARGS $EXTRA_ARGS || IDENTITY_EXIT=$?
     echo ""
 
     echo "============================================"
