@@ -4,7 +4,8 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Any
+from typing import requests as http_requests
+import Any
 import os, uuid, logging
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
@@ -178,11 +179,40 @@ class AuthManager:
         
         @self.app.route('/api/auth/logout', methods=['POST'])
         def logout():
-            """Logout user and clear session"""
+            """Logout user and clear session (revokes refresh token at Keycloak when available)."""
             session_data = self._get_server_session()
             username = (session_data or {}).get('username', 'Unknown')  
             if session.get('session_id'):      
                 self.redis_store.delete(session.get('session_id'))
+            refresh_token_val = (session_data or {}).get('refresh_token') if session_data else None
+            if refresh_token_val:
+                try:
+                    keycloak_base_url = config.keycloak_base_url
+                    realm = config.get('keycloak_realm', 'master')
+                    logout_url = f"{keycloak_base_url}/realms/{realm}/protocol/openid-connect/logout"
+                    resp = http_requests.post(
+                        logout_url,
+                        data={
+                            'client_id': config.client_id,
+                            'client_secret': config.client_secret,
+                            'refresh_token': refresh_token_val,
+                        },
+                        timeout=10,
+                    )
+                    # Keycloak returns 204 No Content (or 200) on successful token revocation
+                    if resp.ok:
+                        logger.info(f"Keycloak session revoked for user {username}")
+                    else:
+                        body_preview = (resp.text or '')[:500]
+                        logger.warning(
+                            f"Keycloak logout returned {resp.status_code} for {username}; "
+                            f"local session cleared but server may still accept the refresh token. "
+                            f"Body: {body_preview}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to revoke Keycloak session for {username}: {e}")
+
+            self._pop_server_session()            
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})
