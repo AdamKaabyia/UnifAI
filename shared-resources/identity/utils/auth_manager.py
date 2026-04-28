@@ -211,8 +211,7 @@ class AuthManager:
                         )
                 except Exception as e:
                     logger.warning(f"Failed to revoke Keycloak session for {username}: {e}")
-
-            self._pop_server_session()            
+          
             session.clear()
             logger.info(f"User {username} logged out")
             return jsonify({'message': 'Logged out successfully'})

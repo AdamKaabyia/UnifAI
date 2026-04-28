@@ -1,4 +1,4 @@
-title Unifai Authentication process
+Unifai Authentication process
 
 User->Nginx: get UI client files (frontend_url)
 Nginx->User: send UI client files
@@ -11,4 +11,5 @@ note over User,identity-be:redirect url: identity-be/api/callback
 User->RH-SSO: login process
 RH-SSO->User: redirect to identity-be/api/callback
 identity-be->User: redirect to frontend_url?auth=success
+note over User,identity-be: session id is added to the session cookie for future usage
 User->Nginx: browse pages (frontend_url/api1 | frontend_url/api2)

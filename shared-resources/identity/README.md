@@ -13,7 +13,7 @@ the chart text is below:
 
 
 ```
-title Unifai Authentication process
+Unifai Authentication process
 
 User->Nginx: get UI client files (frontend_url)
 Nginx->User: send UI client files
@@ -26,8 +26,13 @@ note over User,identity-be:redirect url: identity-be/api/callback
 User->RH-SSO: login process
 RH-SSO->User: redirect to identity-be/api/callback
 identity-be->User: redirect to frontend_url?auth=success
+note over User,identity-be: session id is added to the session cookie for future usage
 User->Nginx: browse pages (frontend_url/api1 | frontend_url/api2)
 ```
+
+When the user logs in to the system he the identity pods gets all user information from the Keycloak server. once the session is authenticated all used information is saved to Redis. Each session gets a random session id which is sent by the ui from now on till the session is expires or the user logs out.
+Each component in the system that is access by an API gets that cookie and can extract the session id in order to extract its details from the Redis server.
+
 
 ## Logout and login (GENIE-827)
 
