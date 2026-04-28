@@ -33,9 +33,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        # ========================
-        # Backend Container
-        # ========================
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
@@ -43,7 +40,10 @@ spec:
             - name: {{ .Values.backend.service.name }}
               containerPort: {{ .Values.backend.service.port }}
               protocol: TCP
-              
+          {{- with .Values.resources }}
+          resources:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}    
           envFrom:
           - configMapRef:
               name: {{ .Values.IdentityConfigMapName }}
