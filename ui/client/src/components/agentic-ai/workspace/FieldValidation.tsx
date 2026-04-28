@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Loader2, Lock, LogIn } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import axios from "../../../http/axiosAgentConfig";
 import { executeAction } from '@/api/actions';
 import { useAuth } from "@/contexts/AuthContext";
+import { FieldValidationTwoFactorAuth } from './FieldValidationTwoFactorAuth';
 
 
 // Type guard to check if hint is an ApiHint (has endpoint) vs ActionHint (has action_uid)
@@ -70,7 +71,6 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
 
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastValidatedKeyRef = useRef<string | null>(null);
-  const popupRef = useRef<Window | null>(null);
 
   // Determine if this is an ApiHint or ActionHint
   const useApiHint = isApiHint(validationHint);
@@ -80,7 +80,13 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     ? elementActions.find(action => action.uid === validationHint.action_uid)
     : null;
 
+  /**
+   * Creates a stable validation key that combines the field value and all dependency values.
+   * This key is used to determine if validation should be re-triggered.
+   * When either the field value or any dependency changes, this key will change.
+   */
   const validationKey = React.useMemo(() => {
+    // Gather dependency values (excluding the current field)
     const dependencyValues: Record<string, any> = {};
     if (validationHint?.dependencies) {
       Object.keys(validationHint.dependencies).forEach((configField) => {
@@ -96,18 +102,31 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     });
   }, [fieldValue, validationHint?.dependencies, fieldName, configValues]);
 
+  /**
+   * Builds the input data for validation by:
+   * 1. Always including the current field's value
+   * 2. Gathering dependency values from configValues based on the hint's dependencies mapping
+   * 
+   * @param value - The current field's value
+   * @param fieldNameMapping - Optional custom mapping for the current field name in the input
+   * @returns Record with field values for the validation action/API
+   */
   const buildInputWithDependencies = (value: any, fieldNameMapping?: string): Record<string, any> => {
     const inputData: Record<string, any> = {};
     
+    // Always include the current field's value
     const targetFieldName = fieldNameMapping || fieldName;
     inputData[targetFieldName] = value;
     
+    // Gather dependency values from configValues
     if (validationHint.dependencies && Object.keys(validationHint.dependencies).length > 0) {
       Object.entries(validationHint.dependencies).forEach(([configField, actionField]) => {
+        // Skip if this is the current field (already added above)
         if (configField === fieldName) {
           return;
         }
         
+        // Get the dependency value from configValues
         const dependencyValue = configValues[configField];
         if (dependencyValue !== undefined) {
           inputData[actionField as string] = dependencyValue;
@@ -118,19 +137,24 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     return inputData;
   };
 
+  // Validate using ActionHint (via action system)
   const performActionValidation = async (value: any) => {
     if (!validationAction) {
       return { success: false, message: 'Validation action not found' };
     }
 
+    // Determine the correct field name mapping for the current field
     let fieldNameMapping: string | undefined;
     
+    // Check if the current field is explicitly mapped in dependencies
     if (validationHint.dependencies?.[fieldName]) {
       fieldNameMapping = validationHint.dependencies[fieldName];
     } else if (!validationAction.input_schema?.properties?.[fieldName]) {
+      // If fieldName doesn't match input schema, try to find matching property
       const inputProperties = validationAction.input_schema?.properties || {};
       const inputKeys = Object.keys(inputProperties);
       
+      // Use the first required property or first property as fallback
       const requiredFields = validationAction.input_schema?.required || [];
       fieldNameMapping = requiredFields.length > 0 ? requiredFields[0] : inputKeys[0];
     }
@@ -140,21 +164,27 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     return executeAction(validationAction.uid, inputData, userId);
   };
 
+  // Validate using ApiHint (direct API call)
   const performApiValidation = async (value: any) => {
+    // Determine field name mapping for the current field
     const fieldNameMapping = validationHint.dependencies?.[fieldName] || fieldName;
     
+    // Build request body with current field and dependencies
     const requestBody = buildInputWithDependencies(value, fieldNameMapping);
     if (userId) {
       requestBody.userId = userId;
     }
 
+    // Determine the HTTP method (default to POST)
     const method = (validationHint.method || 'POST').toUpperCase();
     const endpoint = validationHint.endpoint;
 
     let response;
     if (method === 'GET') {
+      // For GET requests, send data as query params
       response = await axios.get(endpoint, { params: requestBody });
     } else {
+      // For POST/PUT/PATCH, send data in body
       response = await axios({
         method: method.toLowerCase(),
         url: endpoint,
@@ -166,26 +196,32 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
   };
 
   const performValidation = async (value: any) => {
+    // For ActionHint, we need the action to exist
     if (!useApiHint && !validationAction) {
       setValidationState({ isValidating: false, isValid: null, message: '' });
       onValidationChange(fieldName, false);
       return;
     }
 
+    // For ApiHint, we need the endpoint to exist
     if (useApiHint && !validationHint.endpoint) {
       setValidationState({ isValidating: false, isValid: null, message: '' });
       onValidationChange(fieldName, false);
       return;
     }
 
+    // Skip if no value
     if (!value || value === '' || (Array.isArray(value) && value.length === 0)) {
       setValidationState({ isValidating: false, isValid: null, message: '' });
       setAuthUrl(null);
       setAuthStatus(null);
+      // For non-required fields, empty value should not block save (report as valid)
+      // For required fields, empty value is invalid
       onValidationChange(fieldName, !isRequired);
       return;
     }
 
+    // Skip validation if neither the value nor dependencies have changed
     if (lastValidatedKeyRef.current === validationKey) {
       return;
     }
@@ -193,10 +229,12 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     setValidationState(prev => ({ ...prev, isValidating: true }));
 
     try {
+      // Use the appropriate validation method based on hint type
       const responseData = useApiHint 
         ? await performApiValidation(value)
         : await performActionValidation(value);
 
+      // Extract validation result based on field_mapping or default to 'success'
       const fieldMapping = validationHint.field_mapping || 'success';
 
       if (onInputChange && responseData.server_identifier) {
@@ -211,6 +249,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
       }
       
       // ── Standard validation handling ──
+      // Handle array responses (for list validation like resources.validate)
       if (Array.isArray(responseData)) {
         const itemResults: ItemValidationResult[] = responseData.map((item: any) => ({
           rid: item.element_rid || '',
@@ -218,6 +257,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
           message: item.messages?.[0]?.message || (item[fieldMapping] ? 'Valid' : 'Invalid')
         }));
         
+        // Field is valid only if ALL items are valid
         const allValid = itemResults.every(item => item.isValid);
         const invalidCount = itemResults.filter(item => !item.isValid).length;
         
@@ -232,6 +272,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
         lastValidatedKeyRef.current = validationKey;
         onValidationChange(fieldName, allValid, itemResults);
       } else {
+        // Single item response (original behavior)
         const isValid = responseData[fieldMapping] === true;
         
         setValidationState({
@@ -253,64 +294,63 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     }
   };
 
+  /**
+   * Dispatches an auth-aware response to the correct state-update path.
+   * Uses switch/case so each auth status maps to exactly one update.
+   */
   const handleAuthResponse = useCallback((data: any) => {
-    const status = data.status;
-    const message = data.message || '';
+    const status: string = data.status;
+    const message: string = data.message || '';
 
-    if (status === 'authenticated') {
-      setAuthUrl(null);
-      setAuthStatus('authenticated');
-      setAuthMessage(message);
-      setValidationState({ isValidating: false, isValid: true, message });
-      onValidationChange(fieldName, true);
-    } else if (status === 'requires_consent' || status === 'expired') {
-      setAuthUrl(data.authorization_url || null);
-      setAuthStatus(status);
-      setAuthMessage(message);
-      setValidationState({ isValidating: false, isValid: null, message });
-      onValidationChange(fieldName, false);
-    } else if (status === 'needs_client_registration') {
-      setAuthUrl(null);
-      setAuthStatus(status);
-      setAuthMessage(data.message || 'OAuth client registration required');
-      setValidationState({ isValidating: false, isValid: false, message: data.message || '' });
-      onValidationChange(fieldName, false);
-    } else {
-      setAuthUrl(null);
-      setAuthStatus(status);
-      setAuthMessage(message);
-      setValidationState({ isValidating: false, isValid: false, message });
-      onValidationChange(fieldName, false);
+    switch (status) {
+      case 'authenticated':
+        setAuthUrl(null);
+        setAuthStatus('authenticated');
+        setAuthMessage(message);
+        setValidationState({ isValidating: false, isValid: true, message });
+        onValidationChange(fieldName, true);
+        break;
+
+      case 'requires_consent':
+      case 'expired':
+        setAuthUrl(data.authorization_url || null);
+        setAuthStatus(status);
+        setAuthMessage(message);
+        setValidationState({ isValidating: false, isValid: null, message });
+        onValidationChange(fieldName, false);
+        break;
+
+      case 'needs_client_registration':
+        setAuthUrl(null);
+        setAuthStatus('needs_client_registration');
+        setAuthMessage(message || 'OAuth client registration required');
+        setValidationState({ isValidating: false, isValid: false, message: message || '' });
+        onValidationChange(fieldName, false);
+        break;
+
+      default:
+        setAuthUrl(null);
+        setAuthStatus(status);
+        setAuthMessage(message);
+        setValidationState({ isValidating: false, isValid: false, message });
+        onValidationChange(fieldName, false);
+        break;
     }
   }, [fieldName, onValidationChange]);
 
-  const handleSignIn = useCallback(() => {
-    if (!authUrl) return;
-    popupRef.current = window.open(authUrl, 'oauth_signin', 'width=600,height=700,scrollbars=yes');
-  }, [authUrl]);
+  /** Called by FieldValidationTwoFactorAuth after a successful OAuth callback */
+  const handleAuthRevalidate = useCallback(() => {
+    lastValidatedKeyRef.current = null;
+    performValidation(fieldValue);
+  }, [fieldValue]);
 
-  // Listen for OAuth callback postMessage from popup
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'credentials_callback') {
-        if (popupRef.current) {
-          popupRef.current.close();
-          popupRef.current = null;
-        }
-        if (event.data.success) {
-          lastValidatedKeyRef.current = null;
-          performValidation(fieldValue);
-        } else {
-          setAuthStatus('error');
-          setAuthMessage(event.data.error || 'Authentication failed');
-          setValidationState({ isValidating: false, isValid: false, message: event.data.error || 'Authentication failed' });
-          onValidationChange(fieldName, false);
-        }
-      }
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [fieldValue, fieldName]);
+  /** Called by FieldValidationTwoFactorAuth when the OAuth popup reports failure */
+  const handleAuthError = useCallback((errorMessage: string) => {
+    setAuthStatus('error');
+    setAuthMessage(errorMessage);
+    setValidationState({ isValidating: false, isValid: false, message: errorMessage });
+    onValidationChange(fieldName, false);
+  }, [fieldName, onValidationChange]);
 
   // Debounced validation on field value change OR dependency value change
   useEffect(() => {
@@ -320,15 +360,16 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
 
     validationTimeoutRef.current = setTimeout(() => {
       performValidation(fieldValue);
-    }, 1500);
+    }, 1500); // 1.5 second delay
 
     return () => {
       if (validationTimeoutRef.current) {
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [validationKey]);
+  }, [validationKey]); // Re-trigger when field value OR any dependency changes
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (validationTimeoutRef.current) {
@@ -337,6 +378,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     };
   }, []);
 
+  // For ActionHint, we need a valid action; for ApiHint, we need an endpoint
   if (!useApiHint && !validationAction) {
     return null;
   }
@@ -344,73 +386,20 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     return null;
   }
 
-  // ── Auth-aware rendering ──
+  // ── Auth-aware rendering — delegated to sub-component ──
 
-  if (authStatus === 'authenticated') {
+  if (authStatus) {
+    const authMethodAllowsSignIn = !configValues?.auth_method || configValues.auth_method === 'sign_in';
+
     return (
-      <div className="flex items-center gap-2 mt-1">
-        <CheckCircle className="h-4 w-4 text-green-400" />
-        <span className="text-xs text-green-400">Authenticated</span>
-        {authMessage && <Badge variant="outline" className="text-xs">{authMessage}</Badge>}
-      </div>
-    );
-  }
-
-  const authMethodAllowsSignIn = !configValues?.auth_method || configValues.auth_method === 'sign_in';
-
-  if ((authStatus === 'requires_consent' || authStatus === 'expired') && authUrl && authMethodAllowsSignIn) {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <Lock className="h-4 w-4 text-yellow-400" />
-        <span className="text-xs text-yellow-400">
-          {authStatus === 'expired' ? 'Session expired' : 'Sign in required'}
-        </span>
-        <button
-          type="button"
-          onClick={handleSignIn}
-          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-        >
-          <LogIn className="h-3 w-3" />
-          {authStatus === 'expired' ? 'Re-authenticate' : 'Sign In'}
-        </button>
-        {authMessage && <Badge variant="outline" className="text-xs">{authMessage}</Badge>}
-      </div>
-    );
-  }
-
-  if (authStatus === 'needs_client_registration') {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <XCircle className="h-4 w-4 text-orange-400" />
-        <span className="text-xs text-orange-400">{authMessage || 'Client registration required'}</span>
-      </div>
-    );
-  }
-
-  if (authStatus === 'requires_consent' && !authUrl) {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <Lock className="h-4 w-4 text-yellow-400" />
-        <span className="text-xs text-yellow-400">{authMessage || 'Sign in required'}</span>
-      </div>
-    );
-  }
-
-  if (authStatus === 'auth_required') {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <Lock className="h-4 w-4 text-yellow-400" />
-        <span className="text-xs text-yellow-400">{authMessage || 'Authentication required'}</span>
-      </div>
-    );
-  }
-
-  if (authStatus === 'authenticated_but_rejected') {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <XCircle className="h-4 w-4 text-red-400" />
-        <span className="text-xs text-red-400">{authMessage || 'Authenticated but the server rejected the request'}</span>
-      </div>
+      <FieldValidationTwoFactorAuth
+        authStatus={authStatus}
+        authUrl={authUrl}
+        authMessage={authMessage}
+        authMethodAllowsSignIn={authMethodAllowsSignIn}
+        onRevalidate={handleAuthRevalidate}
+        onAuthError={handleAuthError}
+      />
     );
   }
 
