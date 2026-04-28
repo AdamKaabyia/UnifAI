@@ -24,5 +24,5 @@ def test_health_get() -> None:
         pytest.skip("Set IDENTITY_SMOKE_URL to the /api base (e.g. http://127.0.0.1:13456/api)")
     url = f"{base.rstrip('/')}/health/"
     r = requests.get(url, timeout=15, verify=bool(int(os.environ.get("TLS_VERIFY", "0"))))
-    assert r.status_code == 200, f"{r.status_code} {r.text!r[:400]}"
+    assert r.status_code == 200, f"{r.status_code} {repr(r.text)[:400]}"
     assert r.json().get("status") == "ok"
