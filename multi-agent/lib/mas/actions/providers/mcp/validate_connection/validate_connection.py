@@ -212,6 +212,15 @@ class ValidateConnectionAction(BaseAction):
                     )
             except Exception as exc:
                 logger.error("Auth initiation failed: %s", exc, exc_info=True)
+                return ValidateConnectionOutput(
+                    success=False,
+                    message=f"OAuth setup required: {exc}",
+                    status="needs_client_registration",
+                    is_reachable=True,
+                    auth_required=True,
+                    server_identifier=server_id,
+                    scopes=scopes,
+                )
 
         return ValidateConnectionOutput(
             success=True, message="Authentication required",

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Loader2, RefreshCw, ChevronDown, Check, CheckCheck, X } from 'lucide-react';
 import axios from "../../../http/axiosAgentConfig";
+import { executeAction } from '@/api/actions';
 import { useAuth } from "@/contexts/AuthContext";
 import { OptionItem, normalizeOptions } from './fieldPopulationUtils';
 
@@ -309,13 +310,7 @@ export const FieldPopulation: React.FC<FieldPopulationProps> = ({
       throw new Error('Populate action not found');
     }
 
-    const response = await axios.post('/actions/action.execute', {
-      uid: populateAction.uid,
-      inputData,
-      userId,
-    });
-
-    return response.data;
+    return executeAction(populateAction.uid, inputData, userId);
   };
 
   // Perform population via ApiHint (direct API call)

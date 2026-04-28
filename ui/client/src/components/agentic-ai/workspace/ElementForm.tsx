@@ -95,6 +95,14 @@ export const ElementForm: React.FC<ElementFormProps> = ({
            fieldSchema.hints?.api?.hint_type === 'validate';
   }, [elementSchema]);
 
+  const isFieldConditionallyVisible = useCallback((fieldSchema: any): boolean => {
+    const conditions = fieldSchema?.hints?.conditional?.visible_when;
+    if (!conditions) return true;
+    return Object.entries(conditions).every(
+      ([field, requiredValue]) => formData[field] === requiredValue,
+    );
+  }, [formData]);
+
   const handleValidationChange = (fieldName: string, isValid: boolean, itemResults?: ItemValidationResult[]) => {
     setFieldValidationStates(prev => ({
       ...prev,
@@ -507,6 +515,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
         return true;
       }
+
+      // Skip validation for conditionally hidden fields
+      if (!isFieldConditionallyVisible(fieldSchema)) {
+        return true;
+      }
       
       const value = formData[field];
       
@@ -547,13 +560,18 @@ export const ElementForm: React.FC<ElementFormProps> = ({
         return;
       }
 
-      // Validate all required fields from combined schema, excluding hidden fields
+      // Validate all required fields from combined schema, excluding hidden and conditionally hidden fields
       const required = elementSchema.config_schema.required || [];
       const missing = required.filter((field) => {
         const fieldSchema = elementSchema.config_schema.properties[field];
         
         // Skip validation for hidden fields
         if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+          return false;
+        }
+
+        // Skip validation for conditionally hidden fields
+        if (!isFieldConditionallyVisible(fieldSchema)) {
           return false;
         }
         
@@ -579,6 +597,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
         // Skip hidden fields - don't include them in save payload
         if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+          return;
+        }
+
+        // Skip conditionally hidden fields
+        if (!isFieldConditionallyVisible(fieldSchema)) {
           return;
         }
 
@@ -761,6 +784,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
                 // Filter out hidden fields - check if field has hints.hidden.hint_type === "hidden"
                 if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+                  return false;
+                }
+
+                // Filter out conditionally hidden fields
+                if (!isFieldConditionallyVisible(fieldSchema)) {
                   return false;
                 }
 

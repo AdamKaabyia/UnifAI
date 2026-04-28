@@ -202,7 +202,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
     try {
       const response = await axios.post<ElementValidationResult>(
         '/resources/resource.validate',
-        { resourceId: rid }
+        { resourceId: rid, userId: USER_ID }
       );
       const result = response.data;
       updateDependencyParentMap(rid, result.dependency_results);

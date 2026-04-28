@@ -197,7 +197,38 @@ class SecretHint(BaseModel):
         }
 
 
-def combine_hints(*hints: Union[ActionHint, ApiHint, HiddenHint, SecretHint]) -> Dict[str, Any]:
+class ConditionalHint(BaseModel):
+    """
+    Hint for conditional field visibility.
+
+    The UI should only render this field when every condition in
+    ``visible_when`` is satisfied (i.e. the named sibling field has the
+    specified value).
+
+    Example::
+
+        json_schema_extra=combine_hints(
+            SecretHint(),
+            ConditionalHint(visible_when={"auth_method": "access_token"}),
+        )
+    """
+    visible_when: Dict[str, Any] = Field(
+        ...,
+        description="Map of {field_name: required_value}. All must match for the field to be visible.",
+    )
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        return super().model_dump(**kwargs)
+
+    def to_hints(self) -> Dict[str, Any]:
+        return {
+            "hints": {
+                "conditional": self.model_dump()
+            }
+        }
+
+
+def combine_hints(*hints: Union[ActionHint, ApiHint, HiddenHint, SecretHint, ConditionalHint]) -> Dict[str, Any]:
     """
     Combine multiple hints into a single json_schema_extra structure.
     

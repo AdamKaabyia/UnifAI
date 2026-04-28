@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Loader2, Lock, LogIn } from 'lucide-react';
 import axios from "../../../http/axiosAgentConfig";
+import { executeAction } from '@/api/actions';
 import { useAuth } from "@/contexts/AuthContext";
 
 
@@ -35,6 +36,7 @@ interface FieldValidationProps {
 const AUTH_STATUSES = new Set([
   'authenticated', 'requires_consent', 'expired',
   'not_configured', 'needs_client_registration',
+  'auth_required', 'authenticated_but_rejected',
 ]);
 
 export const FieldValidation: React.FC<FieldValidationProps> = ({
@@ -135,13 +137,7 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
 
     const inputData = buildInputWithDependencies(value, fieldNameMapping);
 
-    const response = await axios.post('/actions/action.execute', {
-      uid: validationAction.uid,
-      inputData,
-      userId,
-    });
-
-    return response.data;
+    return executeAction(validationAction.uid, inputData, userId);
   };
 
   const performApiValidation = async (value: any) => {
@@ -357,7 +353,9 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     );
   }
 
-  if ((authStatus === 'requires_consent' || authStatus === 'expired') && authUrl) {
+  const authMethodAllowsSignIn = !configValues?.auth_method || configValues.auth_method === 'sign_in';
+
+  if ((authStatus === 'requires_consent' || authStatus === 'expired') && authUrl && authMethodAllowsSignIn) {
     return (
       <div className="flex items-center gap-2 mt-1">
         <Lock className="h-4 w-4 text-yellow-400" />
@@ -391,6 +389,24 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
       <div className="flex items-center gap-2 mt-1">
         <Lock className="h-4 w-4 text-yellow-400" />
         <span className="text-xs text-yellow-400">{authMessage || 'Sign in required'}</span>
+      </div>
+    );
+  }
+
+  if (authStatus === 'auth_required') {
+    return (
+      <div className="flex items-center gap-2 mt-1">
+        <Lock className="h-4 w-4 text-yellow-400" />
+        <span className="text-xs text-yellow-400">{authMessage || 'Authentication required'}</span>
+      </div>
+    );
+  }
+
+  if (authStatus === 'authenticated_but_rejected') {
+    return (
+      <div className="flex items-center gap-2 mt-1">
+        <XCircle className="h-4 w-4 text-red-400" />
+        <span className="text-xs text-red-400">{authMessage || 'Authenticated but the server rejected the request'}</span>
       </div>
     );
   }

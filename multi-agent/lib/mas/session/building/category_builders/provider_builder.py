@@ -15,6 +15,9 @@ class ProviderBuilder(CategoryBuilder):
     def _extra_kwargs(
         self, cfg: Any, session_registry: SessionRegistry, deps: Optional[ElementDeps] = None,
     ) -> dict[str, Any]:
+        if getattr(cfg, "auth_method", "none") == "access_token":
+            return {}
+
         server_id = getattr(cfg, "server_identifier", "")
         if server_id and deps and deps.auth_service:
             ctx_holder = getattr(deps, "execution_ctx", None)

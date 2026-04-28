@@ -604,11 +604,14 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
     const authOptions = (refOptions['auths'] || [])
       .filter((option: any) => option.rid && option.rid.trim() !== "");
 
+    const authActionUid = validationHint?.action_uid || fieldSchema.action_uid || 'auth.authenticate';
+
     return (
       <AuthSelector
         fieldName={fieldName}
         value={value}
         refOptions={authOptions}
+        actionUid={authActionUid}
         onInputChange={onInputChange}
         isRequired={isRequired}
         description={fieldSchema.description}
