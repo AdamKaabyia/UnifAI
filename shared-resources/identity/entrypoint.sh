@@ -10,7 +10,7 @@ echo "------------------------------------------"
 case "$ROLE" in
   flask)
     echo "🟢 Starting Flask API (Gunicorn)..."
-    exec venv/bin/gunicorn -b 0.0.0.0:$PORT --capture-output --log-level debug --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s pid=%(p)s "%(f)s" "%(a)s"' --access-logfile - --error-logfile - bootstrap.flask_app:app
+    exec venv/bin/gunicorn -b 0.0.0.0:$PORT --capture-output --log-level info --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s pid=%(p)s "%(f)s" "%(a)s"' --access-logfile - --error-logfile - bootstrap.flask_app:app
     ;;
 
   dev)

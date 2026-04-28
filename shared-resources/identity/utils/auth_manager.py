@@ -4,9 +4,9 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import requests as http_requests
-import Any
+from typing import Any
 import os, uuid, logging
+import requests as http_requests
 from flask import request, jsonify, session, redirect, url_for, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
@@ -295,7 +295,7 @@ class AuthManager:
         user['session_created_at'] = session_data.get('session_created_at')
         user['session_expires_at'] = session_data.get('session_expires_at')
         user['token_expires_at'] = session_data.get('token_expires_at')
-        return dict[str, Any](user) if user else None
+        return user
     
     def _is_session_expired(self):
         """Check if the user session has expired (requires re-authentication)"""
