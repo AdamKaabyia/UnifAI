@@ -61,8 +61,8 @@ def updateGlobalConfigYaml(String filePath) {
     if (values?.env) {
         values.env.FRONTEND_URL = "https://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
         // will be used once SSO team adds the new routes to the configuration
-        // values.env.IDENTITY_HOST = "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
-        values.env.IDENTITY_HOST = "https://unifai-sso-backend-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
+        values.env.IDENTITY_HOST = "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
+        // values.env.IDENTITY_HOST = "https://unifai-sso-backend-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
     }
     writeYaml file: filePath, data: values, overwrite: true
     echo "📄 successfully Updated routes values in ${filePath}:\n" + writeYaml(returnText: true, data: values)
