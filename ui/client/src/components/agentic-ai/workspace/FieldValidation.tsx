@@ -144,6 +144,9 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
     const fieldNameMapping = validationHint.dependencies?.[fieldName] || fieldName;
     
     const requestBody = buildInputWithDependencies(value, fieldNameMapping);
+    if (userId) {
+      requestBody.userId = userId;
+    }
 
     const method = (validationHint.method || 'POST').toUpperCase();
     const endpoint = validationHint.endpoint;

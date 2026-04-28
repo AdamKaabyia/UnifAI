@@ -656,7 +656,7 @@ return String(ref);
     setBlueprintValidationStatus(blueprintId, 'loading');
     
     try {
-      const result = await validateBlueprintApi(request);
+      const result = await validateBlueprintApi({ ...request, userId: request.userId || USER_ID });
       
       // Cache the result
       cacheBlueprintResult(blueprintId, result);

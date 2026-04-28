@@ -184,6 +184,7 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.resources_service._auth_service = self.auth_service
+        self.blueprint_service._auth_service = self.auth_service
 
         self.actions_service.register_instance(AuthenticateAction(
             auth_service=self.auth_service,
