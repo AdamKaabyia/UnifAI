@@ -127,4 +127,4 @@ backend:
   type: ClusterIP
   env:
     - name: LOG_LEVEL
-      value: "INFO"
+      value: debug

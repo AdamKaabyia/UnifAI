@@ -9,6 +9,7 @@ backend:
     BACKEND_ENV: "production"
     VERSION: ""
     PORT: 13456
+    LOG_LEVEL: debug
 
   service:
     name: identity
