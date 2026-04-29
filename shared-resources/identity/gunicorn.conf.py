@@ -29,13 +29,24 @@ def post_fork(server, worker):
 
 
 def worker_exit(server, worker):
+    # Called in the CHILD process (only if worker reaches the try block in spawn_worker)
     print(
-        f"worker_exit hook: pid={worker.pid} exitcode={getattr(worker, 'exitcode', 'unknown')}",
+        f"worker_exit hook (child): pid={worker.pid} exitcode={getattr(worker, 'exitcode', 'unknown')}",
         file=sys.stderr,
         flush=True,
     )
     server.log.error(
-        "worker_exit hook: pid=%s exitcode=%s",
+        "worker_exit hook (child): pid=%s exitcode=%s",
         worker.pid,
+        getattr(worker, "exitcode", "unknown"),
+    )
+
+
+def child_exit(server, worker):
+    # Called in the MASTER process after ANY worker dies — guaranteed to run
+    server.log.error(
+        "child_exit hook (master): pid=%s age=%s exitcode=%s",
+        worker.pid,
+        worker.age,
         getattr(worker, "exitcode", "unknown"),
     )
