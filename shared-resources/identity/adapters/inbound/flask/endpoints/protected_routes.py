@@ -1,7 +1,3 @@
-"""
-Example of how to create protected API endpoints
-"""
-
 from flask import Blueprint, jsonify
 from utils.auth_manager import require_auth, get_current_user
 
