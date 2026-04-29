@@ -29,6 +29,7 @@ class ValidateConnectionInput(BaseActionInput):
     mcp_url: HttpUrl
     user_id: str = Field(default="")
     server_identifier: str = Field(default="")
+    bearer_token: Optional[str] = Field(default=None)
     transport_type: McpTransportType = Field(default=McpTransportType.STREAMABLE_HTTP)
     additional_headers: Dict[str, Any] = Field(default_factory=dict)
 
@@ -91,6 +92,7 @@ class ValidateConnectionAction(BaseAction):
 
         config = McpProviderConfig(
             mcp_url=input_data.mcp_url,
+            bearer_token=input_data.bearer_token,
             transport_type=input_data.transport_type,
             additional_headers=input_data.additional_headers,
         )
@@ -100,8 +102,9 @@ class ValidateConnectionAction(BaseAction):
             elapsed = (time.time() - start) * 1000
             return ValidateConnectionOutput(
                 success=True, message=f"Connected ({elapsed:.0f}ms)",
-                is_reachable=True, authenticated=bool(auth_cred),
-                status="authenticated" if auth_cred else "",
+                is_reachable=True,
+                authenticated=bool(auth_cred) or bool(input_data.bearer_token),
+                status="authenticated" if (auth_cred or input_data.bearer_token) else "",
                 server_identifier=server_id,
                 response_time_ms=elapsed,
             )

@@ -21,7 +21,7 @@ class McpProviderFactory(BaseFactory[McpProviderConfig, McpProvider]):
 
     def _build_headers(self, cfg: McpProviderConfig) -> Optional[Dict[str, str]]:
         headers = dict(cfg.additional_headers) if cfg.additional_headers else {}
-        if cfg.bearer_token and getattr(cfg, "auth_method", "none") == "access_token":
+        if cfg.bearer_token:
             headers["Authorization"] = f"Bearer {cfg.bearer_token}"
         return headers or None
 

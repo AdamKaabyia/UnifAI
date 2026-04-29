@@ -98,18 +98,13 @@ class AuthenticateAction(BaseAction):
             )
 
         config = self._auth.get_client_config(user_id, server_id)
-        if not config:
-            return AuthenticateOutput(
-                success=False,
-                message="No client credentials configured for this server",
-                status="not_configured",
-            )
+        login_config = config.model_dump() if config else {}
 
         try:
             challenge = await self._auth.initiate(
                 user_id, server_id,
                 scheme_type=input_data.scheme_type,
-                config=config.model_dump(),
+                config=login_config,
             )
             resp = challenge.to_response()
             return AuthenticateOutput(

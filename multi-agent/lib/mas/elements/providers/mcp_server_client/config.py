@@ -52,7 +52,6 @@ class McpProviderConfig(ProviderBaseConfig):
     server_identifier: str = Field(
         default="",
         description="Auth server issuer (set automatically by connection validation)",
-        json_schema_extra=HiddenHint(reason="Set automatically by connection validation").to_hints(),
     )
     sign_in: Optional[str] = Field(
         default=None,
@@ -80,6 +79,31 @@ class McpProviderConfig(ProviderBaseConfig):
         default_factory=dict,
         description="Additional HTTP headers to include in MCP server requests"
     )
+    def on_pre_save(self, user_id: str, **services) -> None:
+        """Persist bearer_token to the credential store and clear it from config.
+
+        Called by ``ResourcesService`` on save so that API-key credentials
+        follow the same store-based path as OAuth credentials at runtime.
+        """
+        auth_service = services.get("auth_service")
+        if not self.bearer_token or self.auth_method != McpAuthMethod.ACCESS_TOKEN or not auth_service:
+            return
+
+        from mas.core.auth.credentials.models import StoredCredential, TokenStatus
+
+        server_id = str(self.mcp_url)
+        auth_service.save_credential(StoredCredential(
+            user_id=user_id,
+            server_identifier=server_id,
+            access_token=self.bearer_token,
+            scheme_type="api_key",
+            status=TokenStatus.ACTIVE,
+            expires_at=None,
+        ))
+
+        object.__setattr__(self, "server_identifier", server_id)
+        object.__setattr__(self, "bearer_token", None)
+
     tool_names: Optional[List[str]] = Field(
         default_factory=list,
         description="List of specific tool names to use from the MCP server",
