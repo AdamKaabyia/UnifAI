@@ -7,6 +7,7 @@ class AppConfig(SharedConfig):
     app_name: str = "identity"
     hostname_local: str = "0.0.0.0"
     port: str = "13456"
+    secret_key: str = ""
 
     # Keycloak Configuration
     keycloak_base_url: str = ""
