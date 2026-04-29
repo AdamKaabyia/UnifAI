@@ -8,20 +8,22 @@ import traceback
 
 def on_starting(server):
     # Register a fork handler in the MASTER process.
-    # This fires on EVERY os.fork() call — whether from Gunicorn's spawn_worker
-    # or from any library (asyncio, multiprocessing, etc.).
+    # Uses os.write() directly — signal-safe, no Python locks, no logging system.
+    # This fires on EVERY os.fork() call regardless of which thread calls it.
     def _before_fork():
-        server.log.warning(
-            "FORK DETECTED in master (pid=%s) — stack:\n%s",
-            os.getpid(),
-            "".join(traceback.format_stack()),
-        )
+        pid = os.getpid()
+        # Write directly to stderr fd=2, bypassing all Python logging locks
+        msg = f"\nFORK-TRAP pid={pid} stack:\n{''.join(traceback.format_stack())}\n"
+        os.write(2, msg.encode("utf-8", errors="replace"))
 
     os.register_at_fork(before=_before_fork)
 
 
 def pre_fork(server, worker):
     # Called by Gunicorn arbiter just before it calls os.fork() for a worker.
+    # Use both the gunicorn logger AND direct stderr write for reliability.
+    msg = f"\nGUNICORN-PRE-FORK pid={os.getpid()} current_workers={list(server.WORKERS.keys())}\n"
+    os.write(2, msg.encode("utf-8", errors="replace"))
     server.log.warning(
         "pre_fork: Gunicorn is about to spawn a new worker (current workers: %s)",
         list(server.WORKERS.keys()),
