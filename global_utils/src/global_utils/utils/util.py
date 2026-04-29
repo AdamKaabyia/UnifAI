@@ -38,10 +38,9 @@ def get_temporal_url():
 def get_redis_url():
     ip = config.redis_ip
     port = config.redis_port
-    password = "Mc10vin!!"
     if not ip:
         return ""
-    return f"redis://:{password}@{ip}:{port}"
+    return f"redis://{ip}:{port}"
 
 
 def get_rabbitmq_url(user=None, password=None):
