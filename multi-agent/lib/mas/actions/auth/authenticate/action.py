@@ -19,6 +19,7 @@ from mas.actions.common.action_models import (
 )
 from mas.core.auth.service import AuthService
 from mas.core.enums import ResourceCategory
+from mas.elements.providers.mcp_server_client.identifiers import Identifier as McpIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class AuthenticateAction(BaseAction):
         (ResourceCategory.AUTH.value, "google_oauth"),
         (ResourceCategory.AUTH.value, "github_oauth"),
         (ResourceCategory.AUTH.value, "jira_oauth"),
+        (ResourceCategory.PROVIDER.value, McpIdentifier.TYPE),
     }
 
     def __init__(

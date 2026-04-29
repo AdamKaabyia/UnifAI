@@ -5,16 +5,15 @@ from pydantic import Field, HttpUrl
 from mas.elements.providers.common.base_config import ProviderBaseConfig
 from mas.core.field_hints import (
     ActionHint, HintType, SelectionType,
-    SecretHint, ConditionalHint, combine_hints,
+    SecretHint, AuthHint, HiddenHint, ConditionalHint, combine_hints,
 )
 from .transport.enums import McpTransportType
 
 
 class McpAuthMethod(str, Enum):
     """How the user authenticates to the MCP server."""
-    NONE = "none"
-    SIGN_IN = "sign_in"
     ACCESS_TOKEN = "access_token"
+    SIGN_IN = "sign_in"
 
 
 class McpProviderConfig(ProviderBaseConfig):
@@ -46,18 +45,28 @@ class McpProviderConfig(ProviderBaseConfig):
             }
         ).to_hints()
     )
-    auth: Optional[str] = Field(
-        default=None,
-        exclude=True,
-        description="Deprecated — auth is now handled via core/auth token store",
-    )
     auth_method: McpAuthMethod = Field(
-        default=McpAuthMethod.NONE,
+        default=McpAuthMethod.ACCESS_TOKEN,
         description="Authentication method for this MCP server",
     )
     server_identifier: str = Field(
         default="",
         description="Auth server issuer (set automatically by connection validation)",
+        json_schema_extra=HiddenHint(reason="Set automatically by connection validation").to_hints(),
+    )
+    sign_in: Optional[str] = Field(
+        default=None,
+        exclude=True,
+        description="Sign in to authenticate with this MCP server",
+        json_schema_extra=combine_hints(
+            ConditionalHint(visible_when={"auth_method": "sign_in"}),
+            AuthHint(
+                action_uid="auth.authenticate",
+                dependencies={
+                    "server_identifier": "server_identifier",
+                },
+            ),
+        ),
     )
     bearer_token: Optional[str] = Field(
         default=None,

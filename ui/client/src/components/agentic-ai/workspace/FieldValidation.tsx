@@ -389,14 +389,11 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
   // ── Auth-aware rendering — delegated to sub-component ──
 
   if (authStatus) {
-    const authMethodAllowsSignIn = !configValues?.auth_method || configValues.auth_method === 'sign_in';
-
     return (
       <FieldValidationTwoFactorAuth
         authStatus={authStatus}
         authUrl={authUrl}
         authMessage={authMessage}
-        authMethodAllowsSignIn={authMethodAllowsSignIn}
         onRevalidate={handleAuthRevalidate}
         onAuthError={handleAuthError}
       />

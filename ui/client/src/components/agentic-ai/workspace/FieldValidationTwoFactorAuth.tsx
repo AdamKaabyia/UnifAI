@@ -19,8 +19,6 @@ export interface FieldValidationTwoFactorAuthProps {
   authStatus: string;
   authUrl: string | null;
   authMessage: string | null;
-  /** Whether the current auth_method config value allows interactive sign-in */
-  authMethodAllowsSignIn: boolean;
   /** Called after a successful OAuth callback so the parent can re-run validation */
   onRevalidate: () => void;
   /** Called when the OAuth popup reports a failure */
@@ -31,7 +29,6 @@ export const FieldValidationTwoFactorAuth: React.FC<FieldValidationTwoFactorAuth
   authStatus,
   authUrl,
   authMessage,
-  authMethodAllowsSignIn,
   onRevalidate,
   onAuthError,
 }) => {
@@ -76,7 +73,7 @@ export const FieldValidationTwoFactorAuth: React.FC<FieldValidationTwoFactorAuth
 
     case 'requires_consent':
     case 'expired':
-      if (authUrl && authMethodAllowsSignIn) {
+      if (authUrl) {
         return (
           <div className="flex items-center gap-2 mt-1">
             <Lock className="h-4 w-4 text-yellow-400" />

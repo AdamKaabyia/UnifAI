@@ -190,40 +190,9 @@ class ValidateConnectionAction(BaseAction):
                         server_identifier=server_id,
                     )
 
-            try:
-                client_cfg = self._auth.get_client_config(user_id, server_id)
-                login_config = client_cfg.model_dump() if client_cfg else {}
-                with get_async_bridge() as bridge:
-                    challenge = bridge.run(
-                        self._auth.initiate(
-                            user_id, server_id,
-                            scheme_type="oauth2",
-                            config=login_config,
-                        )
-                    )
-                    resp = challenge.to_response()
-                    return ValidateConnectionOutput(
-                        success=True, message="Sign in required",
-                        status="requires_consent", is_reachable=True,
-                        auth_required=True, server_identifier=server_id,
-                        authorization_url=resp.get("authorization_url"),
-                        scopes=resp.get("scopes", scopes),
-                        challenge=resp,
-                    )
-            except Exception as exc:
-                logger.error("Auth initiation failed: %s", exc, exc_info=True)
-                return ValidateConnectionOutput(
-                    success=False,
-                    message=f"OAuth setup required: {exc}",
-                    status="needs_client_registration",
-                    is_reachable=True,
-                    auth_required=True,
-                    server_identifier=server_id,
-                    scopes=scopes,
-                )
-
         return ValidateConnectionOutput(
-            success=True, message="Authentication required",
+            success=True,
+            message="Authentication required — use the sign in field or provide an access token to authenticate",
             status="auth_required", is_reachable=True, auth_required=True,
             server_identifier=server_id, scopes=scopes,
         )

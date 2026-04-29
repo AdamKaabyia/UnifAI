@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { FieldValidation, ItemValidationResult } from "./FieldValidation";
 import { FieldPopulation } from "./FieldPopulation";
 import { AuthSelector } from "./AuthSelector";
+import { AuthFieldRenderer } from "./AuthFieldRenderer";
 import { AgentCardVisualization } from "./AgentCardVisualization";
 import { ElementType } from "../../../types/workspace";
 import { maskSecretValue } from "../../../utils/maskSecretFields";
@@ -596,6 +597,19 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           />
         )}
       </div>
+    );
+  }
+
+  // Handle fields with AuthHint — render as Sign In / auth status component
+  if (fieldSchema?.hints?.auth) {
+    return (
+      <AuthFieldRenderer
+        fieldName={fieldName}
+        fieldSchema={fieldSchema}
+        formData={formData}
+        elementActions={elementActions}
+        onValidationChange={onValidationChange}
+      />
     );
   }
 
