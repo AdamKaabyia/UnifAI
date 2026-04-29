@@ -58,16 +58,21 @@ class AuthManager:
         realm = config.get('keycloak_realm', 'master')
         if not all([keycloak_base_url, client_id, client_secret]):
             raise ValueError("Missing required Keycloak configuration")
-        
-        self.keycloak_client = self.oauth.register(
-            name='keycloak',
-            client_id=client_id,
-            client_secret=client_secret,
-            server_metadata_url=f"{keycloak_base_url}/realms/{realm}/.well-known/openid-configuration",
-            client_kwargs={
-                'scope': 'openid email profile',
-            }
-        )
+        try:
+            self.keycloak_client = self.oauth.register(
+                name='keycloak',
+                client_id=client_id,
+                client_secret=client_secret,
+                server_metadata_url=f"{keycloak_base_url}/realms/{realm}/.well-known/openid-configuration",
+                client_kwargs={
+                    'scope': 'openid email profile',
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to setup Keycloak client: {e}")
+            raise e
+        else:
+            logger.info("Keycloak client setup successfully")
 
     def _setup_redis(self, redis_store):
         self.redis_store = redis_store
