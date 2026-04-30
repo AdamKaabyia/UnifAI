@@ -15,6 +15,7 @@ def create_app(container, config: AppConfig = None) -> Flask:
     config = config or AppConfig.get_instance()
     app = Flask(__name__)
     app.version = config.get("version", "1.0.0")
+    app.secret_key = config.get("secret_key", os.urandom(24))
     app.config["admin_allowed_users"] = config.admin_allowed_users
 
     CORS(app, resources={r"/api/*": {"origins": "*",

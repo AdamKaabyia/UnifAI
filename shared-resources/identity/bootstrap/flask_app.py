@@ -47,7 +47,7 @@ def create_app() -> Flask:
     app = Flask(config.app_name)
         
     # Application config
-    app.secret_key = config.get("secret_key", os.urandom(24))
+    app.secret_key = config.get("secret_key", os.urandom(24)) # this key is crucial to code and decode all cookies. and it should be taken from env.
     app.version = config.get("version", "1.0.0")
     
     # CORS

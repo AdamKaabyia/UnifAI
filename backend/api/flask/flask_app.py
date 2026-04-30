@@ -22,7 +22,11 @@ def create_app(config: AppConfig = None) -> Flask:
     """
     config = config or AppConfig.get_instance()
     app = Flask(__name__)
+
+    # Application config
     app.version = config.get("version", "1.0.0")
+    app.secret_key = config.get("secret_key", os.urandom(24))
+    # CORS
     CORS(app, resources={r"/api/*": {
         "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
