@@ -240,6 +240,9 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
       if (onInputChange && responseData.server_identifier) {
         onInputChange('server_identifier', responseData.server_identifier);
       }
+      if (onInputChange && responseData.scheme_type) {
+        onInputChange('scheme_type', responseData.scheme_type);
+      }
 
       // ── Auth-aware response handling ──
       if (responseData.status && AUTH_STATUSES.has(responseData.status)) {

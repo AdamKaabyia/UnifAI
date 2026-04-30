@@ -45,7 +45,7 @@ class McpProviderValidator(BaseElementValidator):
     Validates MCP Provider configuration via lightweight HTTP probe.
 
     Sends a JSON-RPC initialize request directly with httpx.
-    Resolves auth headers based on ``auth_method`` before probing.
+    Resolves auth headers via ``core/auth`` before probing.
     """
 
     def validate(
@@ -79,37 +79,28 @@ class McpProviderValidator(BaseElementValidator):
             "Accept": "application/json, text/event-stream",
         }
 
-        auth_method = getattr(config, "auth_method", "none")
+        server_id = getattr(config, "server_identifier", "")
+        scheme_type = getattr(config, "scheme_type", "")
 
-        if auth_method == "access_token" and config.bearer_token:
-            headers["Authorization"] = f"Bearer {config.bearer_token}"
-        elif auth_method == "sign_in":
-            server_id = getattr(config, "server_identifier", "")
-            if server_id and context.user_id and context.auth_service:
-                try:
-                    auth_headers = await context.auth_service.get_headers(
-                        context.user_id, server_id,
-                    )
-                    headers.update(auth_headers)
-                except TokenExpiredError:
-                    messages.append(self._error(
-                        "AUTH_EXPIRED",
-                        "OAuth session expired — sign in again from the provider form",
-                        field="mcp_url",
-                    ))
-                    return
-                except Exception as exc:
-                    logger.debug("Failed to get auth headers for validation: %s", exc)
-                    messages.append(self._error(
-                        "AUTH_EXPIRED",
-                        "Authentication failed — sign in again from the provider form",
-                        field="mcp_url",
-                    ))
-                    return
-            else:
+        if server_id and context.user_id and context.auth_service:
+            try:
+                auth_headers = await context.auth_service.get_headers(
+                    context.user_id, server_id,
+                    scheme_type=scheme_type,
+                )
+                headers.update(auth_headers)
+            except TokenExpiredError:
                 messages.append(self._error(
-                    "AUTH_REQUIRED",
-                    "Not authenticated — sign in from the provider form",
+                    "AUTH_EXPIRED",
+                    "Authentication expired — sign in again or update your access token",
+                    field="mcp_url",
+                ))
+                return
+            except Exception as exc:
+                logger.debug("Failed to get auth headers for validation: %s", exc)
+                messages.append(self._error(
+                    "AUTH_EXPIRED",
+                    "Authentication failed — sign in again or update your access token",
                     field="mcp_url",
                 ))
                 return
@@ -148,24 +139,11 @@ class McpProviderValidator(BaseElementValidator):
                 field="mcp_url",
             ))
         elif resp.status_code == 401:
-            if auth_method == "access_token":
-                messages.append(self._error(
-                    ValidationCode.INVALID_CREDENTIALS.value,
-                    "Access token was rejected by the server",
-                    field="mcp_url",
-                ))
-            elif auth_method == "sign_in":
-                messages.append(self._error(
-                    "AUTH_EXPIRED",
-                    "OAuth token was rejected — sign in again from the provider form",
-                    field="mcp_url",
-                ))
-            else:
-                messages.append(self._error(
-                    "AUTH_REQUIRED",
-                    "Server requires authentication — configure an authentication method",
-                    field="mcp_url",
-                ))
+            messages.append(self._error(
+                ValidationCode.INVALID_CREDENTIALS.value,
+                "Server rejected the credentials — sign in again or update your access token",
+                field="mcp_url",
+            ))
         elif resp.status_code == 403:
             messages.append(self._error(
                 ValidationCode.INVALID_CREDENTIALS.value,

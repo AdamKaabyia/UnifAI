@@ -16,10 +16,11 @@ class ProviderBuilder(CategoryBuilder):
         self, cfg: Any, session_registry: SessionRegistry, deps: Optional[ElementDeps] = None,
     ) -> dict[str, Any]:
         server_id = getattr(cfg, "server_identifier", "")
+        scheme_type = getattr(cfg, "scheme_type", "")
         if server_id and deps and deps.auth_service:
             ctx_holder = getattr(deps, "execution_ctx", None)
             if ctx_holder:
-                cred = deps.auth_service.bind_lazy(ctx_holder, server_id)
+                cred = deps.auth_service.bind_lazy(ctx_holder, server_id, scheme_type)
                 if cred:
                     return {"auth_credential": cred}
 

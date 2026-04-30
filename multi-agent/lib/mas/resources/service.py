@@ -67,6 +67,8 @@ class ResourcesService:
 
     def update(self, rid: str, *, config: dict, name: str = None) -> Resource:
         doc = self._store.get(rid)
+        old_server_id = doc.cfg_dict.get("server_identifier", "")
+
         model_cls = self.element_registry.get_schema(
             ResourceCategory(doc.category), doc.type)
         cfg_model = model_cls(**config)
@@ -81,10 +83,20 @@ class ResourcesService:
         if name is not None:
             doc.name = name
 
-        return self._store.update(doc)
+        result = self._store.update(doc)
+
+        new_server_id = doc.cfg_dict.get("server_identifier", "")
+        if old_server_id and old_server_id != new_server_id:
+            self._cleanup_orphaned_credential(doc.user_id, old_server_id)
+
+        return result
 
     def delete(self, rid: str) -> None:
+        doc = self._store.get(rid)
         self._store.delete(rid)
+        server_id = doc.cfg_dict.get("server_identifier", "")
+        if server_id:
+            self._cleanup_orphaned_credential(doc.user_id, server_id)
 
     # ---------- READ ----------
     def get(self, rid: str) -> Resource:
@@ -293,6 +305,16 @@ class ResourcesService:
         if rid not in cards:
             raise KeyError(f"Resource not found: {rid}")
         return cards[rid]
+
+    def _cleanup_orphaned_credential(self, user_id: str, server_id: str) -> None:
+        """Delete the stored credential if no other resource uses the same server_identifier."""
+        if not self._auth_service:
+            return
+        remaining = self._store.count_by_config_field(
+            user_id, "server_identifier", server_id,
+        )
+        if remaining == 0:
+            self._auth_service.delete_credential(user_id, server_id)
 
     # ---------- Helpers ----------
     def _run_pre_save_hook(self, cfg_model: BaseModel, user_id: str) -> None:

@@ -52,13 +52,18 @@ class MongoCredentialStore(CredentialStore):
             upsert=True,
         )
 
-    def find_by_server(self, user_id: str, server_identifier: str) -> Optional[StoredCredential]:
+    def find_by_server(
+        self, user_id: str, server_identifier: str, scheme_type: str = "",
+    ) -> Optional[StoredCredential]:
         normalized = server_identifier.rstrip("/")
-        doc = self._coll.find_one({
+        query = {
             "user_id": user_id,
             "server_identifier": normalized,
             "status": TokenStatus.ACTIVE.value,
-        })
+        }
+        if scheme_type:
+            query["scheme_type"] = scheme_type
+        doc = self._coll.find_one(query)
         return self._to_model(doc) if doc else None
 
     def delete(self, user_id: str, server_identifier: str) -> None:

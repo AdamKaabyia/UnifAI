@@ -40,6 +40,7 @@ class ValidateConnectionOutput(BaseActionOutput):
     auth_required: bool = False
     status: str = ""
     server_identifier: str = ""
+    scheme_type: str = ""
     authorization_url: Optional[str] = None
     scopes: List[str] = Field(default_factory=list)
     response_time_ms: float = 0.0
@@ -129,6 +130,7 @@ class ValidateConnectionAction(BaseAction):
         """Handle 401: discover auth via AuthService, initiate if possible (sync)."""
         server_id = input_data.server_identifier
         user_id = input_data.user_id
+        scheme_type = ""
         scopes: List[str] = []
 
         from global_utils.utils.async_bridge import get_async_bridge
@@ -141,6 +143,7 @@ class ValidateConnectionAction(BaseAction):
                     )
                     if detection:
                         server_id = detection.server_identifier
+                        scheme_type = detection.protocol_type
                         scopes = detection.scopes_supported
             except Exception as exc:
                 logger.debug("Auth discovery failed: %s", exc)
@@ -175,6 +178,7 @@ class ValidateConnectionAction(BaseAction):
                         is_reachable=True, authenticated=True,
                         status="authenticated",
                         server_identifier=server_id,
+                        scheme_type=scheme_type,
                         response_time_ms=elapsed,
                     )
                 except Exception as exc:
@@ -191,11 +195,12 @@ class ValidateConnectionAction(BaseAction):
                         authenticated=True,
                         auth_required=False,
                         server_identifier=server_id,
+                        scheme_type=scheme_type,
                     )
 
         return ValidateConnectionOutput(
             success=True,
             message="Authentication required — use the sign in field or provide an access token to authenticate",
             status="auth_required", is_reachable=True, auth_required=True,
-            server_identifier=server_id, scopes=scopes,
+            server_identifier=server_id, scheme_type=scheme_type, scopes=scopes,
         )

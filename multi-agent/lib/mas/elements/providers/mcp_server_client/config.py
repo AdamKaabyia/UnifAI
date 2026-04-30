@@ -53,6 +53,11 @@ class McpProviderConfig(ProviderBaseConfig):
         default="",
         description="Auth server issuer (set automatically by connection validation)",
     )
+    scheme_type: str = Field(
+        default="",
+        description="Auth scheme type (set automatically by connection validation)",
+        json_schema_extra=HiddenHint(reason="Set automatically by auth detection").to_hints(),
+    )
     sign_in: Optional[str] = Field(
         default=None,
         exclude=True,
@@ -102,6 +107,7 @@ class McpProviderConfig(ProviderBaseConfig):
         ))
 
         object.__setattr__(self, "server_identifier", server_id)
+        object.__setattr__(self, "scheme_type", "api_key")
         object.__setattr__(self, "bearer_token", None)
 
     tool_names: Optional[List[str]] = Field(

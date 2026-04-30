@@ -62,11 +62,13 @@ class AuthHandle:
         auth_service: AuthService,
         user_id: Any,
         server_identifier: str,
+        scheme_type: str = "",
         config: Optional[Dict[str, Any]] = None,
     ):
         self._svc = auth_service
         self._user_id_or_holder = user_id
         self._server_id = server_identifier
+        self._scheme_type = scheme_type
         self._config = config or {}
 
     @property
@@ -79,11 +81,13 @@ class AuthHandle:
     async def get_headers(self) -> Dict[str, str]:
         return await self._svc.get_headers(
             self._user_id, self._server_id, self._config,
+            scheme_type=self._scheme_type,
         )
 
     async def get_token(self) -> str:
         token = await self._svc.get_valid_token(
             self._user_id, self._server_id, self._config,
+            scheme_type=self._scheme_type,
         )
         if not token:
             raise TokenExpiredError("No valid token")
@@ -112,14 +116,18 @@ class AuthService:
     # ── Credential CRUD (sync — pure DB, no external I/O) ────────────
 
     def get_credential(
-        self, user_id: str, server_identifier: str,
+        self, user_id: str, server_identifier: str, scheme_type: str = "",
     ) -> Optional[StoredCredential]:
         if not user_id or not server_identifier:
             return None
-        return self._store.find_by_server(user_id, server_identifier)
+        return self._store.find_by_server(user_id, server_identifier, scheme_type)
 
     def save_credential(self, credential: StoredCredential) -> None:
         self._store.upsert(credential)
+
+    def delete_credential(self, user_id: str, server_identifier: str) -> None:
+        if user_id and server_identifier:
+            self._store.delete(user_id, server_identifier)
 
     def update_status(
         self, user_id: str, server_identifier: str, status: TokenStatus,
@@ -144,9 +152,10 @@ class AuthService:
         user_id: str,
         server_identifier: str,
         config: Optional[Dict[str, Any]] = None,
+        scheme_type: str = "",
     ) -> Optional[str]:
         """Return a valid access token, attempting recovery if expired."""
-        cred = self.get_credential(user_id, server_identifier)
+        cred = self.get_credential(user_id, server_identifier, scheme_type)
         if cred and cred.is_valid():
             return cred.access_token
 
@@ -161,8 +170,9 @@ class AuthService:
         user_id: str,
         server_identifier: str,
         config: Optional[Dict[str, Any]] = None,
+        scheme_type: str = "",
     ) -> Dict[str, str]:
-        cred = self.get_credential(user_id, server_identifier)
+        cred = self.get_credential(user_id, server_identifier, scheme_type)
         if not cred:
             raise TokenExpiredError(
                 f"No credential for user={user_id} server={server_identifier}"
@@ -171,7 +181,7 @@ class AuthService:
         if not cred.is_valid():
             recovery = await self.attempt_recovery(user_id, server_identifier, config)
             if recovery.recovered:
-                cred = self.get_credential(user_id, server_identifier)
+                cred = self.get_credential(user_id, server_identifier, scheme_type)
             if not cred or not cred.is_valid():
                 raise TokenExpiredError(
                     f"Credential expired and recovery failed for server={server_identifier}"
@@ -291,11 +301,11 @@ class AuthService:
     # ── Binding ───────────────────────────────────────────────────────
 
     def bind(
-        self, user_id: str, server_identifier: str,
+        self, user_id: str, server_identifier: str, scheme_type: str = "",
     ) -> Optional[AuthCredential]:
         if not user_id or not server_identifier:
             return None
-        if not self.get_credential(user_id, server_identifier):
+        if not self.get_credential(user_id, server_identifier, scheme_type):
             return None
 
         config = self._resolve_config(user_id, server_identifier)
@@ -303,6 +313,7 @@ class AuthService:
             auth_service=self,
             user_id=user_id,
             server_identifier=server_identifier,
+            scheme_type=scheme_type,
             config=config,
         )
 
@@ -310,6 +321,7 @@ class AuthService:
         self,
         ctx_holder: Any,
         server_identifier: str,
+        scheme_type: str = "",
     ) -> Optional[AuthCredential]:
         """Create a credential handle with deferred user_id resolution."""
         if not server_identifier:
@@ -320,6 +332,7 @@ class AuthService:
             auth_service=self,
             user_id=ctx_holder,
             server_identifier=server_identifier,
+            scheme_type=scheme_type,
             config=config,
         )
 
