@@ -3,6 +3,7 @@ from config.app_config import AppConfig
 from .endpoints import register_all_endpoints
 from flask_cors import CORS
 from global_utils.flask.request_rules import RequestRules
+import os
 
 
 def create_app(container, config: AppConfig = None) -> Flask:
