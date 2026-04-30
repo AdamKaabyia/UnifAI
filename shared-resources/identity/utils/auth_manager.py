@@ -12,6 +12,7 @@ from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
 from config.app_config import AppConfig
 from urllib.parse import quote
+from global_utils.redis.constants import identity_session_key
 
 config = AppConfig.get_instance()
 
@@ -94,7 +95,7 @@ class AuthManager:
         sid = session.get('session_id')
         if not sid:
             return None
-        return self.redis_store.hget(sid)
+        return self.redis_store.hget(identity_session_key(sid))
 
     def _ttl_seconds_until_session_expires(self, session_expires_at) -> int:
         """
@@ -167,7 +168,7 @@ class AuthManager:
                 ttl_seconds = self._ttl_seconds_until_session_expires(
                     session_expires_at.timestamp()
                 )
-                self.redis_store.hset(session_id, session_data, ttl_seconds=ttl_seconds)
+                self.redis_store.hset(identity_session_key(session_id), session_data, ttl_seconds=ttl_seconds)
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""
@@ -188,7 +189,7 @@ class AuthManager:
             session_data = self._get_server_session()
             username = (session_data or {}).get('username', 'Unknown')  
             if session.get('session_id'):      
-                self.redis_store.delete(session.get('session_id'))
+                self.redis_store.delete(identity_session_key(session.get('session_id')))
             refresh_token_val = (session_data or {}).get('refresh_token') if session_data else None
             if refresh_token_val:
                 try:
@@ -230,7 +231,7 @@ class AuthManager:
             # Check if session has expired (requires re-authentication)
             if self._is_session_expired():
                 if session.get('session_id'):
-                    self.redis_store.delete(session.get('session_id'))
+                    self.redis_store.delete(identity_session_key(session.get('session_id')))
                     session.clear()
                     return jsonify({'error': 'Session expired'}), 401
             
@@ -265,7 +266,7 @@ class AuthManager:
             # Check if session has expired first
             if self._is_session_expired():
                 if session.get('session_id'):
-                    self.redis_store.delete(session.get('session_id'))
+                    self.redis_store.delete(identity_session_key(session.get('session_id')))
                     session.clear()
                     return jsonify({'error': 'Session expired'}), 401
             
@@ -355,7 +356,7 @@ class AuthManager:
                 session_data.get('session_expires_at')
             )
             self.redis_store.hset(
-                session.get('session_id'), session_data, ttl_seconds=ttl_seconds
+                identity_session_key(session.get('session_id')), session_data, ttl_seconds=ttl_seconds
             )
             logger.info("Access token refreshed successfully")
             return True

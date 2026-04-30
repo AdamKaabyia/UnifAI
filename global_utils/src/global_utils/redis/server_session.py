@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from global_utils.redis.constants import identity_session_key
 from global_utils.redis.session_model import UserSessionData
 
 
@@ -20,7 +21,7 @@ def get_identity_session(redis_store: Any, session_id: str | None) -> UserSessio
     """
     if not session_id or not str(session_id).strip():
         return None
-    raw = redis_store.hget(str(session_id))
+    raw = redis_store.hget(identity_session_key(str(session_id)))
     if not raw:
         return None
     return UserSessionData.from_redis_hash(raw)
