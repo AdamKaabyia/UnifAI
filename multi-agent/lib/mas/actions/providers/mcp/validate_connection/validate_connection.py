@@ -30,6 +30,7 @@ class ValidateConnectionInput(BaseActionInput):
     user_id: str = Field(default="")
     server_identifier: str = Field(default="")
     bearer_token: Optional[str] = Field(default=None)
+    auth_method: str = Field(default="access_token")
     transport_type: McpTransportType = Field(default=McpTransportType.STREAMABLE_HTTP)
     additional_headers: Dict[str, Any] = Field(default_factory=dict)
 
@@ -86,9 +87,10 @@ class ValidateConnectionAction(BaseAction):
         start = time.time()
         user_id = input_data.user_id
         server_id = input_data.server_identifier
+        auth_method = input_data.auth_method
 
         auth_cred = None
-        if self._auth and user_id and server_id:
+        if auth_method != "access_token" and self._auth and user_id and server_id:
             auth_cred = self._auth.bind(user_id, server_id)
 
         config = McpProviderConfig(
@@ -99,7 +101,9 @@ class ValidateConnectionAction(BaseAction):
         )
 
         try:
-            await self._factory.create_async(config, auth_credential=auth_cred)
+            import anyio
+            with anyio.fail_after(10.0):
+                await self._factory.create_async(config, auth_credential=auth_cred)
             elapsed = (time.time() - start) * 1000
             return ValidateConnectionOutput(
                 success=True, message=f"Connected ({elapsed:.0f}ms)",
@@ -127,11 +131,23 @@ class ValidateConnectionAction(BaseAction):
     def _handle_auth_required_sync(
         self, input_data: ValidateConnectionInput,
     ) -> ValidateConnectionOutput:
-        """Handle 401: discover auth via AuthService, initiate if possible (sync)."""
+        """Handle 401: discover auth and retry with stored credentials.
+
+        Skips discovery and store lookup when auth_method is access_token.
+        """
+        auth_method = input_data.auth_method
         server_id = input_data.server_identifier
         user_id = input_data.user_id
         scheme_type = ""
         scopes: List[str] = []
+
+        if auth_method == "access_token":
+            return ValidateConnectionOutput(
+                success=True,
+                message="Authentication required — provide an access token",
+                status="auth_required", is_reachable=True, auth_required=True,
+                server_identifier=server_id,
+            )
 
         from global_utils.utils.async_bridge import get_async_bridge
 

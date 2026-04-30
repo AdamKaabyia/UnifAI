@@ -40,6 +40,7 @@ class McpProviderConfig(ProviderBaseConfig):
             dependencies={
                 "mcp_url": "mcp_url",
                 "bearer_token": "bearer_token",
+                "auth_method": "auth_method",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
             }
@@ -52,6 +53,7 @@ class McpProviderConfig(ProviderBaseConfig):
     server_identifier: str = Field(
         default="",
         description="Auth server issuer (set automatically by connection validation)",
+        json_schema_extra=HiddenHint(reason="Set automatically by connection validation").to_hints(),
     )
     scheme_type: str = Field(
         default="",

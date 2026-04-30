@@ -240,9 +240,6 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
       if (onInputChange && responseData.server_identifier) {
         onInputChange('server_identifier', responseData.server_identifier);
       }
-      if (onInputChange && responseData.scheme_type) {
-        onInputChange('scheme_type', responseData.scheme_type);
-      }
 
       // ── Auth-aware response handling ──
       if (responseData.status && AUTH_STATUSES.has(responseData.status)) {
@@ -356,14 +353,25 @@ export const FieldValidation: React.FC<FieldValidationProps> = ({
   }, [fieldName, onValidationChange]);
 
   // Debounced validation on field value change OR dependency value change
+  const isInitialRenderRef = useRef(true);
   useEffect(() => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
 
+    if (!isInitialRenderRef.current) {
+      lastValidatedKeyRef.current = null;
+      setAuthStatus(null);
+      setAuthUrl(null);
+      setAuthMessage(null);
+      onValidationChange(fieldName, false);
+      setValidationState({ isValidating: true, isValid: null, message: '' });
+    }
+    isInitialRenderRef.current = false;
+
     validationTimeoutRef.current = setTimeout(() => {
       performValidation(fieldValue);
-    }, 1500); // 1.5 second delay
+    }, 1500);
 
     return () => {
       if (validationTimeoutRef.current) {

@@ -151,8 +151,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       // Set default values from combined schema, excluding hidden fields
       Object.entries(elementSchema.config_schema.properties).forEach(
         ([key, property]: [string, any]) => {
-          // Skip hidden fields - don't initialize them
+          // Skip hidden fields - don't initialize them (except server_identifier which is needed by auth flow)
           if (property?.hints?.hidden?.hint_type === "hidden") {
+            if (key === "server_identifier") {
+              initialData[key] = property.default ?? "";
+            }
             return;
           }
           
@@ -183,8 +186,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
           Object.entries(editingElement.config).forEach(([key, value]) => {
             const fieldSchema = elementSchema.config_schema.properties[key];
             
-            // Skip hidden fields - don't populate them in edit mode
+            // Skip hidden fields - don't populate them in edit mode (except server_identifier)
             if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+              if (key === "server_identifier") {
+                initialData[key] = value;
+              }
               return;
             }
             

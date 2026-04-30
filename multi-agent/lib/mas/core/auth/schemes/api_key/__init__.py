@@ -1,10 +1,7 @@
 """
 API Key strategy implementation.
 
-Static credential — no acquisition flow, no refresh.
-
-Public API:
-  - :class:`ApiKeyStrategy` — the adapter
+The strategy adapter has moved to ``adapters/outbound/auth/api_key_strategy.py``.
 """
 
 from .adapter import ApiKeyStrategy

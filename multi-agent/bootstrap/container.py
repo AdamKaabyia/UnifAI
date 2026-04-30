@@ -33,10 +33,10 @@ from mas.templates.service import TemplateService
 # Auth layer
 from mas.core.auth.service import AuthService, AuthStrategyRegistry
 from mas.core.auth.discovery import AuthDetector
-from mas.core.auth.schemes.oauth2.adapter import OAuth2Strategy
+from outbound.auth.oauth2_strategy import OAuth2Strategy
 from mas.core.auth.schemes.oauth2.detection import OAuth2DetectionStrategy
 from mas.core.auth.schemes.oauth2.state_manager import OAuthStateManager
-from mas.core.auth.schemes.api_key.adapter import ApiKeyStrategy
+from outbound.auth.api_key_strategy import ApiKeyStrategy
 from outbound.mongo.client_config_repository import MongoServerConfigStore
 from mas.actions.auth.authenticate.action import AuthenticateAction
 from mas.actions.providers.mcp.validate_connection.validate_connection import ValidateConnectionAction
