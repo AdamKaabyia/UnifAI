@@ -12,16 +12,12 @@ import logging
 import os
 import sys
 import threading
-import traceback
 
 
 def on_starting(server):
     """Register a fork-coordination handler in the master process."""
     def _before_fork():
-        # os.write is signal-safe; no Python locks, no logging system.
-        pid = os.getpid()
-        msg = f"\nFORK pid={pid}: {''.join(traceback.format_stack(limit=5))}\n"
-        os.write(2, msg.encode("utf-8", errors="replace"))
+        pass  # Coordinates C-level fork calls via pthread_atfork
 
     os.register_at_fork(before=_before_fork)
 
