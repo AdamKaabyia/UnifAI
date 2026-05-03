@@ -111,7 +111,7 @@ class ParserType(Enum):
 class ParserDefaults:
     """Default values for parser configuration."""
     MIN_CONTENT_LENGTH = 1
-    MAX_CONTENT_LENGTH = 100000
+    MAX_CONTENT_LENGTH = 200000
     VALIDATE_SCHEMA = True
     FALLBACK_TO_CONTENT = True
     STRICT_FORMAT = False
