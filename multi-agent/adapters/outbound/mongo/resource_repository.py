@@ -106,6 +106,17 @@ class MongoResourceRepository(ResourceRepository):
     def exists(self, rid: str) -> bool:
         return self.col.count_documents({"_id": rid}, limit=1) == 1
 
+    def count_by_config_field(
+        self, user_id: str, field: str, value: str, exclude_rid: str = "",
+    ) -> int:
+        filter_dict: Dict[str, Any] = {
+            "user_id": user_id,
+            f"cfg_dict.{field}": value,
+        }
+        if exclude_rid:
+            filter_dict["_id"] = {"$ne": exclude_rid}
+        return self.col.count_documents(filter_dict)
+
     def group_count(
         self, 
         user_id: str, 

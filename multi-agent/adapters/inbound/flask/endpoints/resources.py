@@ -139,14 +139,16 @@ def get_resource_schema():
 @resources_bp.route("/resource.validate", methods=["POST"])
 @from_body({
     "resource_id": fields.Str(data_key="resourceId", required=True),
+    "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
 })
-def validate_resource(resource_id, timeout_seconds):
+def validate_resource(resource_id, user_id, timeout_seconds):
     """Validate a saved resource and its dependencies."""
     svc = current_app.container.resources_service
     try:
         result = svc.validate_resource(
             rid=resource_id,
+            user_id=user_id,
             timeout_seconds=timeout_seconds,
         )
         return jsonify(result.model_dump()), 200
@@ -161,16 +163,18 @@ def validate_resource(resource_id, timeout_seconds):
 @resources_bp.route("/resources.validate", methods=["POST"])
 @from_body({
     "resource_ids": fields.List(fields.Str(), data_key="resourceIds", required=True),
+    "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
     "max_workers": fields.Int(data_key="maxWorkers", load_default=10),
 })
-def validate_resources(resource_ids, timeout_seconds, max_workers):
+def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
     """
     Validate multiple resources in parallel.
     
     Request:
         {
             "resourceIds": ["rid1", "rid2", "rid3"],
+            "userId": "alice",
             "timeoutSeconds": 10.0,
             "maxWorkers": 10
         }
@@ -196,6 +200,7 @@ def validate_resources(resource_ids, timeout_seconds, max_workers):
     try:
         results = svc.validate_resources(
             rids=resource_ids,
+            user_id=user_id,
             timeout_seconds=timeout_seconds,
             max_workers=max_workers,
         )

@@ -50,8 +50,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: multiagent-temporal-worker-configmap
-            # - configMapRef:
-            #     name: multiagent-be-security
+            - configMapRef:
+                name: multiagent-be-security
             - configMapRef:
                 name: {{ .Values.globalConfigMapName }}
           ports:

@@ -8,6 +8,7 @@ class AppConfig(SharedConfig):
     session_coll: str = "workflow_sessions"
     shares_coll: str = "shares"
     templates_coll: str = "templates"
+    credentials_coll: str = "credentials"
     hostname: str = "0.0.0.0"
     port: str = "8002"
     version: str = "1.0.0"
@@ -20,3 +21,8 @@ class AppConfig(SharedConfig):
     redis_stream_ttl: int = 3600
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
+    # MCP Auth
+    mcp_auth_state_secret: str = ""
+    identity_host: str = "http://localhost:13456"
+    credential_encryption_key: str = ""
+

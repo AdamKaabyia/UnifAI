@@ -199,6 +199,7 @@ export async function setBlueprintMetadata(
 export async function validateBlueprint(request: BlueprintValidationRequest): Promise<BlueprintValidationResult> {
   const response = await axios.post('/blueprints/blueprint.validate', {
     blueprintId: request.blueprintId,
+    userId: request.userId,
     timeoutSeconds: request.timeoutSeconds ?? 10.0,
   });
   return response.data;

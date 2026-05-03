@@ -197,7 +197,74 @@ class SecretHint(BaseModel):
         }
 
 
-def combine_hints(*hints: Union[ActionHint, ApiHint, HiddenHint, SecretHint]) -> Dict[str, Any]:
+class AuthHint(BaseModel):
+    """
+    Hint that marks a field as an interactive authentication trigger.
+
+    The UI renders this as a Sign In / auth status component instead
+    of a normal input.  It calls the specified action to check status
+    and initiate the OAuth flow when needed.
+
+    Example::
+
+        json_schema_extra=combine_hints(
+            ConditionalHint(visible_when={"auth_method": "sign_in"}),
+            AuthHint(action_uid="auth.authenticate",
+                     dependencies={"server_identifier": "server_identifier"}),
+        )
+    """
+    action_uid: str = Field(
+        ...,
+        description="Action to call for auth status check / login initiation",
+    )
+    dependencies: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Config field → action input field mapping",
+    )
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        return super().model_dump(**kwargs)
+
+    def to_hints(self) -> Dict[str, Any]:
+        return {
+            "hints": {
+                "auth": self.model_dump()
+            }
+        }
+
+
+class ConditionalHint(BaseModel):
+    """
+    Hint for conditional field visibility.
+
+    The UI should only render this field when every condition in
+    ``visible_when`` is satisfied (i.e. the named sibling field has the
+    specified value).
+
+    Example::
+
+        json_schema_extra=combine_hints(
+            SecretHint(),
+            ConditionalHint(visible_when={"auth_method": "access_token"}),
+        )
+    """
+    visible_when: Dict[str, Any] = Field(
+        ...,
+        description="Map of {field_name: required_value}. All must match for the field to be visible.",
+    )
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        return super().model_dump(**kwargs)
+
+    def to_hints(self) -> Dict[str, Any]:
+        return {
+            "hints": {
+                "conditional": self.model_dump()
+            }
+        }
+
+
+def combine_hints(*hints: Union[ActionHint, ApiHint, HiddenHint, SecretHint, AuthHint, ConditionalHint]) -> Dict[str, Any]:
     """
     Combine multiple hints into a single json_schema_extra structure.
     

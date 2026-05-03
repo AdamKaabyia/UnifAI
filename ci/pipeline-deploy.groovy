@@ -123,17 +123,20 @@ def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
     def identity_env_file = null
     def redis_env_file = null
+    def multiagent_env_file = null
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
         identity_env_file = "./UnifAI-secrets/production/.env_identity"
         redis_env_file = "./UnifAI-secrets/production/.env_redis"
+        multiagent_env_file = "./UnifAI-secrets/production/.env_multi_agent"
     } else if (params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
         identity_env_file = "./UnifAI-secrets/staging/.env_identity"
         redis_env_file = "./UnifAI-secrets/staging/.env_redis"
+        multiagent_env_file = "./UnifAI-secrets/staging/.env_multi_agent"
     }
     echo("✅ Deployer env updated successfully")
-    return [identity_env_file, redis_env_file]
+    return [identity_env_file, redis_env_file, multiagent_env_file]
 }
 
 
@@ -297,9 +300,9 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            def (identity_env_file, redis_env_file) = updateDeployerEnv()
+                            def (identity_env_file, redis_env_file, multiagent_env_file) = updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=${identity_env_file} --env-file=${redis_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=${identity_env_file} --env-file=${redis_env_file} --env-file=${multiagent_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {

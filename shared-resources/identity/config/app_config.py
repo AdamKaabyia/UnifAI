@@ -20,6 +20,10 @@ class AppConfig(SharedConfig):
     frontend_url: str = "http://localhost:5000"    
     backend_env: str = "development"
 
+    # Multi-agent connection
+    multiagent_host: str = "localhost"
+    multiagent_port: str = "8002"
+
     # Session Configuration
     session_cookie_secure: bool = True
     session_cookie_http_only: bool = True
