@@ -262,7 +262,7 @@ unifai/
 │   ├── infrastructure/   # Adapters (MongoDB, Qdrant, Celery)
 │   └── bootstrap/        # Dependency injection & app setup
 ├── ui/                   # React frontend
-├── shared-resources/     # SSO backend (Keycloak integration)
+├── shared-resources/     # Identity service (Keycloak integration)
 ├── global_utils/         # Shared Python utilities
 ├── helm/                 # Helm charts & Helmfile for deployment
 ├── ci/                   # Jenkins CI/CD pipelines
@@ -279,7 +279,7 @@ unifai/
 | RAG Pipeline | [rag/README.md](rag/README.md) |
 | Web UI | [ui/README.md](ui/README.md) |
 | Helm Deployment | [helm/README.md](helm/README.md) |
-| SSO / Auth | [shared-resources/sso-backend/README.md](shared-resources/sso-backend/README.md) |
+| Identity / Auth | [shared-resources/identity/README.md](shared-resources/identity/README.md) |
 | CI/CD | [ci/README.md](ci/README.md) |
 
 ---
