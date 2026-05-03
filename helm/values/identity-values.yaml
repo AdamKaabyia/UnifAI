@@ -9,9 +9,8 @@ backend:
     BACKEND_ENV: "production"
     VERSION: ""
     PORT: 13456
-    LOG_LEVEL: debug
-    PYTHONFAULTHANDLER: 1
-    PYTHONUNBUFFERED: 1
+    LOG_LEVEL: info
+
 
   service:
     name: identity
