@@ -43,6 +43,8 @@ class McpProviderConfig(ProviderBaseConfig):
                 "auth_method": "auth_method",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
+                "server_identifier": "server_identifier",
+                "scheme_type": "scheme_type",
             }
         ).to_hints()
     )

@@ -1,14 +1,15 @@
 """
 MongoCredentialStore — implements :class:`CredentialStore` using MongoDB.
 
-Index:
-    - For server lookup: ``(user_id, server_identifier)``
+Indexes:
+    - Unique lookup: ``(user_id, server_identifier)``
+    - TTL cleanup:   ``_expires_at``  — staged credentials auto-delete
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from pymongo import MongoClient, ASCENDING
@@ -17,6 +18,8 @@ from mas.core.auth.credentials.models import StoredCredential, TokenStatus
 from mas.core.auth.credentials.ports import CredentialStore
 
 logger = logging.getLogger(__name__)
+
+_TTL_FIELD = "_expires_at"
 
 
 class MongoCredentialStore(CredentialStore):
@@ -39,6 +42,11 @@ class MongoCredentialStore(CredentialStore):
             unique=True,
             name="uq_user_server",
         )
+        self._coll.create_index(
+            _TTL_FIELD,
+            expireAfterSeconds=0,
+            name="ttl_staged_credentials",
+        )
 
     # ------------------------------------------------------------------
 
@@ -46,9 +54,12 @@ class MongoCredentialStore(CredentialStore):
         doc = credential.model_dump()
         doc["server_identifier"] = credential.server_identifier.rstrip("/")
         doc["updated_at"] = datetime.now(timezone.utc)
+        update: dict = {"$set": doc}
+        if not credential.staged:
+            update["$unset"] = {_TTL_FIELD: ""}
         self._coll.update_one(
             {"user_id": credential.user_id, "server_identifier": doc["server_identifier"]},
-            {"$set": doc},
+            update,
             upsert=True,
         )
 
@@ -77,11 +88,35 @@ class MongoCredentialStore(CredentialStore):
             {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}},
         )
 
+    def stage(self, credential: StoredCredential, ttl_seconds: int = 300) -> None:
+        credential.staged = True
+        doc = credential.model_dump()
+        doc["server_identifier"] = credential.server_identifier.rstrip("/")
+        doc["updated_at"] = datetime.now(timezone.utc)
+        doc[_TTL_FIELD] = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+        self._coll.update_one(
+            {"user_id": credential.user_id, "server_identifier": doc["server_identifier"]},
+            {"$set": doc},
+            upsert=True,
+        )
+
+    def promote(self, user_id: str, server_identifier: str) -> bool:
+        normalized = server_identifier.rstrip("/")
+        result = self._coll.update_one(
+            {"user_id": user_id, "server_identifier": normalized, "staged": True},
+            {
+                "$set": {"staged": False, "updated_at": datetime.now(timezone.utc)},
+                "$unset": {_TTL_FIELD: ""},
+            },
+        )
+        return result.modified_count > 0
+
     # ------------------------------------------------------------------
 
     @staticmethod
     def _to_model(doc: dict) -> StoredCredential:
         doc.pop("_id", None)
+        doc.pop(_TTL_FIELD, None)
         doc.pop("server_url_normalised", None)
         doc.pop("mcp_server_url", None)
         doc.pop("server_url", None)

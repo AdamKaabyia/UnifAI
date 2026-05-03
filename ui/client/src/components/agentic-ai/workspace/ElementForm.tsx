@@ -151,9 +151,9 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       // Set default values from combined schema, excluding hidden fields
       Object.entries(elementSchema.config_schema.properties).forEach(
         ([key, property]: [string, any]) => {
-          // Skip hidden fields - don't initialize them (except server_identifier which is needed by auth flow)
+          // Skip hidden fields - don't initialize them (except server_identifier/scheme_type needed by auth flow)
           if (property?.hints?.hidden?.hint_type === "hidden") {
-            if (key === "server_identifier") {
+            if (key === "server_identifier" || key === "scheme_type") {
               initialData[key] = property.default ?? "";
             }
             return;
@@ -186,9 +186,9 @@ export const ElementForm: React.FC<ElementFormProps> = ({
           Object.entries(editingElement.config).forEach(([key, value]) => {
             const fieldSchema = elementSchema.config_schema.properties[key];
             
-            // Skip hidden fields - don't populate them in edit mode (except server_identifier)
+            // Skip hidden fields - don't populate them in edit mode (except server_identifier/scheme_type)
             if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
-              if (key === "server_identifier") {
+              if (key === "server_identifier" || key === "scheme_type") {
                 initialData[key] = value;
               }
               return;
@@ -602,7 +602,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
         const fieldSchema = elementSchema.config_schema.properties[fieldName];
 
         // Skip hidden fields - don't include them in save payload
+        // EXCEPT server_identifier and scheme_type which are needed for auth credential lookup
         if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+          if (fieldName === "server_identifier" || fieldName === "scheme_type") {
+            configForSave[fieldName] = value ?? "";
+          }
           return;
         }
 

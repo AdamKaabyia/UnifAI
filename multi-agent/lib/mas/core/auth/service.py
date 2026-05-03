@@ -12,7 +12,7 @@ at build time so they can call ``get_headers()`` with no args.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 
 from .errors import TokenExpiredError
 from .credentials.models import (
@@ -24,6 +24,7 @@ from .ports import AuthStrategy, AuthChallenge
 
 if TYPE_CHECKING:
     from .discovery.detector import AuthDetector
+    from .discovery.models import DetectionResult
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class AuthHandle:
     def __init__(
         self,
         auth_service: AuthService,
-        user_id: Any,
+        user_id: Union[str, Any],
         server_identifier: str,
         scheme_type: str = "",
         config: Optional[Dict[str, Any]] = None,
@@ -123,11 +124,19 @@ class AuthService:
         return self._store.find_by_server(user_id, server_identifier, scheme_type)
 
     def save_credential(self, credential: StoredCredential) -> None:
-        self._store.upsert(credential)
+        """Stage a credential. It auto-expires unless promoted on resource save."""
+        self._store.stage(credential)
 
     def delete_credential(self, user_id: str, server_identifier: str) -> None:
         if user_id and server_identifier:
             self._store.delete(user_id, server_identifier)
+
+    def promote_credential(self, user_id: str, server_identifier: str) -> bool:
+        """Make a staged credential permanent. Called on resource save."""
+        promoted = self._store.promote(user_id, server_identifier)
+        if promoted:
+            logger.info("Credential promoted for user=%s server=%s", user_id, server_identifier)
+        return promoted
 
     def update_status(
         self, user_id: str, server_identifier: str, status: TokenStatus,
@@ -268,7 +277,7 @@ class AuthService:
 
         result = await strategy.complete(raw_callback_data)
 
-        self._store.upsert(StoredCredential(
+        self._store.stage(StoredCredential(
             user_id=result.user_id,
             server_identifier=result.server_identifier,
             access_token=result.token_set.access_token,
@@ -281,7 +290,7 @@ class AuthService:
         ))
 
         logger.info(
-            "Token stored for user=%s server=%s",
+            "Token staged for user=%s server=%s",
             result.user_id, result.server_identifier,
         )
         return {"success": True, "server_identifier": result.server_identifier}
@@ -292,7 +301,7 @@ class AuthService:
         self,
         url: str,
         response_headers: Optional[Dict[str, str]] = None,
-    ) -> Optional[Any]:
+    ) -> Optional[DetectionResult]:
         """Detect what auth a server requires. Returns DetectionResult or None."""
         if not self._detector:
             return None

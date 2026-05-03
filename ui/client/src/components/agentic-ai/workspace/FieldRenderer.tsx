@@ -609,6 +609,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
         formData={formData}
         elementActions={elementActions}
         onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
       />
     );
   }

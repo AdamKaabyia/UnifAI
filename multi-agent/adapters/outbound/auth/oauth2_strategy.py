@@ -15,12 +15,16 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from mas.core.auth.ports import AuthStrategy, AuthChallenge, CompletionResult
+
+if TYPE_CHECKING:
+    from mas.core.auth.ports import HttpClient
+    from mas.core.auth.credentials.ports import ServerConfigStore
 from mas.core.auth.credentials.models import (
     StoredCredential, TokenSet, RecoveryResult,
 )
@@ -33,9 +37,9 @@ from mas.core.auth.errors import (
     TokenRefreshError,
 )
 
-from mas.core.auth.schemes.oauth2.config import OAuth2Config
-from mas.core.auth.schemes.oauth2.state_manager import OAuthStateManager
-from mas.core.auth.schemes.oauth2.models import FlowState, FlowStateStore
+from mas.core.auth.strategies.oauth2.config import OAuth2Config
+from mas.core.auth.strategies.oauth2.state_manager import OAuthStateManager
+from mas.core.auth.strategies.oauth2.models import FlowState, FlowStateStore
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +56,19 @@ class OAuth2Strategy(AuthStrategy):
         pending_store: Optional[FlowStateStore] = None,
         state_manager: Optional[OAuthStateManager] = None,
         callback_url: str = "",
-        client_config_store: Optional[Any] = None,
-        detector: Optional[Any] = None,
+        client_config_store: Optional["ServerConfigStore"] = None,
+        http_client: Optional["HttpClient"] = None,
     ):
         self._pending = pending_store
         self._state_mgr = state_manager
         self._callback_url = callback_url
         self._configs = client_config_store
-        self._detector = detector
+        self._http_client = http_client
 
     @property
     def scheme_type(self) -> str:
-        return "oauth2"
+        from mas.core.enums import SchemeType
+        return SchemeType.OAUTH2
 
     # ── Runtime ──────────────────────────────────────────────────────
 
@@ -310,16 +315,14 @@ class OAuth2Strategy(AuthStrategy):
 
         reg_endpoint = config.get("registration_endpoint")
 
-        if not reg_endpoint and self._detector:
-            http_client = getattr(self._detector, '_http_client', None)
-            if http_client:
-                from mas.core.auth.schemes.oauth2.detection import OAuth2DetectionStrategy
-                as_meta = await OAuth2DetectionStrategy._fetch_as_metadata(
-                    server_identifier, http_client,
-                )
-                if as_meta:
-                    config = {**config, **as_meta}
-                    reg_endpoint = config.get("registration_endpoint")
+        if not reg_endpoint and self._http_client:
+            from mas.core.auth.strategies.oauth2.detection import OAuth2DetectionStrategy
+            as_meta = await OAuth2DetectionStrategy._fetch_as_metadata(
+                server_identifier, self._http_client,
+            )
+            if as_meta:
+                config = {**config, **as_meta}
+                reg_endpoint = config.get("registration_endpoint")
 
         if not reg_endpoint:
             return config

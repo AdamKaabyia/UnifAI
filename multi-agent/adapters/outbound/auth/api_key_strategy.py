@@ -10,8 +10,9 @@ from typing import Any, Dict
 
 from mas.core.auth.ports import AuthStrategy, AuthChallenge, CompletionResult
 from mas.core.auth.credentials.models import StoredCredential, TokenSet, RecoveryResult
+from mas.core.enums import SchemeType
 
-from mas.core.auth.schemes.api_key.config import ApiKeyConfig
+from mas.core.auth.strategies.api_key.config import ApiKeyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class ApiKeyStrategy(AuthStrategy):
 
     @property
     def scheme_type(self) -> str:
-        return "api_key"
+        return SchemeType.API_KEY
 
     def build_headers(self, credential: StoredCredential) -> Dict[str, str]:
         cfg = ApiKeyConfig()
@@ -59,5 +60,5 @@ class ApiKeyStrategy(AuthStrategy):
             token_set=TokenSet(access_token=api_key, token_type="ApiKey"),
             user_id=raw_callback_data.get("user_id", ""),
             server_identifier=raw_callback_data.get("server_identifier", ""),
-            scheme_type="api_key",
+            scheme_type=SchemeType.API_KEY,
         )

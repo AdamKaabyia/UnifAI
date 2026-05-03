@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import asyncio
 from typing import Dict, List, Optional, TYPE_CHECKING
 from pydantic import HttpUrl
 from mcp.types import Tool
@@ -101,7 +100,7 @@ class McpProvider:
         ) as mcp_client:
             # Fetch all available tools in one go
             available_tools = await mcp_client.get_tools()
-            print(f"Fetched {len(available_tools)} tools from MCP server: {[tool.name for tool in available_tools]}")
+            # print(f"Fetched {len(available_tools)} tools from MCP server: {[tool.name for tool in available_tools]}")
             
             # Cache tools in provider registry
             self._tool_registry.cache_tools(available_tools)

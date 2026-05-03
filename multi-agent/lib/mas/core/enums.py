@@ -21,6 +21,25 @@ class ResourceCategory(str, Enum):
         return self in self.plan_categories()
 
 
+class SchemeType(str, Enum):
+    """Authentication scheme discriminators."""
+    OAUTH2 = "oauth2"
+    API_KEY = "api_key"
+
+
+class ProtocolType(str, Enum):
+    """Auth protocol discriminators returned by detection."""
+    OAUTH2 = "oauth2"
+    SAML = "saml"
+
+
+class ChallengeType(str, Enum):
+    """AuthChallenge discriminators sent to the UI."""
+    CONSENT = "consent"
+    COLLECT = "collect"
+    DEVICE = "device"
+
+
 class SystemNodeType(str, Enum):
     """Node types that stay inline in blueprints (never saved as resources)."""
     USER_QUESTION = "user_question_node"

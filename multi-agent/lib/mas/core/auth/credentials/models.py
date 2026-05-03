@@ -6,7 +6,6 @@ All credential, token, and client-config models live here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -62,6 +61,10 @@ class StoredCredential(BaseModel):
     scheme_type: str = "oauth2"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    staged: bool = Field(
+        default=False,
+        description="True while credential is awaiting resource save (not yet permanent).",
+    )
 
     def is_valid(self, buffer_seconds: int = 60) -> bool:
         if self.status != TokenStatus.ACTIVE:
@@ -83,9 +86,10 @@ class ClientConfig(BaseModel):
     server_identifier: str = ""
 
 
-@dataclass(frozen=True)
-class RecoveryResult:
+class RecoveryResult(BaseModel):
     """Outcome of an attempt_recovery call."""
+    model_config = {"frozen": True}
+
     recovered: bool
     should_retry: bool
     reason: str

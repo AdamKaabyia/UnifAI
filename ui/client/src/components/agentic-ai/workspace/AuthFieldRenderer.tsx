@@ -23,6 +23,7 @@ interface AuthFieldRendererProps {
   formData: any;
   elementActions: any[];
   onValidationChange: (fieldName: string, isValid: boolean) => void;
+  onInputChange?: (field: string, value: any) => void;
 }
 
 type AuthStatus = 'idle' | 'checking' | 'authenticated' | 'requires_consent' | 'expired' | 'not_configured' | 'error';
@@ -33,6 +34,7 @@ export const AuthFieldRenderer: React.FC<AuthFieldRendererProps> = ({
   formData,
   elementActions,
   onValidationChange,
+  onInputChange,
 }) => {
   const { user } = useAuth();
   const userId = user?.username || "";
@@ -86,11 +88,15 @@ export const AuthFieldRenderer: React.FC<AuthFieldRendererProps> = ({
 
       const data = response.data;
 
+
       if (data.status === 'authenticated') {
         setStatus('authenticated');
         setAuthUrl(null);
         setMessage(data.message || 'Authenticated');
         onValidationChange(fieldName, true);
+        if (onInputChange) {
+          onInputChange('scheme_type', 'oauth2');
+        }
       } else if (data.status === 'requires_consent' || data.status === 'expired') {
         setStatus(data.status);
         setAuthUrl(data.authorization_url || null);
@@ -116,9 +122,9 @@ export const AuthFieldRenderer: React.FC<AuthFieldRendererProps> = ({
 
   useEffect(() => {
     if (lastCheckedKeyRef.current === dependencyKey) return;
-    lastCheckedKeyRef.current = dependencyKey;
 
     const timer = setTimeout(() => {
+      lastCheckedKeyRef.current = dependencyKey;
       checkAuth();
     }, 500);
 

@@ -195,17 +195,30 @@ class McpProxyTool(BaseTool):
         self._tool_info = None
         self._schema_initialized = False
         self.args_schema = None
-        await self._ensure_tool_info()
+        current_headers = await self._get_current_headers()
+        client = McpServerClient(
+            mcp_url=self.mcp_url,
+            headers=current_headers,
+            transport_type=self.transport_type,
+        )
+        async with client:
+            await self._ensure_tool_info(client)
 
     async def health_check(self) -> bool:
         """
         Quickly verify that:
-          1) a new context enter reconnects if needed
+          1) a new connection can be established
           2) the remote tool still exists
         """
         try:
-            async with self.mcp_client:
-                info = await self.mcp_client.get_tool_by_name(self.mcp_tool_name)
+            current_headers = await self._get_current_headers()
+            client = McpServerClient(
+                mcp_url=self.mcp_url,
+                headers=current_headers,
+                transport_type=self.transport_type,
+            )
+            async with client:
+                info = await client.get_tool_by_name(self.mcp_tool_name)
             return info is not None
         except Exception:
             return False

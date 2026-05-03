@@ -10,9 +10,11 @@ Auth-layer ports — abstract contracts that define the hexagonal boundary.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
+from mas.core.enums import ChallengeType
 from .credentials.models import StoredCredential, TokenSet, RecoveryResult
 
 
@@ -76,20 +78,18 @@ class AuthStrategy(ABC):
 
 # ── CompletionResult ─────────────────────────────────────────────────
 
-@dataclass
-class CompletionResult:
+class CompletionResult(BaseModel):
     """What a strategy returns after completing the auth flow."""
     token_set: TokenSet
     user_id: str
     server_identifier: str
     scheme_type: str
-    scopes: List[str] = field(default_factory=list)
+    scopes: List[str] = Field(default_factory=list)
 
 
 # ── AuthChallenge — scheme-agnostic onboarding responses ─────────────
 
-@dataclass(frozen=True)
-class AuthChallenge:
+class AuthChallenge(BaseModel):
     """What the auth layer sends to the UI when credentials must be acquired.
 
     The ``challenge_type`` discriminator tells the UI how to present it:
@@ -97,16 +97,17 @@ class AuthChallenge:
       - ``"collect"``  → render input form (API key, basic auth)
       - ``"device"``   → show device code + verification URI (future)
     """
+    model_config = {"frozen": True}
 
     challenge_type: str
     flow_id: str = ""
     url: Optional[str] = None
-    fields: List[Dict[str, Any]] = field(default_factory=list)
+    fields: List[Dict[str, Any]] = Field(default_factory=list)
     device_code: Optional[str] = None
     verification_uri: Optional[str] = None
-    scopes: List[str] = field(default_factory=list)
+    scopes: List[str] = Field(default_factory=list)
     server_identifier: str = ""
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: Dict[str, Any] = Field(default_factory=dict)
 
     def to_response(self) -> Dict[str, Any]:
         """Serialize for the action's HTTP response."""
@@ -139,7 +140,7 @@ class AuthChallenge:
         server_identifier: str = "",
     ) -> AuthChallenge:
         return cls(
-            challenge_type="consent",
+            challenge_type=ChallengeType.CONSENT,
             url=url,
             flow_id=flow_id,
             scopes=scopes or [],
@@ -154,7 +155,7 @@ class AuthChallenge:
         server_identifier: str = "",
     ) -> AuthChallenge:
         return cls(
-            challenge_type="collect",
+            challenge_type=ChallengeType.COLLECT,
             fields=fields,
             flow_id=flow_id,
             server_identifier=server_identifier,

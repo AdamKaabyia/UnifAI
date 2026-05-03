@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from mas.core.auth.schemes.oauth2.models import FlowState, FlowStateStore
+from mas.core.auth.strategies.oauth2.models import FlowState, FlowStateStore
 
 logger = logging.getLogger(__name__)
 

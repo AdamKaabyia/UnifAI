@@ -34,8 +34,8 @@ from mas.templates.service import TemplateService
 from mas.core.auth.service import AuthService, AuthStrategyRegistry
 from mas.core.auth.discovery import AuthDetector
 from outbound.auth.oauth2_strategy import OAuth2Strategy
-from mas.core.auth.schemes.oauth2.detection import OAuth2DetectionStrategy
-from mas.core.auth.schemes.oauth2.state_manager import OAuthStateManager
+from mas.core.auth.strategies.oauth2.detection import OAuth2DetectionStrategy
+from mas.core.auth.strategies.oauth2.state_manager import OAuthStateManager
 from outbound.auth.api_key_strategy import ApiKeyStrategy
 from outbound.mongo.client_config_repository import MongoServerConfigStore
 from mas.actions.auth.authenticate.action import AuthenticateAction
@@ -167,7 +167,7 @@ class AppContainer(metaclass=SingletonMeta):
             state_manager=state_manager,
             callback_url=f"{cfg.sso_backend_host.rstrip('/')}/api/credentials/callback",
             client_config_store=self.server_config_store,
-            detector=detector,
+            http_client=http_client,
         )
         api_key_strategy = ApiKeyStrategy()
 
@@ -183,8 +183,8 @@ class AppContainer(metaclass=SingletonMeta):
             detector=detector,
         )
 
-        self.resources_service._auth_service = self.auth_service
-        self.blueprint_service._auth_service = self.auth_service
+        self.resources_service.set_auth_service(self.auth_service)
+        self.blueprint_service.set_auth_service(self.auth_service)
 
         self.actions_service.register_instance(AuthenticateAction(
             auth_service=self.auth_service,
