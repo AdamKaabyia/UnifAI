@@ -1,3 +1,12 @@
+"""
+Gunicorn configuration for the identity service.
+
+Key fix: os.register_at_fork() coordinates C-level fork calls from native
+libraries (OpenSSL/cryptography used by joserfc for JWT verification).
+Without this, the JWKS cache expiry at ~10 minutes triggers uncoordinated
+forks that produce orphan processes and spurious "Worker exited with code 1"
+log noise.
+"""
 import faulthandler
 import logging
 import os
@@ -7,30 +16,18 @@ import traceback
 
 
 def on_starting(server):
-    # Register a fork handler in the MASTER process.
-    # Uses os.write() directly — signal-safe, no Python locks, no logging system.
-    # This fires on EVERY os.fork() call regardless of which thread calls it.
+    """Register a fork-coordination handler in the master process."""
     def _before_fork():
+        # os.write is signal-safe; no Python locks, no logging system.
         pid = os.getpid()
-        # Write directly to stderr fd=2, bypassing all Python logging locks
-        msg = f"\nFORK-TRAP pid={pid} stack:\n{''.join(traceback.format_stack())}\n"
+        msg = f"\nFORK pid={pid}: {''.join(traceback.format_stack(limit=5))}\n"
         os.write(2, msg.encode("utf-8", errors="replace"))
 
     os.register_at_fork(before=_before_fork)
 
 
-def pre_fork(server, worker):
-    # Called by Gunicorn arbiter just before it calls os.fork() for a worker.
-    # Use both the gunicorn logger AND direct stderr write for reliability.
-    msg = f"\nGUNICORN-PRE-FORK pid={os.getpid()} current_workers={list(server.WORKERS.keys())}\n"
-    os.write(2, msg.encode("utf-8", errors="replace"))
-    server.log.warning(
-        "pre_fork: Gunicorn is about to spawn a new worker (current workers: %s)",
-        list(server.WORKERS.keys()),
-    )
-
-
 def post_fork(server, worker):
+    """Per-worker setup: crash diagnostics and unhandled-exception logging."""
     faulthandler.enable(file=sys.stderr)
 
     _log = logging.getLogger("gunicorn.error")
@@ -52,27 +49,3 @@ def post_fork(server, worker):
         )
 
     sys.unraisablehook = _unraisable_handler
-
-
-def worker_exit(server, worker):
-    # Called in the CHILD process (only if worker reaches the try block in spawn_worker)
-    print(
-        f"worker_exit hook (child): pid={worker.pid} exitcode={getattr(worker, 'exitcode', 'unknown')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    server.log.error(
-        "worker_exit hook (child): pid=%s exitcode=%s",
-        worker.pid,
-        getattr(worker, "exitcode", "unknown"),
-    )
-
-
-def child_exit(server, worker):
-    # Called in the MASTER process after ANY worker dies that is in WORKERS dict
-    server.log.error(
-        "child_exit hook (master): pid=%s age=%s exitcode=%s",
-        worker.pid,
-        worker.age,
-        getattr(worker, "exitcode", "unknown"),
-    )
