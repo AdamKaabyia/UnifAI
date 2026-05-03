@@ -124,19 +124,11 @@ class AuthService:
         return self._store.find_by_server(user_id, server_identifier, scheme_type)
 
     def save_credential(self, credential: StoredCredential) -> None:
-        """Stage a credential. It auto-expires unless promoted on resource save."""
-        self._store.stage(credential)
+        self._store.upsert(credential)
 
     def delete_credential(self, user_id: str, server_identifier: str) -> None:
         if user_id and server_identifier:
             self._store.delete(user_id, server_identifier)
-
-    def promote_credential(self, user_id: str, server_identifier: str) -> bool:
-        """Make a staged credential permanent. Called on resource save."""
-        promoted = self._store.promote(user_id, server_identifier)
-        if promoted:
-            logger.info("Credential promoted for user=%s server=%s", user_id, server_identifier)
-        return promoted
 
     def update_status(
         self, user_id: str, server_identifier: str, status: TokenStatus,
@@ -277,7 +269,7 @@ class AuthService:
 
         result = await strategy.complete(raw_callback_data)
 
-        self._store.stage(StoredCredential(
+        self._store.upsert(StoredCredential(
             user_id=result.user_id,
             server_identifier=result.server_identifier,
             access_token=result.token_set.access_token,
@@ -290,7 +282,7 @@ class AuthService:
         ))
 
         logger.info(
-            "Token staged for user=%s server=%s",
+            "Token stored for user=%s server=%s",
             result.user_id, result.server_identifier,
         )
         return {"success": True, "server_identifier": result.server_identifier}

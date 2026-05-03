@@ -61,10 +61,6 @@ class StoredCredential(BaseModel):
     scheme_type: str = "oauth2"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    staged: bool = Field(
-        default=False,
-        description="True while credential is awaiting resource save (not yet permanent).",
-    )
 
     def is_valid(self, buffer_seconds: int = 60) -> bool:
         if self.status != TokenStatus.ACTIVE:

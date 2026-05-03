@@ -47,7 +47,6 @@ class ResourcesService:
         cfg_model = model_cls(**config)
 
         self._run_pre_save_hook(cfg_model, user_id)
-        self._promote_staged_credential(cfg_model, user_id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -79,7 +78,6 @@ class ResourcesService:
         cfg_model = model_cls(**config)
 
         self._run_pre_save_hook(cfg_model, doc.user_id)
-        self._promote_staged_credential(cfg_model, doc.user_id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -327,12 +325,6 @@ class ResourcesService:
         """Call on_pre_save on the config model if it supports it."""
         if hasattr(cfg_model, "on_pre_save"):
             cfg_model.on_pre_save(user_id, auth_service=self._auth_service)
-
-    def _promote_staged_credential(self, cfg_model: BaseModel, user_id: str) -> None:
-        """Make a staged credential permanent when the resource is saved."""
-        server_id = getattr(cfg_model, "server_identifier", None)
-        if server_id and self._auth_service:
-            self._auth_service.promote_credential(user_id, server_id)
 
     def _ensure_validation_service(self) -> None:
         """Raise if validation service not configured."""

@@ -27,20 +27,6 @@ class CredentialStore(ABC):
     @abstractmethod
     def update_status(self, user_id: str, server_identifier: str, status: str) -> None: ...
 
-    def stage(self, credential: StoredCredential, ttl_seconds: int = 300) -> None:
-        """Persist a credential temporarily. Adapter decides cleanup mechanism."""
-        credential.staged = True
-        self.upsert(credential)
-
-    def promote(self, user_id: str, server_identifier: str) -> bool:
-        """Make a staged credential permanent. Returns True if promoted."""
-        cred = self.find_by_server(user_id, server_identifier)
-        if not cred or not cred.staged:
-            return False
-        cred.staged = False
-        self.upsert(cred)
-        return True
-
 
 class ServerConfigStore(ABC):
     """Persist and retrieve :class:`ClientConfig` objects."""
