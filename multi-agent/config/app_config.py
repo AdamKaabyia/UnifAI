@@ -12,6 +12,7 @@ class AppConfig(SharedConfig):
     port: str = "8002"
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
+    secret_key: str = ""
     # Engine
     engine_name: str = "temporal"
     temporal_task_queue: str = "graph-engine"
