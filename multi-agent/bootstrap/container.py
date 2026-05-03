@@ -177,7 +177,7 @@ class AppContainer(metaclass=SingletonMeta):
         oauth2_strategy = OAuth2Strategy(
             pending_store=pending_store,
             state_manager=state_manager,
-            callback_url=f"{cfg.sso_backend_host.rstrip('/')}/api/credentials/callback",
+            callback_url=f"{cfg.identity_host.rstrip('/')}/api/credentials/callback",
             client_config_store=self.server_config_store,
             http_client=http_client,
         )
