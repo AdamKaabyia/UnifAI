@@ -28,3 +28,8 @@ RH-sso->User: redirect to sso-be/api/callback
 sso-be->User: redirect to frontend_url?auth=success
 User->Nginx: browse pages (frontend_url/api1 | frontend_url/api2)
 ```
+
+## Logout and login (GENIE-827)
+
+- **`POST /api/auth/logout`** — Clears the server-side session and cookie, and **best-effort** calls Keycloak’s **OpenID Connect logout** with the stored **refresh token** so the SSO session can be ended server-side, not only in the browser.
+- **Login page** — The UI serves **`/login`** with a single **SSO** action; that route is outside the authenticated shell so users can open it while logged out.
