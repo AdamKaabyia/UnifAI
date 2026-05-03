@@ -13,6 +13,7 @@ from typing import Optional
 
 import typer
 
+from unifai_cli.commands.auth import auth_app
 from unifai_cli.commands.blueprints import blueprints_app
 from unifai_cli.commands.inventory import inventory_app
 from unifai_cli.commands.workflow import workflow_app
@@ -24,6 +25,7 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
 )
 
+app.add_typer(auth_app, name="auth")
 app.add_typer(blueprints_app, name="blueprints")
 app.add_typer(inventory_app, name="inventory")
 app.add_typer(workflow_app, name="workflow")
