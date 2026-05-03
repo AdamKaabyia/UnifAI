@@ -8,11 +8,15 @@ Routes:
   GET  /api/credentials/client-config.get     — Get OAuth client config for an auth server
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from global_utils.utils.async_bridge import get_async_bridge
 from mas.core.auth.credentials.models import ClientConfig
 from webargs import fields
+
+logger = logging.getLogger(__name__)
 
 credentials_bp = Blueprint("credentials", __name__)
 
@@ -36,7 +40,8 @@ def exchange_code(code, state):
             result = bridge.run(auth_service.complete({"code": code, "state": state}))
         return jsonify(result), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logger.exception("Token exchange failed")
+        return jsonify({"error": "Token exchange failed"}), 400
 
 
 @credentials_bp.route("/status", methods=["GET"])
@@ -60,7 +65,8 @@ def token_status(user_id, server_identifier):
             "status": "expired" if cred else "not_found",
         }), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logger.exception("Token status check failed")
+        return jsonify({"error": "Status check failed"}), 400
 
 
 @credentials_bp.route("/client-config.save", methods=["POST"])
@@ -94,10 +100,14 @@ def save_client_config(
 
         store = current_app.container.server_config_store
         store.save(user_id="", config=config)
-        return jsonify(config.model_dump()), 201
+        data = config.model_dump()
+        if data.get("client_secret"):
+            data["client_secret"] = "***"
+        return jsonify(data), 201
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logger.exception("Failed to save client config")
+        return jsonify({"error": "Failed to save client config"}), 400
 
 
 @credentials_bp.route("/client-config.get", methods=["GET"])
@@ -119,4 +129,5 @@ def get_client_config(server_identifier):
         return jsonify(data), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logger.exception("Failed to get client config")
+        return jsonify({"error": "Failed to get client config"}), 400

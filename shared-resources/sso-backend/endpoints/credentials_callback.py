@@ -32,8 +32,9 @@ _POPUP_CLOSE_TEMPLATE = """\
 <script>
 (function() {{
   var payload = {payload_json};
+  var targetOrigin = {target_origin};
   if (window.opener) {{
-    window.opener.postMessage(payload, "*");
+    window.opener.postMessage(payload, targetOrigin);
   }}
   document.getElementById("msg").textContent = payload.success
     ? "Signed in! You can close this window."
@@ -47,8 +48,11 @@ _POPUP_CLOSE_TEMPLATE = """\
 
 def _popup_response(payload: dict):
     """Return a small HTML page that posts *payload* to the opener and closes."""
+    config = AppConfig.get_instance()
+    frontend_url = getattr(config, "frontend_url", "*") or "*"
     html = _POPUP_CLOSE_TEMPLATE.format(
         payload_json=json.dumps(payload),
+        target_origin=json.dumps(frontend_url),
     )
     resp = make_response(html, 200)
     resp.headers["Content-Type"] = "text/html; charset=utf-8"

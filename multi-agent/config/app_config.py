@@ -23,3 +23,5 @@ class AppConfig(SharedConfig):
     # MCP Auth
     mcp_auth_state_secret: str = ""
     sso_backend_host: str = "http://localhost:13456"
+    credential_encryption_key: str = ""
+

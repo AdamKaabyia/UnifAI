@@ -3,6 +3,9 @@ MongoCredentialStore — implements :class:`CredentialStore` using MongoDB.
 
 Index:
     - Unique lookup: ``(user_id, server_identifier)``
+
+Sensitive fields (access_token, refresh_token) are encrypted at rest
+using Fernet symmetric encryption when an encryption key is provided.
 """
 
 from __future__ import annotations
@@ -18,6 +21,29 @@ from mas.core.auth.credentials.ports import CredentialStore
 
 logger = logging.getLogger(__name__)
 
+_ENCRYPTED_FIELDS = ("access_token", "refresh_token")
+_FERNET_PREFIX = "gAAAAAB"
+
+
+class _FieldCipher:
+    """Fernet wrapper for encrypting/decrypting individual string fields."""
+
+    def __init__(self, key: str):
+        from cryptography.fernet import Fernet
+        self._fernet = Fernet(key.encode() if isinstance(key, str) else key)
+
+    def encrypt(self, value: Optional[str]) -> Optional[str]:
+        if not value:
+            return value
+        return self._fernet.encrypt(value.encode()).decode()
+
+    def decrypt(self, value: Optional[str]) -> Optional[str]:
+        if not value:
+            return value
+        if not value.startswith(_FERNET_PREFIX):
+            return value
+        return self._fernet.decrypt(value.encode()).decode()
+
 
 class MongoCredentialStore(CredentialStore):
 
@@ -27,10 +53,12 @@ class MongoCredentialStore(CredentialStore):
         mongodb_port: int = 27017,
         db_name: str = "unifai",
         coll_name: str = "credentials",
+        encryption_key: str = "",
     ):
         client = MongoClient(f"mongodb://{mongodb_ip}:{mongodb_port}/")
         db = client[db_name]
         self._coll = db[coll_name]
+        self._cipher = _FieldCipher(encryption_key) if encryption_key else None
         self._ensure_indexes()
 
     def _ensure_indexes(self) -> None:
@@ -46,6 +74,10 @@ class MongoCredentialStore(CredentialStore):
         doc = credential.model_dump()
         doc["server_identifier"] = credential.server_identifier.rstrip("/")
         doc["updated_at"] = datetime.now(timezone.utc)
+        if self._cipher:
+            for field in _ENCRYPTED_FIELDS:
+                if doc.get(field):
+                    doc[field] = self._cipher.encrypt(doc[field])
         self._coll.update_one(
             {"user_id": credential.user_id, "server_identifier": doc["server_identifier"]},
             {"$set": doc},
@@ -79,8 +111,7 @@ class MongoCredentialStore(CredentialStore):
 
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _to_model(doc: dict) -> StoredCredential:
+    def _to_model(self, doc: dict) -> StoredCredential:
         doc.pop("_id", None)
         doc.pop("_expires_at", None)
         doc.pop("staged", None)
@@ -88,4 +119,8 @@ class MongoCredentialStore(CredentialStore):
         doc.pop("mcp_server_url", None)
         doc.pop("server_url", None)
         doc.pop("auth_rid", None)
+        if self._cipher:
+            for field in _ENCRYPTED_FIELDS:
+                if doc.get(field):
+                    doc[field] = self._cipher.decrypt(doc[field])
         return StoredCredential.model_validate(doc)

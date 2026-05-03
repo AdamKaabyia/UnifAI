@@ -1,4 +1,8 @@
+import logging
+
 from flask import Blueprint, jsonify, current_app
+
+logger = logging.getLogger(__name__)
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 
@@ -96,4 +100,5 @@ def execute_action(uid, input_data, context, user_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Action execution failed: %s", uid)
+        return jsonify({"error": "Action execution failed"}), 500

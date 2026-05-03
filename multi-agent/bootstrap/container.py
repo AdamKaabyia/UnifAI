@@ -10,6 +10,8 @@ points (run/dev.py, run/wsgi.py, inbound/temporal/__main__.py, …)
 create an AppContainer and pass it — or individual services from it —
 into the layers that need them.
 """
+import logging
+
 from mas.catalog.element_registry import ElementRegistry
 from mas.catalog.service import CatalogService
 from mas.catalog.card_service import ElementCardService
@@ -58,6 +60,9 @@ from outbound.auth.http_oauth_client import HttpxAuthClient
 
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_redis_url
+
+
+logger = logging.getLogger(__name__)
 
 
 class AppContainer(metaclass=SingletonMeta):
@@ -133,6 +138,7 @@ class AppContainer(metaclass=SingletonMeta):
             mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
             coll_name=cfg.credentials_coll,
+            encryption_key=cfg.credential_encryption_key,
         )
 
         redis_url = get_redis_url()
@@ -140,7 +146,10 @@ class AppContainer(metaclass=SingletonMeta):
         if redis_url:
             import redis as redis_lib
             redis_client = redis_lib.Redis.from_url(redis_url)
-            pending_store = RedisFlowStateStore(redis_client=redis_client)
+            pending_store = RedisFlowStateStore(
+                redis_client=redis_client,
+                encryption_key=cfg.credential_encryption_key,
+            )
 
         # Detection
         oauth2_detection = OAuth2DetectionStrategy()
@@ -158,8 +167,11 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         # OAuth2 state manager
-        state_secret = cfg.mcp_auth_state_secret or "dev-only-change-me"
-        state_manager = OAuthStateManager(secret=state_secret)
+        if not cfg.mcp_auth_state_secret:
+            logger.warning("MCP_AUTH_STATE_SECRET not set — using random key (sessions won't survive restarts)")
+            import secrets as _secrets
+            cfg.mcp_auth_state_secret = _secrets.token_urlsafe(32)
+        state_manager = OAuthStateManager(secret=cfg.mcp_auth_state_secret)
 
         # Strategy registry — self-contained strategies
         oauth2_strategy = OAuth2Strategy(

@@ -4,6 +4,9 @@ RedisFlowStateStore — implements :class:`FlowStateStore` using Redis.
 Keys: ``auth_pending:<state_hash>``
 TTL:  derived from ``flow_state.expires_at``
 Consume: atomic ``GETDEL`` (Redis 6.2+)
+
+When an encryption key is provided, the JSON payload is encrypted at rest
+so that PKCE verifiers and user identifiers are not exposed in Redis.
 """
 
 from __future__ import annotations
@@ -22,8 +25,12 @@ _PREFIX = "auth_pending:"
 
 class RedisFlowStateStore(FlowStateStore):
 
-    def __init__(self, redis_client):
+    def __init__(self, redis_client, encryption_key: str = ""):
         self._redis = redis_client
+        self._fernet = None
+        if encryption_key:
+            from cryptography.fernet import Fernet
+            self._fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
 
     def save(self, flow_state: FlowState) -> None:
         key = f"{_PREFIX}{flow_state.state_hash}"
@@ -31,8 +38,10 @@ class RedisFlowStateStore(FlowStateStore):
             int((flow_state.expires_at - datetime.now(timezone.utc)).total_seconds()),
             60,
         )
-        payload = flow_state.model_dump(mode="json")
-        self._redis.setex(key, ttl, json.dumps(payload))
+        payload = json.dumps(flow_state.model_dump(mode="json"))
+        if self._fernet:
+            payload = self._fernet.encrypt(payload.encode()).decode()
+        self._redis.setex(key, ttl, payload)
 
     def consume(self, state_hash: str) -> Optional[FlowState]:
         key = f"{_PREFIX}{state_hash}"
@@ -40,6 +49,10 @@ class RedisFlowStateStore(FlowStateStore):
         if raw is None:
             return None
         try:
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            if self._fernet and raw.startswith("gAAAAAB"):
+                raw = self._fernet.decrypt(raw.encode()).decode()
             data = json.loads(raw)
             return FlowState.model_validate(data)
         except Exception as exc:
