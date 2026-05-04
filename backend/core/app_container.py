@@ -9,8 +9,6 @@ from admin_config.template import ADMIN_CONFIG_TEMPLATE
 from config.app_config import AppConfig
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_mongo_url
-from teams.repository.mongo_repository import MongoTeamRepository
-from teams.service import TeamService
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +43,5 @@ class AppContainer(metaclass=SingletonMeta):
             template=ADMIN_CONFIG_TEMPLATE,
             action_dispatcher=self.action_dispatcher,
         )
-
-        teams_db = mongo_client[cfg.teams_db]
-        self.team_repo = MongoTeamRepository(db=teams_db, coll_name=cfg.teams_coll)
-
-        self.team_service = TeamService(repository=self.team_repo)
 
         self._initialized = True
