@@ -2,6 +2,8 @@ import logging
 
 from flask import Blueprint, jsonify, current_app, request
 
+from utils.auth_manager import directory_request_user_token
+
 logger = logging.getLogger(__name__)
 
 directory_bp = Blueprint("directory", __name__)
@@ -15,7 +17,7 @@ def _parse_limit(default: int = 20) -> int:
 
 
 def _user_token():
-    return request.headers.get("X-User-Token")
+    return directory_request_user_token()
 
 
 @directory_bp.route("/directory.status", methods=["GET"])

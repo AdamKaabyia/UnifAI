@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, current_app, request
 from global_utils.identity import Identity
 
+from utils.auth_manager import directory_request_user_token
+
 identity_bp = Blueprint("identity", __name__)
 
 
@@ -27,7 +29,7 @@ def resolve_identity():
 
         if identity_type == "user":
             if svc.has_directory:
-                token = request.headers.get("X-User-Token")
+                token = directory_request_user_token()
                 user = svc.get_directory_user(identity_id, user_token=token)
                 if user:
                     identity = Identity.user(

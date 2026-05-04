@@ -4,7 +4,7 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Any
+from typing import Any, Optional
 import os, uuid, logging
 import requests as http_requests
 from flask import request, jsonify, session, redirect, url_for, current_app
@@ -17,6 +17,25 @@ from global_utils.redis.constants import identity_session_key
 config = AppConfig.get_instance()
 
 logger = logging.getLogger('auth_manager')
+
+
+def directory_request_user_token() -> Optional[str]:
+    """OIDC access token for directory / identity-resolve calls.
+
+    Prefer ``X-User-Token`` when present (programmatic clients). For browser
+    sessions authenticated via cookie + Redis, fall back to the access token
+    stored server-side so the UI does not need ``/api/auth/user`` to expose the
+    raw token to JavaScript.
+    """
+    header = request.headers.get("X-User-Token")
+    if header:
+        return header
+    auth_manager = current_app.extensions.get("auth_manager")
+    if auth_manager and auth_manager.is_authenticated():
+        session_data = auth_manager._get_server_session() or {}
+        return session_data.get("access_token")
+    return None
+
 
 class AuthManager:
     def __init__(self, app=None, redis_store=None):
@@ -83,10 +102,18 @@ class AuthManager:
             logger.info("Connected to Redis")
 
     def _setup_session_configuration(self, app):
+        backend_env = (config.get("backend_env") or "development").lower()
+        if backend_env == "development":
+            # SameSite=None requires Secure; local UI/Identity are HTTP (e.g. :5000 / :13456).
+            cookie_secure = False
+            cookie_samesite = "Lax"
+        else:
+            cookie_secure = config.session_cookie_secure
+            cookie_samesite = config.session_cookie_samesite
         app.config.update({
-            'SESSION_COOKIE_SECURE': config.session_cookie_secure,
+            'SESSION_COOKIE_SECURE': cookie_secure,
             'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,
-            'SESSION_COOKIE_SAMESITE': config.session_cookie_samesite,
+            'SESSION_COOKIE_SAMESITE': cookie_samesite,
             'PERMANENT_SESSION_LIFETIME': timedelta(hours=config.permanent_session_lifetime)
         })
 
@@ -258,11 +285,10 @@ class AuthManager:
             
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
-          
 
             return jsonify({
                 'user': user,
-                'authenticated': True
+                'authenticated': True,
             })
         
         @self.app.route('/api/auth/user/groups')
