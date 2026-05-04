@@ -1,4 +1,4 @@
-import backendApi from '@/http/backendClient';
+import { api as identityApi } from '@/http/authClient';
 import agentApi from '@/http/axiosAgentConfig';
 
 export type TeamMemberType = 'user' | 'group';
@@ -12,7 +12,7 @@ export interface TeamMember {
 
 /**
  * Return the effective member count for a team.  Prefers the
- * backend-computed ``effective_member_count`` when available, otherwise
+ * Identity-computed ``effective_member_count`` when available, otherwise
  * falls back to a client-side calculation from ``group_members``.
  */
 export function getEffectiveMemberCount(
@@ -52,7 +52,7 @@ export async function createTeam(
   createdBy: string,
   members: TeamMember[]
 ): Promise<Team> {
-  const { data } = await backendApi.post<Team>('/teams/team.create', {
+  const { data } = await identityApi.post<Team>('/teams/team.create', {
     name,
     createdBy,
     members,
@@ -68,14 +68,14 @@ export async function listUserTeams(
   if (groupIds && groupIds.length > 0) {
     params.groupIds = groupIds.join(',');
   }
-  const { data } = await backendApi.get<TeamsListResponse>('/teams/teams.list', {
+  const { data } = await identityApi.get<TeamsListResponse>('/teams/teams.list', {
     params,
   });
   return data.teams;
 }
 
 export async function getTeam(teamId: string): Promise<Team> {
-  const { data } = await backendApi.get<Team>('/teams/team.get', {
+  const { data } = await identityApi.get<Team>('/teams/team.get', {
     params: { teamId },
   });
   return data;
@@ -85,7 +85,7 @@ export async function updateTeam(
   teamId: string,
   updates: { name?: string; members?: TeamMember[] }
 ): Promise<Team> {
-  const { data } = await backendApi.put<Team>('/teams/team.update', {
+  const { data } = await identityApi.put<Team>('/teams/team.update', {
     teamId,
     ...updates,
   });
@@ -94,14 +94,14 @@ export async function updateTeam(
 
 /**
  * Clean up all multi-agent data (resources, blueprints, sessions) owned by a
- * team identity, then delete the team record from the SSO backend.
+ * team identity, then delete the team record in Identity (Mongo).
  */
 export async function deleteTeam(teamId: string, requestedBy: string): Promise<void> {
   await agentApi.delete('/workspace/workspace.cleanup', {
     data: { identityType: 'team', identityId: teamId },
   });
 
-  await backendApi.delete('/teams/team.delete', {
+  await identityApi.delete('/teams/team.delete', {
     params: { teamId, requestedBy },
   });
 }
