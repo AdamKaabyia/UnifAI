@@ -2,6 +2,15 @@ from global_utils.config.config import SharedConfig
 
 
 class AppConfig(SharedConfig):
+    """
+    Multi-agent service config.
+
+    ``mongodb_ip`` defaults to loopback for local dev. Set ``MONGODB_IP`` / ``mongodb_ip``
+    in the environment in Kubernetes or shared compose so pods reach the real host.
+    """
+
+    mongodb_ip: str = "127.0.0.1"
+
     mongo_db: str = "UnifAI"
     blueprint_coll: str = "blueprints"
     resources_coll: str = "resources"
