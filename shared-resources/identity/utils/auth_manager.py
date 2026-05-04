@@ -275,7 +275,8 @@ class AuthManager:
             if not self.is_authenticated():
                 return jsonify({'error': 'Not authenticated'}), 401
 
-            username = session.get('user', {}).get('username')
+            session_data = self._get_server_session() or {}
+            username = session_data.get('username')
             if not username:
                 return jsonify({'groups': []}), 200
 
@@ -285,7 +286,8 @@ class AuthManager:
                 groups = cache.get_groups(username)
 
             if groups is None:
-                groups = self._fetch_user_groups(username, session.get('access_token'))
+                access_token = session_data.get('access_token')
+                groups = self._fetch_user_groups(username, access_token)
                 if cache and groups:
                     cache.set_groups(username, groups)
 

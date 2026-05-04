@@ -10,15 +10,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("auth_manager")
 
-def build_auth_stack(app: Flask, config: AppConfig) -> AuthManager:
-    """Wire Redis + AuthManager after logging is configured (lazy import of AuthManager)."""
+
+def build_auth_stack(app: Flask, config: AppConfig) -> tuple["AuthManager", RedisKVStore]:
+    """Wire Redis + AuthManager. Returns ``(auth_manager, redis_store)`` for shared Redis use."""
     from utils.auth_manager import AuthManager
-    
+
     try:
         redis_store = build_redis_store(config)
         auth_stack = AuthManager(app, redis_store)
         logger.info("Auth stack built successfully")
-        return auth_stack
+        return auth_stack, redis_store
     except Exception as e:
         logger.error(f"Failed to build auth stack: {e}")
         raise

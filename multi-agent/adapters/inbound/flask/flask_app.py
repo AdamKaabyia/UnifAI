@@ -18,7 +18,9 @@ def create_app(container, config: AppConfig = None) -> Flask:
     app.version = config.get("version", "1.0.0")
     app.secret_key = config.get("secret_key", os.urandom(24))
     app.config["admin_allowed_users"] = config.admin_allowed_users
-    app.config["directory_sso_url"] = config.directory_sso_url
+    identity_base = (config.directory_sso_url or config.identity_host or "").rstrip("/")
+    app.config["directory_sso_url"] = identity_base
+    app.config["identity_host"] = (config.identity_host or "").rstrip("/")
 
     CORS(app, resources={r"/api/*": {"origins": "*",
                                      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

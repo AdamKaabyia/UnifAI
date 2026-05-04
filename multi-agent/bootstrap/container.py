@@ -341,12 +341,13 @@ class AppContainer(metaclass=SingletonMeta):
         import logging
         logger = logging.getLogger(__name__)
 
-        if not cfg.directory_sso_url:
+        base_url = (cfg.directory_sso_url or cfg.identity_host or "").strip()
+        if not base_url:
             raise ValueError(
-                "directory_sso_url is required when directory_provider='sso'"
+                "identity_host or directory_sso_url is required when directory_provider='sso'"
             )
-        logger.info("Directory provider: sso (%s)", cfg.directory_sso_url)
+        logger.info("Directory provider: sso (%s)", base_url)
         return SsoDirectoryClient(
-            base_url=cfg.directory_sso_url,
+            base_url=base_url.rstrip("/"),
             timeout=cfg.directory_timeout,
         )

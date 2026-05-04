@@ -19,7 +19,7 @@ from pymongo import MongoClient
 from config.app_config import AppConfig
 from config.logging_config import LoggingConfig
 from global_utils.flask.request_rules import RequestRules
-from global_utils.utils.util import get_mongo_url, get_redis_url
+from global_utils.utils.util import get_mongo_url
 from bootstrap.factories import build_auth_stack
 from directory.factory import build_directory_provider
 from teams.repository.mongo_repository import MongoTeamRepository
@@ -63,23 +63,13 @@ def create_app() -> Flask:
         origins=os.environ.get("FRONTEND_URL", "http://localhost:5000"),
     )
     
-    auth_manager = build_auth_stack(app, config)
+    auth_manager, redis_store = build_auth_stack(app, config)
     app.extensions['auth_manager'] = auth_manager
 
-    redis_url = get_redis_url()
-    user_groups_cache = None
-    if redis_url:
-        try:
-            import redis as redis_lib
-            redis_client = redis_lib.Redis.from_url(redis_url, decode_responses=True)
-            redis_client.ping()
-            user_groups_cache = UserGroupsCache(
-                redis_client,
-                ttl=config.user_groups_cache_ttl,
-            )
-            logger.info("Redis connected for user-groups cache (%s)", redis_url)
-        except Exception as e:
-            logger.warning("Redis unavailable — user-groups cache disabled: %s", e)
+    user_groups_cache = UserGroupsCache(
+        redis_store,
+        ttl=config.user_groups_cache_ttl,
+    )
     app.extensions['user_groups_cache'] = user_groups_cache
 
     mongo_client = MongoClient(get_mongo_url())

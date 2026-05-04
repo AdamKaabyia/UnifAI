@@ -1,9 +1,8 @@
 """
-Self-contained SSO directory client.
+Self-contained Identity directory HTTP client.
 
-HTTP adapter that delegates user/group lookups to the centralised SSO
-backend pod.  Keeps its own lightweight model definitions so that the
-multi-agent service has no dependency on the sso-backend package.
+Delegates user/group lookups to the Identity service (``/api/directory/*``).
+Uses lightweight local models so multi-agent does not import Identity packages.
 """
 import logging
 from abc import ABC, abstractmethod
@@ -54,7 +53,7 @@ class DirectoryProvider(ABC):
 # ── SSO HTTP client ───────────────────────────────────────────────────
 
 class SsoDirectoryClient(DirectoryProvider):
-    """Talks to the SSO pod's ``/api/directory/*`` endpoints."""
+    """Talks to the Identity service ``/api/directory/*`` endpoints."""
 
     def __init__(self, base_url: str, timeout: int = 10):
         self._base = base_url.rstrip("/")
