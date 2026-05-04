@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * Axios instance for the SSO backend (directory, identity, teams).
+ * Axios instance for Identity (directory, teams, non-auth JSON calls).
  * Proxied via /api3 -> http://127.0.0.1:13456/api
  */
 export const ssoApi = axios.create({
