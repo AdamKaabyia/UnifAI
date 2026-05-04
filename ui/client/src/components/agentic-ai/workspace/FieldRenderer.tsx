@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldValidation, ItemValidationResult } from "./FieldValidation";
 import { FieldPopulation } from "./FieldPopulation";
+import { AuthSelector } from "./AuthSelector";
+import { AuthFieldRenderer } from "./AuthFieldRenderer";
 import { AgentCardVisualization } from "./AgentCardVisualization";
 import { ElementType } from "../../../types/workspace";
 import { maskSecretValue } from "../../../utils/maskSecretFields";
@@ -490,6 +492,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -575,6 +578,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -593,6 +597,40 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           />
         )}
       </div>
+    );
+  }
+
+  // Handle fields with AuthHint — render as Sign In / auth status component
+  if (fieldSchema?.hints?.auth) {
+    return (
+      <AuthFieldRenderer
+        fieldName={fieldName}
+        fieldSchema={fieldSchema}
+        formData={formData}
+        elementActions={elementActions}
+        onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
+      />
+    );
+  }
+
+  // Handle auth category fields with dedicated AuthSelector component
+  if (fieldSchema.category === 'auths') {
+    const authOptions = (refOptions['auths'] || [])
+      .filter((option: any) => option.rid && option.rid.trim() !== "");
+
+    const authActionUid = validationHint?.action_uid || fieldSchema.action_uid || 'auth.authenticate';
+
+    return (
+      <AuthSelector
+        fieldName={fieldName}
+        value={value}
+        refOptions={authOptions}
+        actionUid={authActionUid}
+        onInputChange={onInputChange}
+        isRequired={isRequired}
+        description={fieldSchema.description}
+      />
     );
   }
 
@@ -685,6 +723,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
               isRequired={isRequired}
               configValues={formData}
               onValidationChange={onValidationChange}
+              onInputChange={onInputChange}
             />
           )}
 
@@ -865,6 +904,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           isRequired={isRequired}
           configValues={formData}
           onValidationChange={onValidationChange}
+          onInputChange={onInputChange}
         />
       )}
       {populateHint && (
@@ -942,6 +982,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
         isRequired={isRequired}
         configValues={formData}
         onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
       />
     )}
     {populateHint && (

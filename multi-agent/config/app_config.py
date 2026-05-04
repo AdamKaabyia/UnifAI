@@ -8,10 +8,12 @@ class AppConfig(SharedConfig):
     session_coll: str = "workflow_sessions"
     shares_coll: str = "shares"
     templates_coll: str = "templates"
+    credentials_coll: str = "credentials"
     hostname: str = "0.0.0.0"
     port: str = "8002"
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
+    secret_key: str = ""
     # Engine
     engine_name: str = "temporal"
     temporal_task_queue: str = "graph-engine"
@@ -22,10 +24,16 @@ class AppConfig(SharedConfig):
 
     # Collaboration hub — Redis-backed multi-user session presence
     collaboration_presence_ttl: int = 300
+    collaboration_edit_lock_ttl_sec: int = 180
 
-    # Directory provider: "sso" (via SSO pod) or "" to disable
+    # Directory provider: "sso" (via Identity pod) or "" to disable
     directory_provider: str = ""
     directory_timeout: int = 10
 
     # SSO directory URL (used when directory_provider="sso")
     directory_sso_url: str = ""
+
+    # MCP Auth
+    mcp_auth_state_secret: str = ""
+    identity_host: str = "http://localhost:13456"
+    credential_encryption_key: str = ""

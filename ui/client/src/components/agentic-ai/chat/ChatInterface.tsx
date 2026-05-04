@@ -9,7 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw,
+  ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network,
+  Maximize2, Minimize2, Download, FileText, FileJson,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import axios from "../../../http/axiosAgentConfig";
@@ -25,6 +29,18 @@ import WorkflowStatusBanner, { WorkflowBannerMessages } from '@/components/share
 import { useAuth } from "@/contexts/AuthContext";
 import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
 import { CollabAvatar } from "@/components/shared/CollabAvatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  exportSessionAsMarkdown,
+  exportSessionAsJSON,
+  downloadFile,
+  buildExportFilename,
+} from "./exportSession";
 
 // Backend message format
 interface BackendMessage {
@@ -858,6 +874,16 @@ export default function ChatInterface({
     stopStreamingLogs();
   };
 
+  const handleExportMarkdown = useCallback(() => {
+    const md = exportSessionAsMarkdown(messages, runId);
+    downloadFile(md, buildExportFilename(runId, "md"), "text/markdown");
+  }, [messages, runId]);
+
+  const handleExportJSON = useCallback(() => {
+    const json = exportSessionAsJSON(messages, runId);
+    downloadFile(json, buildExportFilename(runId, "json"), "application/json");
+  }, [messages, runId]);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
@@ -1138,6 +1164,29 @@ export default function ChatInterface({
       <CardHeader className="py-4 px-6 flex flex-row justify-between items-center flex-shrink-0">
         <CardTitle className="text-lg font-heading">AI Assistant</CardTitle>
         <div className="flex space-x-1 items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-gray-100"
+                title="Export chat"
+                disabled={messages.length === 0}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover border-gray-700">
+              <DropdownMenuItem onClick={handleExportMarkdown}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export as Markdown (.md)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportJSON}>
+                <FileJson className="h-4 w-4 mr-2" />
+                Export as JSON (.json)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!isChatOnlyMode && (
             <>
               <Button

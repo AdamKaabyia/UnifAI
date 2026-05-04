@@ -1,0 +1,121 @@
+"""
+Flask Application Factory.
+
+Creates and configures the Flask application using hexagonal architecture.
+HTTP adapters are registered as blueprints.
+
+Usage:
+    from bootstrap.flask_app import create_app
+    
+    app = create_app()
+    app.run(host="0.0.0.0", port=5000)
+"""
+import os
+import logging
+from flask import Flask
+from flask_cors import CORS
+from pymongo import MongoClient
+
+from config.app_config import AppConfig
+from config.logging_config import LoggingConfig
+from global_utils.flask.request_rules import RequestRules
+from global_utils.utils.util import get_mongo_url, get_redis_url
+from bootstrap.factories import build_auth_stack
+from directory.factory import build_directory_provider
+from teams.repository.mongo_repository import MongoTeamRepository
+from teams.service import TeamService
+from utils.user_groups_cache import UserGroupsCache
+
+
+def create_app() -> Flask:
+    """
+    Application factory for Flask app.
+    
+    Creates a Flask application with:
+    - CORS configuration
+    - Secret key
+    - All HTTP endpoint blueprints registered
+    - Request validation rules
+    
+    Returns:
+        Configured Flask application
+    """
+    
+    config = AppConfig.get_instance()
+
+    #logging setup for app and all sub-modules.
+    logging.basicConfig(
+        level=LoggingConfig.log_level,
+        format=LoggingConfig.log_format,
+    )
+    logger = logging.getLogger(config.app_name)
+
+    app = Flask(config.app_name)
+        
+    # Application config
+    app.secret_key = config.get("secret_key", os.urandom(24)) # this key is crucial to code and decode all cookies. and it should be taken from env.
+    app.version = config.get("version", "1.0.0")
+    
+    # CORS
+    CORS(
+        app,
+        supports_credentials=True,
+        origins=os.environ.get("FRONTEND_URL", "http://localhost:5000"),
+    )
+    
+    auth_manager = build_auth_stack(app, config)
+    app.extensions['auth_manager'] = auth_manager
+
+    redis_url = get_redis_url()
+    user_groups_cache = None
+    if redis_url:
+        try:
+            import redis as redis_lib
+            redis_client = redis_lib.Redis.from_url(redis_url, decode_responses=True)
+            redis_client.ping()
+            user_groups_cache = UserGroupsCache(
+                redis_client,
+                ttl=config.user_groups_cache_ttl,
+            )
+            logger.info("Redis connected for user-groups cache (%s)", redis_url)
+        except Exception as e:
+            logger.warning("Redis unavailable — user-groups cache disabled: %s", e)
+    app.extensions['user_groups_cache'] = user_groups_cache
+
+    mongo_client = MongoClient(get_mongo_url())
+    teams_db = mongo_client[config.mongo_db]
+    team_repo = MongoTeamRepository(db=teams_db, coll_name=config.teams_coll)
+    directory_provider = build_directory_provider(config)
+    team_service = TeamService(
+        repository=team_repo,
+        directory_provider=directory_provider,
+    )
+    app.extensions['team_service'] = team_service
+    # Register HTTP adapters (blueprints)
+    _register_blueprints(app)
+    
+    # Request validation rules
+    RequestRules(app)
+    
+    return app
+
+
+def _register_blueprints(app: Flask) -> None:
+    """Register all HTTP endpoint blueprints."""
+    from adapters.inbound.flask.endpoints import register_all_endpoints
+    register_all_endpoints(app)
+
+
+app = create_app()
+# ══════════════════════════════════════════════════════════════════════════════
+# Development Entry Point
+# ══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    config = AppConfig.get_instance()
+    app.run(
+        host=config.hostname_local,
+        port=int(config.port),
+        debug=True,
+    )
+

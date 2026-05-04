@@ -187,6 +187,7 @@ export const useWorkspaceData = () => {
           rid: resource.rid,
           name: resource.name,
           type: resource.type,
+          config: resource.cfg_dict,
         }));
       } catch (err: any) {
         const errorMessage =

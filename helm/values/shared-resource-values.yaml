@@ -62,7 +62,7 @@ redis-insight:
   image:
     registry: redis
     repository: redisinsight
-    tag: latest
+    tag: 3.4.2
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

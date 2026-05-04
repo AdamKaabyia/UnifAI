@@ -11,7 +11,7 @@ Design:
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Dict, List, Optional, Mapping
+from typing import Any, Dict, List, Optional, Mapping
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -112,8 +112,10 @@ class ValidationContext(BaseModel):
     """
     timeout_seconds: float = 10.0
     dependency_results: Dict[str, ElementValidationResult] = Field(default_factory=dict)
+    user_id: str = ""
+    auth_service: Optional[Any] = Field(default=None, exclude=True)
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     def get_dependency_result(self, rid: str) -> Optional[ElementValidationResult]:
         """Look up a dependency's validation result."""

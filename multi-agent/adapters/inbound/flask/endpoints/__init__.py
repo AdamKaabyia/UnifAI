@@ -11,6 +11,7 @@ from inbound.flask.endpoints.statistics import statistics_bp
 from inbound.flask.endpoints.templates import templates_bp
 from inbound.flask.endpoints.collaboration import collaboration_bp
 from inbound.flask.endpoints.workspace import workspace_bp
+from inbound.flask.endpoints.credentials import credentials_bp
 
 
 def register_all_endpoints(app):
@@ -28,6 +29,7 @@ def register_all_endpoints(app):
         {"bp": templates_bp, "parent": 'templates', "route": ''},
         {"bp": collaboration_bp, "parent": 'collaboration', "route": ''},
         {"bp": workspace_bp, "parent": 'workspace', "route": ''},
+        {"bp": credentials_bp, "parent": 'credentials', "route": ''},
     ]
 
     # register all other blueprints in the app

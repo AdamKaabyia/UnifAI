@@ -1,0 +1,24 @@
+environments:
+  default:
+    values:
+      - ./values/identity-values.yaml
+---
+
+helmDefaults:
+  createNamespace: false
+  wait: false
+
+releases:
+
+  - name: unifai-identity
+    chart: ./shared-resources/identity
+    wait: true
+    values:
+      - {{- toYaml .Values | nindent 8 }}
+      - ./values/global-config.yaml
+    hooks:
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+        - "./scripts/identity-presync.sh"

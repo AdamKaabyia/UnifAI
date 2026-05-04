@@ -563,8 +563,8 @@ const GraphCreation: React.FC<GraphCreationProps> = ({
         <CardContent className="p-0 h-full relative">
           {/* YAML debug panel */}
           {showYamlDebug && yamlFlow && (
-            <div className="absolute top-4 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg p-4 max-w-md max-h-96 overflow-auto">
-              <div className="flex justify-between items-center mb-2">
+            <div className="absolute top-4 right-4 z-50 bg-gray-900 border border-gray-700 rounded-lg max-w-md max-h-96 flex flex-col overflow-hidden">
+              <div className="flex justify-between items-center px-4 pt-4 pb-2 flex-shrink-0 border-b border-gray-700">
                 <h3 className="text-sm font-medium text-white">
                   YAML Flow State
                 </h3>
@@ -577,7 +577,7 @@ const GraphCreation: React.FC<GraphCreationProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <pre className="text-xs text-gray-300 overflow-auto">
+              <pre className="text-xs text-gray-300 overflow-auto p-4 flex-1 min-h-0">
                 {yaml.dump(yamlFlow, { indent: 2, lineWidth: -1 })}
               </pre>
             </div>

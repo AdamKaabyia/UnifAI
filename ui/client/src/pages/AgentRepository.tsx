@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Plus, Info } from 'lucide-react';
@@ -62,12 +62,26 @@ export default function UserWorkspace() {
     setIsFormOpen(true);
   };
 
+  const existingNames = useMemo(
+    () =>
+      elementInstances
+        .map((el) => el.name)
+        .filter((name): name is string => !!name),
+    [elementInstances],
+  );
+
   const handleSaveElement = async (elementData: any) => {
-    if (selectedElementType) {
-      await saveElement(selectedElementType.category, selectedElementType.type, elementData, editingElement?.rid);
-      setIsFormOpen(false);
+    if (!selectedElementType) return null;
+    const result = await saveElement(
+      selectedElementType.category,
+      selectedElementType.type,
+      elementData,
+      editingElement?.rid,
+    );
+    if (result) {
       fetchElementInstances(selectedElementType.category, selectedElementType.type);
     }
+    return result;
   };
 
   const handleDeleteElement = (rid: string) => {
@@ -117,7 +131,7 @@ export default function UserWorkspace() {
           <div className="col-span-12 md:col-span-9 lg:col-span-10">
             <div className="flex flex-col h-full">
               {selectedElementType && (
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-6 sticky top-0 z-10 pb-4 pt-px -mt-px bg-[hsl(var(--background-dark))] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.4)]">
                   <div>
                     <h2 className="text-2xl font-heading font-bold">
                       {selectedElementType.name} Instances
@@ -189,6 +203,7 @@ export default function UserWorkspace() {
             elementSchema={elementSchema}
             elementActions={elementActions}
             editingElement={editingElement}
+            existingNames={existingNames}
             onSave={handleSaveElement}
           />
         )}

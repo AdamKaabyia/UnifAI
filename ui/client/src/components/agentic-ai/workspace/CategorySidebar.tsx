@@ -11,6 +11,7 @@ import {
   Wrench,
   GitBranch,
   Layers,
+  Lock,
   ChevronRight,
   ChevronDown,
   LoaderCircle
@@ -32,7 +33,8 @@ const getCategoryIcon = (category: string) => {
     tools: <Wrench className="h-4 w-4" />,
     retrievers: <Search className="h-4 w-4" />,
     providers: <Server className="h-4 w-4" />,
-    conditions: <GitBranch className="h-4 w-4" />
+    conditions: <GitBranch className="h-4 w-4" />,
+    auths: <Lock className="h-4 w-4" />
   };
   
   return iconMap[category] || <Layers className="h-4 w-4" />;
@@ -41,6 +43,7 @@ const getCategoryIcon = (category: string) => {
 const getCategoryDisplayName = (category: string) => {
   const nameMap: { [key: string]: string } = {
     nodes: 'Agents',
+    auths: 'Auths',
     llms: 'LLMs',
     tools: 'Tools',
     retrievers: 'Retrievers',
