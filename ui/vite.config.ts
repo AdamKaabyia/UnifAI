@@ -43,7 +43,23 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api2/, '/api'), // This rewrites /api2 to nothing
         // secure: false, // Only needed if this target is HTTPS and you have SSL issues
       },
-      // You can add more proxies here if needed
+      // Identity (auth, directory, teams) — matches nginx /api3 → …/api/…
+      '/api3': {
+        target:
+          process.env.IDENTITY_HOST ||
+          process.env.SSO_HOST ||
+          'http://127.0.0.1:13456',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api3/, '/api'),
+        secure: false,
+      },
+      // Platform backend (admin config, etc.)
+      '/api4': {
+        target: process.env.BACKEND_HOST || 'http://127.0.0.1:8005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api4/, '/api'),
+        secure: false,
+      },
     }
   },
 
