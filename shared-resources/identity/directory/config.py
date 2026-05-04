@@ -15,7 +15,10 @@ class LdapConfig(BaseModel):
     attr_cn: str = "cn"
     attr_mail: str = "mail"
     attr_title: str = "title"
+    # Default matches historical sso-backend (factory did not override this).
     user_object_class: str = "person"
+    # Extra attributes appended to the uid/cn/mail substring OR (see ldap_provider).
+    user_search_attrs: str = "uid,cn,mail"
 
     # group settings (empty base DN disables group queries)
     group_base_dn: str = ""

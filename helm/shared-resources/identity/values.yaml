@@ -125,6 +125,8 @@ affinity: {}
 
 # Identity specific configuration - this is what your templates are looking for
 
+# LDAP directory search requires these on the Identity pod (process env wins over local .env).
+# Optional bind account: set DIRECTORY_LDAP_BIND_DN / DIRECTORY_LDAP_BIND_PASSWORD (or a secret mount).
 backend:
   image:
     repository: images.paas.redhat.com/unifai/identity
@@ -140,10 +142,15 @@ backend:
     DIRECTORY_URL: "ldaps://ldap.corp.redhat.com"
     DIRECTORY_TIMEOUT: "10"
     DIRECTORY_VERIFY_SSL: "false"
+    # If this is left as a doc placeholder (dc=your,dc=base) while GROUP_BASE is real,
+    # Identity derives ou=users + DC suffix from the group DN. Override DIRECTORY_LDAP_USER_RDN_OU if users live under another OU (e.g. ou=People).
     DIRECTORY_LDAP_USER_BASE_DN: "ou=users,dc=redhat,dc=com"
     DIRECTORY_LDAP_GROUP_BASE_DN: "ou=adhoc,ou=managedGroups,dc=redhat,dc=com"
     DIRECTORY_LDAP_GROUP_OBJECT_CLASS: "groupOfUniqueNames,rhatRoverGroup"
     DIRECTORY_LDAP_GROUP_MEMBER_ATTR: "uniqueMember"
+    # Match legacy sso-backend defaults; override for RHDS if entries lack objectClass=person.
+    DIRECTORY_LDAP_USER_OBJECT_CLASS: "person"
+    DIRECTORY_LDAP_USER_SEARCH_ATTRS: "uid,cn,mail"
     DIRECTORY_LDAP_BIND_DN: ""
     DIRECTORY_LDAP_BIND_PASSWORD: ""
 

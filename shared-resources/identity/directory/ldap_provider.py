@@ -59,9 +59,7 @@ class LdapDirectoryProvider(DirectoryProvider):
     def __init__(self, config: LdapConfig):
         self._cfg = config
         self._user_base = config.user_base_dn
-        self._user_attrs = [
-            config.attr_uid, config.attr_cn, config.attr_mail, config.attr_title,
-        ]
+        self._user_attrs = self._build_user_ldap_attribute_list(config)
 
         self._group_base = config.group_base_dn or None
         self._group_attrs = [
@@ -96,6 +94,27 @@ class LdapDirectoryProvider(DirectoryProvider):
             self._group_base or "(disabled)",
             self._bind_dn or "anonymous",
         )
+
+    @staticmethod
+    def _build_user_ldap_attribute_list(config: LdapConfig) -> list:
+        """Request all attributes referenced in user search and display mapping."""
+        names: list[str] = []
+        seen: set[str] = set()
+        for raw in (
+            config.attr_uid,
+            config.attr_cn,
+            config.attr_mail,
+            config.attr_title,
+            *(
+                a.strip()
+                for a in config.user_search_attrs.split(",")
+                if a.strip()
+            ),
+        ):
+            if raw and raw not in seen:
+                seen.add(raw)
+                names.append(raw)
+        return names
 
     def _get_connection(self) -> Connection:
         """Return a reusable connection, reconnecting only when necessary."""
@@ -172,6 +191,15 @@ class LdapDirectoryProvider(DirectoryProvider):
 
     # ── user helpers ───────────────────────────────────────────────────
 
+    def _user_object_class_filter(self) -> str:
+        """Build objectClass filter for users (comma-separated like group_object_class)."""
+        classes = [c.strip() for c in self._cfg.user_object_class.split(",") if c.strip()]
+        if not classes:
+            return "(objectClass=person)"
+        if len(classes) == 1:
+            return f"(objectClass={classes[0]})"
+        return "(|" + "".join(f"(objectClass={c})" for c in classes) + ")"
+
     def _entry_to_user(self, entry) -> DirectoryUser:
         attrs = entry.entry_attributes_as_dict
         uid = _first(attrs.get(self._cfg.attr_uid, []))
@@ -179,31 +207,86 @@ class LdapDirectoryProvider(DirectoryProvider):
         mail = _first(attrs.get(self._cfg.attr_mail, []))
         title = _first(attrs.get(self._cfg.attr_title, []))
 
+        login = uid
+        if not login:
+            for name in self._cfg.user_search_attrs.split(","):
+                key = name.strip()
+                if not key or key == self._cfg.attr_uid:
+                    continue
+                login = _first(attrs.get(key, []))
+                if login:
+                    break
+
         return DirectoryUser(
-            user_id=uid or cn or "",
-            username=uid or "",
-            display_name=cn or uid or "",
+            user_id=uid or login or cn or "",
+            username=uid or login or cn or "",
+            display_name=cn or uid or login or "",
             email=mail or "",
             title=title or "",
         )
 
+    def _user_name_substrings_filter(self, q: str) -> str:
+        """Substring OR filter for user search.
+
+        Always includes ``attr_uid``, ``attr_cn``, and ``attr_mail`` first — matching
+        the historical ``sso-backend`` filter — then any extra attributes from
+        ``user_search_attrs`` (deduped). That way optional attrs (e.g. RH-specific
+        aliases) cannot accidentally replace the core triple or omit ``mail``.
+        """
+        core_attrs = [
+            self._cfg.attr_uid,
+            self._cfg.attr_cn,
+            self._cfg.attr_mail,
+        ]
+        ordered: list[str] = []
+        seen_lower: set[str] = set()
+        for attr in core_attrs:
+            a = (attr or "").strip()
+            if not a:
+                continue
+            low = a.lower()
+            if low in seen_lower:
+                continue
+            seen_lower.add(low)
+            ordered.append(a)
+        for raw in self._cfg.user_search_attrs.split(","):
+            a = raw.strip()
+            if not a:
+                continue
+            low = a.lower()
+            if low in seen_lower:
+                continue
+            seen_lower.add(low)
+            ordered.append(a)
+        if not ordered:
+            ordered.append((self._cfg.attr_uid or "uid").strip() or "uid")
+        return "(|" + "".join(f"({a}=*{q}*)" for a in ordered) + ")"
+
     def search_users(self, query: str, limit: int = 20) -> List[DirectoryUser]:
         q = self._escape(query)
-        uid, cn, mail = self._cfg.attr_uid, self._cfg.attr_cn, self._cfg.attr_mail
-        search_filter = (
-            f"(&(objectClass={self._cfg.user_object_class})"
-            f"(|({uid}=*{q}*)({cn}=*{q}*)({mail}=*{q}*)))"
+        oc_filter = self._user_object_class_filter()
+        name_filter = self._user_name_substrings_filter(q)
+        search_filter = f"(&{oc_filter}{name_filter})"
+        logger.info(
+            "LDAP user search: base=%s filter=%s",
+            self._user_base, search_filter,
         )
         entries = self._search(self._user_base, search_filter,
                                self._user_attrs, limit=limit)
-        return [self._entry_to_user(e) for e in entries]
+        users = [self._entry_to_user(e) for e in entries]
+        # Match legacy sso-backend: return mapped entries; drop only completely empty rows.
+        return [u for u in users if u.user_id or u.username or u.display_name]
 
     def get_user(self, user_id: str) -> Optional[DirectoryUser]:
         q = self._escape(user_id)
-        search_filter = (
-            f"(&(objectClass={self._cfg.user_object_class})"
-            f"({self._cfg.attr_uid}={q}))"
-        )
+        oc_filter = self._user_object_class_filter()
+        or_parts = [f"({self._cfg.attr_uid}={q})"]
+        for raw in self._cfg.user_search_attrs.split(","):
+            attr = raw.strip()
+            if attr and attr != self._cfg.attr_uid:
+                or_parts.append(f"({attr}={q})")
+        id_filter = "(|" + "".join(or_parts) + ")"
+        search_filter = f"(&{oc_filter}{id_filter})"
         entries = self._search(self._user_base, search_filter,
                                self._user_attrs, limit=1)
         if not entries:
