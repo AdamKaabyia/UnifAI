@@ -39,7 +39,7 @@ pipeline {
             steps {
             withCredentials([
                 usernamePassword(
-                    credentialsId: 'creds for rh corporate vault service',
+                    credentialsId: 'vault_creds',
                     usernameVariable: 'ROLE_ID',
                     passwordVariable: 'SECRET_ID'
                 )
