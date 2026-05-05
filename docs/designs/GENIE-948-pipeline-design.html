@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GENIE-948: Migrate UnifAI Secrets to HashiCorp Vault — Technical Design</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1a1a2e; --accent: #0f3460; --border: #dee2e6; --code-bg: #f4f5f7; --highlight: #e2e8f0; --link: #0f3460; --success: #28a745; --warning: #ffc107; --danger: #dc3545; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.6; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 1.75rem; margin-bottom: 0.5rem; color: var(--accent); border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; }
+  h2 { font-size: 1.4rem; margin: 2rem 0 0.75rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 0.5rem; }
+  h4 { font-size: 1.05rem; margin: 1.2rem 0 0.4rem; }
+  p, li { margin-bottom: 0.5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  blockquote { background: #f0f4ff; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; }
+  th { background: var(--highlight); font-weight: 600; }
+  tr:nth-child(even) { background: #fafbfc; }
+  code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.88em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1rem; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .meta { color: #555; font-size: 0.95rem; margin-bottom: 1.5rem; }
+  .tag-primary { display: inline-block; background: var(--accent); color: #fff; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600; }
+  .tag-secondary { display: inline-block; background: #6c757d; color: #fff; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>GENIE-948: Migrate UnifAI Secrets to HashiCorp Vault — Technical Design</h1>
+<p class="meta"><strong>Ticket:</strong> <a href="https://redhat.atlassian.net/browse/GENIE-948">GENIE-948</a> &nbsp;|&nbsp; <strong>Lead Developer:</strong> Saar Fireshtein &nbsp;|&nbsp; <strong>Date:</strong> 2026-05-05 &nbsp;|&nbsp; <strong>Priority:</strong> High</p>
+
+<blockquote>
+<strong>Option Guidance:</strong> This design presents two integration options. <span class="tag-primary">Option A (Jenkins-Managed Injection) is the recommended primary path</span> — it has no cluster-side operator dependency and builds on the already-proven <code>withVault</code> Jenkins plugin (<code>ci/test-vault.groovy</code>). <span class="tag-secondary">Option B (OpenShift Vault Operator)</span> is the higher-security target architecture but is contingent on operator availability on the target clusters. Both options share the same Vault KV structure, <code>VaultFileSource</code> application adapter, and credential rotation process.
+</blockquote>
+
+<hr>
+
+<h2>1. Overview</h2>
+
+<p><strong>Problem statement:</strong> UnifAI stores all sensitive credentials (Keycloak client secrets, encryption keys, Redis/RabbitMQ passwords, Slack tokens, OpenShift access tokens) in plaintext inside a private Git repository (<code>UnifAI-secrets</code>) and injects them via Kubernetes ConfigMaps — not Kubernetes Secrets — through presync shell scripts. This leaves secrets exposed in Git history, in etcd unencrypted, and visible to anyone with cluster ConfigMap read access.</p>
+
+<p><strong>Proposed solution:</strong> Migrate all UnifAI secrets to the company's existing HashiCorp Vault instance (<code>vault.corp.redhat.com:8200</code>). Two integration options are provided:</p>
+
+<ul>
+<li><strong>Option A — Jenkins-Managed Injection (RECOMMENDED PRIMARY):</strong> Jenkins fetches all secrets from Vault at deploy time using the HashiCorp Vault Jenkins Plugin, writes them to temporary <code>.env</code> files, passes them to the helmfile container, and presync scripts create Kubernetes Secrets. Pods consume secrets via volume mounts at <code>/vault/secrets/</code>. No cluster-side operator required.</li>
+<li><strong>Option B — OpenShift Vault Operator (Agent Injector):</strong> The Vault Agent Injector operator runs on the cluster and injects secrets directly into pods at startup via init-container and in-memory <code>tmpfs</code>. Jenkins only fetches the cluster access token from Vault. Requires the Vault Operator to be installed on the cluster.</li>
+</ul>
+
+<p>Both options share: the same Vault KV path layout, the same <code>VaultFileSource</code> application config adapter, and the same credential rotation/cleanup process.</p>
+
+<h3>Success Metrics / Acceptance Criteria</h3>
+<ul>
+<li>All secrets currently in <code>UnifAI-secrets/.env*</code> files are stored in Vault under <code>apps/automation-and-tools/unifai/{env}/{service}</code></li>
+<li>Pods receive secrets via the chosen option (A: K8s Secrets from Jenkins, or B: Vault Agent init-container)</li>
+<li>Application code reads secrets from injected files via the new <code>VaultFileSource</code> in <code>SharedConfig</code></li>
+<li>Presync scripts no longer create ConfigMaps containing plaintext credentials (non-secret ConfigMaps are preserved)</li>
+<li>Jenkins pipeline uses the Vault plugin instead of <code>UnifAI-secrets</code> Git checkout</li>
+<li>Old secrets in GitHub, ConfigMaps, and plaintext <code>.env</code> files are removed and rotated</li>
+<li>Existing functionality is unchanged — all services start and operate normally</li>
+<li>Vault audit logs capture every secret access</li>
+</ul>
+
+<hr>
+
+<h2>2. Affected Components</h2>
+
+<h3>2.1 Shared Components (Both Options)</h3>
+<table>
+<tr><th>Layer</th><th>Component</th><th>Action</th><th>File Path</th></tr>
+<tr><td>Adapter (Config)</td><td><code>VaultFileSource</code></td><td><strong>New</strong></td><td><code>global_utils/src/global_utils/config/sources.py</code></td></tr>
+<tr><td>Adapter (Config)</td><td><code>SharedConfig</code></td><td><strong>Modified</strong></td><td><code>global_utils/src/global_utils/config/config.py</code></td></tr>
+<tr><td>Adapter (CI)</td><td>Jenkins deploy pipeline</td><td><strong>Modified</strong></td><td><code>ci/pipeline-deploy.groovy</code></td></tr>
+<tr><td>Adapter (Scripts)</td><td>Identity presync</td><td><strong>Modified</strong></td><td><code>helm/scripts/identity-presync.sh</code></td></tr>
+<tr><td>Adapter (Scripts)</td><td>Multiagent presync</td><td><strong>Modified</strong></td><td><code>helm/scripts/multiagent-presync.sh</code></td></tr>
+<tr><td>Adapter (Scripts)</td><td>RAG presync</td><td><strong>Modified</strong></td><td><code>helm/scripts/rag-presync.sh</code></td></tr>
+<tr><td>Adapter (Scripts)</td><td>Redis presync</td><td><strong>Modified</strong></td><td><code>helm/scripts/redis-presync.sh</code></td></tr>
+<tr><td>Adapter (Scripts)</td><td>Backend presync</td><td><strong>Unchanged</strong></td><td><code>helm/scripts/backend-presync.sh</code></td></tr>
+<tr><td>External</td><td>Vault KV paths &amp; policies</td><td><strong>New</strong></td><td>HashiCorp Vault (external)</td></tr>
+</table>
+
+<h3>2.2 Option A Only — Jenkins-Managed Injection</h3>
+<table>
+<tr><th>Layer</th><th>Component</th><th>Action</th><th>File Path</th></tr>
+<tr><td>Adapter (Scripts)</td><td>Shared Vault presync</td><td><strong>New</strong></td><td><code>helm/scripts/shared-vault-presync.sh</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Identity deployment</td><td><strong>Modified</strong> — add Secret volume mount</td><td><code>helm/shared-resources/identity/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Multiagent BE deployment</td><td><strong>Modified</strong></td><td><code>helm/multiagent/be/templates/be-deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Multiagent Temporal Worker</td><td><strong>Modified</strong></td><td><code>helm/multiagent/temporal-worker/templates/be-deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Backend deployment</td><td><strong>Modified</strong></td><td><code>helm/backend/unifai-backend/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>RAG server deployment</td><td><strong>Modified</strong></td><td><code>helm/rag/unifai-rag-server/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>RAG celery deployment</td><td><strong>Modified</strong></td><td><code>helm/rag/unifai-rag-celery/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Redis StatefulSet</td><td><strong>Modified</strong></td><td><code>helm/shared-resources/redis/templates/statefulset.yaml</code></td></tr>
+</table>
+
+<h3>2.3 Option B Only — OpenShift Vault Operator</h3>
+<table>
+<tr><th>Layer</th><th>Component</th><th>Action</th><th>File Path</th></tr>
+<tr><td>Adapter (Helm)</td><td>Vault annotations helper</td><td><strong>New</strong></td><td><code>helm/shared-resources/vault-annotations/_helpers.tpl</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Identity deployment</td><td><strong>Modified</strong> — add Vault annotations</td><td><code>helm/shared-resources/identity/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Multiagent BE deployment</td><td><strong>Modified</strong></td><td><code>helm/multiagent/be/templates/be-deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Multiagent Temporal Worker</td><td><strong>Modified</strong></td><td><code>helm/multiagent/temporal-worker/templates/be-deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Backend deployment</td><td><strong>Modified</strong></td><td><code>helm/backend/unifai-backend/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>RAG server deployment</td><td><strong>Modified</strong></td><td><code>helm/rag/unifai-rag-server/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>RAG celery deployment</td><td><strong>Modified</strong></td><td><code>helm/rag/unifai-rag-celery/templates/deployment.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Redis StatefulSet</td><td><strong>Modified</strong></td><td><code>helm/shared-resources/redis/templates/statefulset.yaml</code></td></tr>
+<tr><td>Adapter (Helm)</td><td>Per-service values files</td><td><strong>Modified</strong></td><td><code>helm/values/{identity,multiagent-resource,backend-resource,rag-resource,shared-resource}-values.yaml</code></td></tr>
+</table>
+
+<hr>
+
+<h2>3. Technical Design</h2>
+
+<h3>3.1 <code>VaultFileSource</code> — New Config Source (Both Options)</h3>
+
+<p><strong>Purpose:</strong> Read secrets from <code>.env</code>-formatted files at a configurable directory. In Option A these files are mounted from K8s Secrets. In Option B they are injected by the Vault Agent init-container. Either way, the files land at <code>/vault/secrets/</code>.</p>
+
+<p><strong>Interfaces/Ports:</strong></p>
+<pre><code>class VaultFileSource(ConfigSource):
+    """
+    Reads secret files from a configurable directory (Vault Agent tmpfs or
+    K8s Secret volume mount). Falls back gracefully to empty dict when the
+    path does not exist (local dev, tests, non-Vault environments).
+    """
+    def __init__(self, base_path: str = "/vault/secrets", file_pattern: str = "*.env"):
+        ...
+
+    def load(self) -> Dict[str, Any]:
+        ...</code></pre>
+
+<p><strong>Dependencies:</strong> <code>pathlib.Path</code>, <code>dotenv.dotenv_values</code> (already a dependency via <code>DotEnvSource</code>).</p>
+
+<p><strong>Key logic:</strong></p>
+<ul>
+<li>Check if <code>base_path</code> directory exists; if not, return <code>{}</code> silently (graceful no-op for local dev)</li>
+<li>Glob for all files matching <code>file_pattern</code> under <code>base_path</code></li>
+<li>Sort files alphabetically so <code>shared.env</code> loads before service-specific files — service keys override shared (last-writer-wins)</li>
+<li>Parse each file using <code>dotenv_values</code> (same KEY=VALUE format as existing <code>.env</code> files)</li>
+<li>Merge all parsed dicts into one; return the merged result</li>
+<li>Log a debug message listing which files were loaded</li>
+</ul>
+
+<h3>3.2 <code>SharedConfig</code> Modification (Both Options)</h3>
+
+<p><strong>Purpose:</strong> Insert <code>VaultFileSource</code> into the pydantic-settings source chain, after environment variables.</p>
+
+<p><strong>Modified source chain in <code>global_utils/src/global_utils/config/config.py</code>:</strong></p>
+<pre><code>(init, env, VaultFileSource().load, DotEnvSource().load, YamlSource().load, JsonSource().load, fs)</code></pre>
+
+<p>Vault-injected files take precedence over <code>.env</code>/yaml/json but are still overridden by explicit environment variables (set via <code>envFrom</code> from non-secret ConfigMaps). This means existing <code>envFrom</code> ConfigMap values for non-secret config continue to work, while secrets come from Vault files.</p>
+
+<h3>3.3 Vault Secret Structure (Both Options)</h3>
+
+<p><strong>Path layout:</strong></p>
+<pre><code>apps/automation-and-tools/unifai/
+├── staging/
+│   ├── shared          # redis_password, rmq_username, rmq_password, HF_TOKEN,
+│   │                   # admin_allowed_users, secret_key, umami_*
+│   ├── identity        # keycloak_base_url, client_id, client_secret, keycloak_realm
+│   ├── multiagent      # CREDENTIAL_ENCRYPTION_KEY, MCP_AUTH_STATE_SECRET
+│   ├── rag             # default_slack_bot_token, default_slack_user_token
+│   ├── redis           # redis_username, redis_password, redis_port, redis_insight_port
+│   └── cluster         # preprod_access_token (Jenkins-only, not pod-injected)
+└── production/
+    ├── shared
+    ├── identity
+    ├── multiagent
+    ├── rag
+    ├── redis
+    └── cluster</code></pre>
+
+<p><strong>Authentication:</strong></p>
+<ul>
+<li><strong>Option A (Jenkins):</strong> AppRole auth (<code>automation-and-tools</code>), 20-min non-renewable tokens. Already configured as global Jenkins Vault plugin credentials.</li>
+<li><strong>Option B (Pods):</strong> Kubernetes Service Account (KSA) auth method bound to namespace <code>tag-ai--pipeline</code>. Each service's existing <code>ServiceAccount</code> gets a Vault role scoped to <code>shared</code> + its own service path.</li>
+</ul>
+
+<hr>
+
+<h2>OPTION A: Jenkins-Managed Injection <span class="tag-primary">RECOMMENDED PRIMARY</span></h2>
+
+<h3>A.1 Concept</h3>
+
+<p>Jenkins becomes the single point of Vault contact for secrets. At deploy time, the pipeline fetches ALL service secrets from Vault using the <code>withVault</code> plugin, writes them to temporary <code>.env</code> files on the Jenkins agent, and passes those files to the helmfile <code>podman</code> container via <code>--env-file</code> (the same mechanism used today for <code>UnifAI-secrets</code> <code>.env</code> files). Presync scripts then create proper Kubernetes <code>Secret</code> resources (replacing current plaintext ConfigMaps for secret data). Pods mount these K8s Secrets as volumes at <code>/vault/secrets/</code> so <code>VaultFileSource</code> can read them.</p>
+
+<table>
+<tr><th>Advantages</th><th>Disadvantages</th></tr>
+<tr><td>No cluster-side operator dependency</td><td>Secrets pass through Jenkins as environment variables</td></tr>
+<tr><td>Builds on proven <code>withVault</code> integration (<code>ci/test-vault.groovy</code>)</td><td>K8s Secrets in etcd (need encryption at rest)</td></tr>
+<tr><td>Simpler debugging — <code>oc get secret</code> works</td><td>No pod-level Vault audit trail</td></tr>
+<tr><td>Same <code>--env-file</code> pattern as current pipeline</td><td>Secret rotation requires re-deploy</td></tr>
+</table>
+
+<h3>A.2 Secret Passing Mechanism — Jenkins to Helmfile Container</h3>
+
+<p>The current pipeline passes secrets from <code>UnifAI-secrets</code> to the helmfile container via <code>--env-file</code> on <code>podman run</code> (line 305 of <code>ci/pipeline-deploy.groovy</code>). Option A replaces the source but keeps the same delivery mechanism:</p>
+
+<pre><code>def vaultEnv = (params.deploy_location == 'PRODUCTION') ? 'production' : 'staging'
+def vaultBasePath = "apps/automation-and-tools/unifai/${vaultEnv}"
+
+withVault(
+    configuration: [vaultUrl: '', vaultCredentialId: ''],
+    vaultSecrets: [
+        [path: "${vaultBasePath}/cluster",
+         secretValues: [[envVar: 'VAULT_access_token', vaultKey: 'access_token']]],
+        [path: "${vaultBasePath}/shared",
+         secretValues: [
+             [envVar: 'VAULT_redis_password', vaultKey: 'redis_password'],
+             [envVar: 'VAULT_rmq_username', vaultKey: 'rmq_username'],
+             [envVar: 'VAULT_rmq_password', vaultKey: 'rmq_password'],
+             [envVar: 'VAULT_HF_TOKEN', vaultKey: 'HF_TOKEN'],
+             [envVar: 'VAULT_secret_key', vaultKey: 'secret_key'],
+             [envVar: 'VAULT_umami_app_secret', vaultKey: 'umami_app_secret'],
+             [envVar: 'VAULT_umami_password', vaultKey: 'umami_password'],
+         ]],
+        [path: "${vaultBasePath}/identity",
+         secretValues: [
+             [envVar: 'VAULT_client_secret', vaultKey: 'client_secret'],
+         ]],
+        [path: "${vaultBasePath}/multiagent",
+         secretValues: [
+             [envVar: 'VAULT_CREDENTIAL_ENCRYPTION_KEY', vaultKey: 'CREDENTIAL_ENCRYPTION_KEY'],
+             [envVar: 'VAULT_MCP_AUTH_STATE_SECRET', vaultKey: 'MCP_AUTH_STATE_SECRET'],
+         ]],
+        [path: "${vaultBasePath}/rag",
+         secretValues: [
+             [envVar: 'VAULT_default_slack_bot_token', vaultKey: 'default_slack_bot_token'],
+             [envVar: 'VAULT_default_slack_user_token', vaultKey: 'default_slack_user_token'],
+         ]],
+        [path: "${vaultBasePath}/redis",
+         secretValues: [
+             [envVar: 'VAULT_redis_password_redis', vaultKey: 'redis_password'],
+         ]],
+    ]
+) {
+    // Step 1: Login to cluster using Vault-sourced token
+    sh("oc login --token=${VAULT_access_token} --server=${ClusterAddress}")
+    sh("oc project ${NameSpace}")
+
+    // Step 2: Write secrets to temp .env files ON THE JENKINS AGENT
+    writeFile file: './vault-shared.env', text: [
+        "redis_password=${VAULT_redis_password}",
+        "rmq_username=${VAULT_rmq_username}",
+        "rmq_password=${VAULT_rmq_password}",
+        "HF_TOKEN=${VAULT_HF_TOKEN}",
+        "secret_key=${VAULT_secret_key}",
+        "umami_app_secret=${VAULT_umami_app_secret}",
+        "umami_password=${VAULT_umami_password}",
+    ].join('\n')
+
+    writeFile file: './vault-identity.env', text: [
+        "client_secret=${VAULT_client_secret}",
+    ].join('\n')
+
+    // ... similar for multiagent, rag, redis ...
+
+    // Step 3: Pass .env files to helmfile container (SAME MECHANISM AS TODAY)
+    sh("""podman run --replace -dt \
+        --env-file=./vault-shared.env \
+        --env-file=./vault-identity.env \
+        --env-file=./vault-multiagent.env \
+        --env-file=./vault-rag.env \
+        --env-file=./vault-redis.env \
+        --workdir /helm/charts \
+        -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z \
+        --name helmfile ghcr.io/helmfile/helmfile:latest bash""")
+
+    // Step 4: Deploy modules, Step 5: Cleanup
+    sh("rm -f ./vault-*.env")
+}</code></pre>
+
+<p><strong>Removed from pipeline:</strong> <code>UnifAI-secrets</code> checkout (lines 254–266), <code>updateDeployerEnv()</code> (lines 122–140), <code>updateEnvFile()</code> (lines 143–153), all <code>--env-file=./UnifAI-secrets/...</code> references.</p>
+
+<h3>A.3 Presync Script Changes (Option A)</h3>
+
+<p><strong>Strategy:</strong> Non-secret ConfigMaps continue to be created as today. Secret data is moved to new K8s <code>Secret</code> resources containing <code>.env</code>-formatted files.</p>
+
+<p><strong>Pattern (identity-presync.sh):</strong></p>
+<pre><code>#!/bin/bash
+source "$(dirname "$0")/postsync-lib.sh"
+
+# Non-secret config stays in ConfigMap (UNCHANGED)
+create_or_update_configmap identity-config \
+  --from-literal=admin_allowed_users="$admin_allowed_users" \
+  --from-literal=keycloak_base_url="$keycloak_base_url" \
+  --from-literal=client_id="$client_id" \
+  --from-literal=keycloak_realm="$keycloak_realm"
+  # REMOVED: client_secret, secret_key
+
+# Secret data → K8s Secret with .env-formatted file
+kubectl create secret generic identity-vault-files \
+    --from-literal=identity.env="$(printf '%s\n' \
+        "client_secret=${client_secret}" \
+        "secret_key=${secret_key}" \
+    )" \
+    --dry-run=client -o yaml | kubectl apply -f -</code></pre>
+
+<table>
+<tr><th>Script</th><th>Secrets Removed from ConfigMap</th><th>K8s Secret Created</th><th>Non-Secret ConfigMap Preserved</th></tr>
+<tr><td><code>identity-presync.sh</code></td><td><code>client_secret</code>, <code>secret_key</code></td><td><code>identity-vault-files</code></td><td><code>identity-config</code> with <code>admin_allowed_users</code>, <code>keycloak_base_url</code>, <code>client_id</code>, <code>keycloak_realm</code></td></tr>
+<tr><td><code>multiagent-presync.sh</code></td><td><code>CREDENTIAL_ENCRYPTION_KEY</code>, <code>MCP_AUTH_STATE_SECRET</code></td><td><code>multiagent-vault-files</code></td><td><code>multiagent-be-security</code> with <code>admin_allowed_users</code></td></tr>
+<tr><td><code>rag-presync.sh</code></td><td><code>default_slack_bot_token</code>, <code>default_slack_user_token</code></td><td><code>rag-vault-files</code></td><td>Old <code>unifai-rag-secrets</code> deleted entirely</td></tr>
+<tr><td><code>redis-presync.sh</code></td><td><code>REDIS_PASSWORD</code>, <code>RI_REDIS_PASSWORD</code></td><td><code>redis-vault-files</code></td><td><code>redis-config</code> with <code>REDIS_PORT</code>, <code>REDIS_USERNAME</code>, <code>RI_*</code></td></tr>
+<tr><td><code>backend-presync.sh</code></td><td>None</td><td>None</td><td><code>backend-be-security</code> — <strong>UNCHANGED</strong></td></tr>
+<tr><td><code>shared-vault-presync.sh</code> <strong>(NEW)</strong></td><td>N/A</td><td><code>shared-vault-files</code></td><td>N/A</td></tr>
+</table>
+
+<h3>A.4 Helm Deployment Changes (Option A)</h3>
+
+<p>Each deployment gets a projected volume mount combining shared + service K8s Secrets at <code>/vault/secrets/</code>:</p>
+<pre><code>spec:
+  containers:
+    - name: {{ .Chart.Name }}
+      volumeMounts:
+        {{- if .Values.vaultSecretName }}
+        - name: vault-secrets
+          mountPath: /vault/secrets
+          readOnly: true
+        {{- end }}
+      envFrom:
+        # Non-secret ConfigMaps STAY (unchanged)
+        - configMapRef:
+            name: {{ .Values.globalConfigMapName }}
+        - configMapRef:
+            name: {{ .Values.IdentityConfigMapName }}
+  volumes:
+    {{- if .Values.vaultSecretName }}
+    - name: vault-secrets
+      projected:
+        sources:
+          - secret:
+              name: shared-vault-files
+          - secret:
+              name: {{ .Values.vaultSecretName }}
+    {{- end }}</code></pre>
+
+<table>
+<tr><th>Service</th><th>Remove from envFrom</th><th>Keep in envFrom</th><th><code>vaultSecretName</code></th></tr>
+<tr><td>Identity</td><td>Nothing — ConfigMap stays with non-secret keys only</td><td><code>globalConfigMapName</code>, <code>IdentityConfigMapName</code></td><td><code>identity-vault-files</code></td></tr>
+<tr><td>Multiagent BE</td><td>Nothing — <code>multiagent-be-security</code> stays with <code>admin_allowed_users</code></td><td><code>multiagent-be-configmap</code>, <code>multiagent-be-security</code>, <code>globalConfigMapName</code></td><td><code>multiagent-vault-files</code></td></tr>
+<tr><td>Multiagent Worker</td><td>Same as Multiagent BE</td><td>Same</td><td><code>multiagent-vault-files</code></td></tr>
+<tr><td>Backend</td><td>No changes</td><td><code>globalConfigMapName</code>, <code>backend-be-security</code></td><td><code>shared-vault-files</code></td></tr>
+<tr><td>RAG Server</td><td>Remove <code>secretRef: unifai-rag-secrets</code></td><td><code>globalConfigMapName</code></td><td><code>rag-vault-files</code></td></tr>
+<tr><td>RAG Celery</td><td>Same as RAG Server</td><td>Same</td><td><code>rag-vault-files</code></td></tr>
+<tr><td>Redis</td><td>Nothing — <code>redis-config</code> stays with non-password keys</td><td><code>redisConfigMapName</code> (conditional)</td><td><code>redis-vault-files</code></td></tr>
+</table>
+
+<hr>
+
+<h2>OPTION B: OpenShift Vault Operator (Agent Injector) <span class="tag-secondary">CONTINGENT ON OPERATOR AVAILABILITY</span></h2>
+
+<h3>B.1 Concept</h3>
+
+<p>The Vault Agent Injector operator (mutating webhook) intercepts pod creation events. When it detects <code>vault.hashicorp.com/agent-inject</code> annotations, it injects a Vault Agent init-container that authenticates to Vault using the pod's ServiceAccount JWT, fetches secrets, and writes them as <code>.env</code>-formatted files to in-memory <code>tmpfs</code> at <code>/vault/secrets/</code>.</p>
+
+<table>
+<tr><th>Advantages</th><th>Disadvantages</th></tr>
+<tr><td>Secrets never pass through Jenkins</td><td>Requires Vault Operator on cluster</td></tr>
+<tr><td>In-memory tmpfs only (never in etcd)</td><td>2-5 sec pod startup + ~30MB RAM</td></tr>
+<tr><td>Vault audit logs per pod access</td><td>Harder to debug (no <code>oc get secret</code>)</td></tr>
+<tr><td>Future path to dynamic secret rotation</td><td>KSA auth config needed in Vault</td></tr>
+</table>
+
+<h3>B.2 Vault Authentication (KSA)</h3>
+<pre><code># Example: unifai-identity policy
+path "apps/data/automation-and-tools/unifai/{{identity.meta.environment}}/shared" {
+  capabilities = ["read"]
+}
+path "apps/data/automation-and-tools/unifai/{{identity.meta.environment}}/identity" {
+  capabilities = ["read"]
+}</code></pre>
+
+<h3>B.3 Helm Vault Annotations</h3>
+
+<p><strong>Values structure per service:</strong></p>
+<pre><code>vault:
+  enabled: true
+  role: "unifai-identity"
+  environment: "staging"
+  paths:
+    - name: "shared.env"
+      path: "apps/automation-and-tools/unifai/staging/shared"
+    - name: "identity.env"
+      path: "apps/automation-and-tools/unifai/staging/identity"</code></pre>
+
+<p><strong>Rendered annotations:</strong></p>
+<pre><code>vault.hashicorp.com/agent-inject: "true"
+vault.hashicorp.com/role: "unifai-identity"
+vault.hashicorp.com/agent-inject-secret-shared.env: "apps/automation-and-tools/unifai/staging/shared"
+vault.hashicorp.com/agent-inject-template-shared.env: |
+  {{- with secret "apps/automation-and-tools/unifai/staging/shared" -}}
+  {{- range $k, $v := .Data.data }}
+  {{ $k }}={{ $v }}
+  {{- end }}
+  {{- end }}
+vault.hashicorp.com/agent-pre-populate-only: "true"
+vault.hashicorp.com/preserve-secret-case: "true"</code></pre>
+
+<h3>B.4 Presync &amp; Deployment Changes (Option B)</h3>
+
+<p>Presync scripts remove secret literals only. Non-secret ConfigMaps preserved. No new K8s Secrets — Vault Agent handles injection.</p>
+
+<table>
+<tr><th>Script</th><th>Secrets Removed</th><th>Non-Secret ConfigMap Preserved</th></tr>
+<tr><td><code>identity-presync.sh</code></td><td><code>client_secret</code>, <code>secret_key</code></td><td><code>identity-config</code> with non-secret keys</td></tr>
+<tr><td><code>multiagent-presync.sh</code></td><td><code>CREDENTIAL_ENCRYPTION_KEY</code>, <code>MCP_AUTH_STATE_SECRET</code></td><td><code>multiagent-be-security</code> with <code>admin_allowed_users</code></td></tr>
+<tr><td><code>rag-presync.sh</code></td><td>Both Slack tokens</td><td><code>unifai-rag-secrets</code> deleted entirely</td></tr>
+<tr><td><code>redis-presync.sh</code></td><td><code>REDIS_PASSWORD</code>, <code>RI_REDIS_PASSWORD</code></td><td><code>redis-config</code> with non-password keys</td></tr>
+<tr><td><code>backend-presync.sh</code></td><td>None</td><td><strong>UNCHANGED</strong></td></tr>
+</table>
+
+<h3>B.5 Jenkins Pipeline Changes (Option B)</h3>
+
+<p>Minimal — only cluster access token from Vault:</p>
+<pre><code>def vaultEnv = (params.deploy_location == 'PRODUCTION') ? 'production' : 'staging'
+
+withVault(
+    configuration: [vaultUrl: '', vaultCredentialId: ''],
+    vaultSecrets: [
+        [path: "apps/automation-and-tools/unifai/${vaultEnv}/cluster",
+         secretValues: [[envVar: 'CLUSTER_ACCESS_TOKEN', vaultKey: 'access_token']]]
+    ]
+) {
+    sh("oc login --token=${CLUSTER_ACCESS_TOKEN} --server=${ClusterAddress}")
+    sh("oc project ${NameSpace}")
+    // helmfile WITHOUT --env-file
+}</code></pre>
+
+<hr>
+
+<h2>4. Data Flow</h2>
+
+<h3>4.1 Current Flow</h3>
+<pre><code>Jenkins Pipeline
+  → Checkout UnifAI-secrets repo (SSH key: jenkins_agent_deploy_key)
+  → Select env-specific .env files (staging/.env_identity, etc.)
+  → updateDeployerEnv() returns [identity_env_file, redis_env_file, multiagent_env_file]
+  → podman run --env-file=... helmfile:latest
+  → helmfile apply triggers presync hooks
+  → Presync scripts create ConfigMaps/Secrets from env vars
+  → Deployments reference ConfigMaps/Secrets via envFrom</code></pre>
+
+<h3>4.2 Option A Flow</h3>
+<pre><code>Jenkins Pipeline
+  → withVault: authenticates via AppRole, fetches ALL secrets
+  → Writes secrets to temp .env files on Jenkins agent
+  → oc login --token=&lt;cluster_token_from_vault&gt;
+  → podman run --env-file=./vault-shared.env --env-file=./vault-identity.env ... helmfile:latest
+  → Presync scripts create: non-secret ConfigMaps + K8s Secrets (with .env files)
+  → Deployments: envFrom (non-secret ConfigMaps) + volumeMount (K8s Secrets at /vault/secrets/)
+  → VaultFileSource reads /vault/secrets/*.env
+  → Application gets merged config</code></pre>
+
+<h3>4.3 Option B Flow</h3>
+<pre><code>Jenkins → withVault: cluster token only → oc login → helmfile apply → presync: non-secret ConfigMaps only
+
+Pod Startup:
+  1. Pod created → 2. Vault Operator webhook detects annotations
+  3. Injects Vault Agent init-container → 4. Agent authenticates via KSA JWT
+  5. Reads Vault KV paths → 6. Writes .env files to /vault/secrets/ (tmpfs)
+  7. Agent exits → 8. App starts → 9. VaultFileSource reads files
+  → Application gets merged config</code></pre>
+
+<h3>4.4 Local Development (Unchanged)</h3>
+<pre><code>No /vault/secrets/ → VaultFileSource returns {} → DotEnvSource reads .env → zero friction</code></pre>
+
+<hr>
+
+<h2>5. Edge Cases &amp; Risks</h2>
+
+<h3>5.1 Shared Risks</h3>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td><strong>Git history exposure</strong></td><td>All credentials rotated in Phase G. Git history retains old values permanently.</td></tr>
+<tr><td><strong>UI Dockerfile TLS certificates</strong></td><td>Out of scope. <code>UnifAI-secrets</code> repo kept until cert migration (separate story).</td></tr>
+<tr><td><strong>Key naming conflicts</strong></td><td>Alphabetical load order. Service keys override shared. Mirrors current <code>envFrom</code> ordering.</td></tr>
+<tr><td><strong>Backward compatibility</strong></td><td>Phased rollout. No pod ever lacks secrets.</td></tr>
+<tr><td><strong>Non-secret config stays in ConfigMaps</strong></td><td>Existing <code>envFrom</code> references preserved. Only secret literals removed from presync.</td></tr>
+</table>
+
+<h3>5.2 Option A Risks</h3>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>Jenkins as secret bottleneck</td><td>Already trusted (holds cluster tokens). Same blast radius as current <code>UnifAI-secrets</code> checkout.</td></tr>
+<tr><td>K8s Secrets in etcd</td><td>Verify etcd encryption at rest. Better than current ConfigMaps.</td></tr>
+<tr><td>Temp files on Jenkins agent</td><td>Written inside <code>withVault</code>, deleted after deploy. Same risk as current <code>UnifAI-secrets</code> checkout.</td></tr>
+<tr><td><code>withVault</code> single failure domain</td><td>Acceptable — partial deploys would be worse.</td></tr>
+</table>
+
+<h3>5.3 Option B Risks</h3>
+<table>
+<tr><th>Risk</th><th>Handling</th></tr>
+<tr><td>Vault unavailable at pod startup</td><td><code>Init:CrashLoopBackOff</code> — fail loud. Existing monitoring catches it.</td></tr>
+<tr><td>Operator not installed</td><td>Fall back to Option A.</td></tr>
+<tr><td>Pod startup latency</td><td>2-5 seconds + 30MB. Acceptable.</td></tr>
+<tr><td>Secret rotation</td><td>Init-only mode = restart to rotate. Sidecar mode for dynamic (future).</td></tr>
+</table>
+
+<h3>5.4 Comparison Matrix</h3>
+<table>
+<tr><th>Criterion</th><th>Option A (Jenkins)</th><th>Option B (Vault Operator)</th></tr>
+<tr><td><strong>Cluster dependency</strong></td><td>None</td><td>Vault Operator webhook</td></tr>
+<tr><td><strong>Secret storage on cluster</strong></td><td>K8s Secrets in etcd</td><td>In-memory tmpfs</td></tr>
+<tr><td><strong>Vault audit coverage</strong></td><td>Jenkins access only</td><td>Every pod logged</td></tr>
+<tr><td><strong>Jenkins changes</strong></td><td>Major</td><td>Minimal</td></tr>
+<tr><td><strong>Helm changes</strong></td><td>Volume mounts</td><td>Vault annotations</td></tr>
+<tr><td><strong>Presync changes</strong></td><td>Major (create K8s Secrets)</td><td>Minor (remove literals)</td></tr>
+<tr><td><strong>Pod startup overhead</strong></td><td>None</td><td>2-5 sec + 30MB</td></tr>
+<tr><td><strong>Debugging ease</strong></td><td><code>oc get secret</code> works</td><td>Must exec into pod</td></tr>
+<tr><td><strong>Security posture</strong></td><td>Medium</td><td>High</td></tr>
+<tr><td><strong>Implementation complexity</strong></td><td>Medium</td><td>Medium-High</td></tr>
+</table>
+
+<hr>
+
+<h2>6. Phased Rollout Plan</h2>
+<table>
+<tr><th>Phase</th><th>Option A</th><th>Option B</th><th>Rollback</th></tr>
+<tr><td><strong>A</strong></td><td>Add <code>VaultFileSource</code> to <code>SharedConfig</code> (no-op). Deploy.</td><td>Same</td><td>Remove source from chain.</td></tr>
+<tr><td><strong>B</strong></td><td>Jenkins <code>withVault</code> for cluster token. Validate via <code>test-vault.groovy</code>.</td><td>Same</td><td>Revert to <code>withCredentials</code>.</td></tr>
+<tr><td><strong>C</strong></td><td>Identity secrets from Vault. Presync → K8s Secret. Volume mount. Validate SSO.</td><td>Vault annotations on Identity (staging). Validate SSO.</td><td>Delete Secret / remove annotations.</td></tr>
+<tr><td><strong>D</strong></td><td>All remaining services (staging).</td><td>Same</td><td>Per-service rollback.</td></tr>
+<tr><td><strong>E</strong></td><td>Production rollout.</td><td>Same</td><td>Same as staging.</td></tr>
+<tr><td><strong>F</strong></td><td>Remove old secret literals. Delete secret-bearing ConfigMaps.</td><td>Same</td><td>Re-run presync from backup.</td></tr>
+<tr><td><strong>G</strong></td><td>Rotate all credentials. Archive <code>UnifAI-secrets</code>.</td><td>Same</td><td>N/A — point of no return.</td></tr>
+</table>
+
+<hr>
+
+<h2>7. Open Questions</h2>
+<ol>
+<li><strong>OpenShift Vault Operator availability</strong> — Are clusters <code>stc-ai-e1-pp</code> and <code>stc-ai-e1-prod</code> running the <code>vault.hashicorp.com</code> mutating webhook? <strong>Deciding factor between Option A and B.</strong></li>
+<li><strong>Vault policy creation</strong> — Who provisions KSA auth roles? Self-serve or request to Harel Hadad's team?</li>
+<li><strong>Jenkins Vault Plugin status</strong> — Is <code>withVault</code> fully functional today, or does GENIE-1526 need to complete first?</li>
+<li><strong>etcd encryption at rest</strong> — Configured on target clusters? Affects Option A security posture.</li>
+<li><strong>Secret value rotation timing</strong> — During migration or separate window?</li>
+<li><strong>Certificates follow-up</strong> — Track UI cert migration as separate story?</li>
+<li><strong>Non-secret config placement</strong> — Keep in ConfigMaps or also move to Vault?</li>
+</ol>
+
+</body>
+</html>

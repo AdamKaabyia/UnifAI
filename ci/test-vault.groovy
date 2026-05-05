@@ -14,7 +14,7 @@ pipeline {
     agent any
 
     stages {
-        stage('Read Secret from Vault') {
+        stage('Read Secret key from Vault natively') {
             steps {
                 withVault(
                     configuration: [
@@ -34,6 +34,20 @@ pipeline {
                     // Use MY_SECRET env var in your steps here
                 }
             }
+        },
+        stage('Read Secret key from Vault using vault cli') {
+            steps {
+              withCredentials([string(credentialsId: 'vault_creds', variable: 'VAULT_TOKEN')]) {
+                def json = sh(
+                   script: "vault kv get -format=json ${params.VAULT_SECRET_PATH}",
+                   returnStdout: true
+                ).trim()
+                def secrets = readJSON text: json
+                def data = secrets.data.data  // KV v2; use secrets.data for KV v1
+                data.each { key, value -> echo "Key: ${key}"}
+              }
+            }
         }
+        
     }
 }
