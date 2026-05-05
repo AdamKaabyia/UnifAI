@@ -198,6 +198,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
         const resolved = await fetchResolvedBlueprint(
           session.blueprintId,
           contextUserId,
+          identityType,
+          isTeam ? (selectedTeam?.name || teamName) : undefined,
         );
         if (sessionSelectRequestId.current !== requestId) return;
         if (resolved) {

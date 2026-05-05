@@ -197,7 +197,12 @@ export default function WorkflowsPanel({
 
     const fetchBlueprintData = async () => {
       try {
-        const blueprint = await fetchResolvedBlueprint(selectedFlow.id, contextUserId);
+        const blueprint = await fetchResolvedBlueprint(
+          selectedFlow.id,
+          contextUserId,
+          identityType,
+          isTeam ? selectedTeam!.name : undefined,
+        );
         if (cancelled) return;
         if (blueprint) {
           setSelectedBlueprintData({

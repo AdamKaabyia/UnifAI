@@ -114,12 +114,28 @@ export async function fetchResolvedBlueprints(userId?: string, identityType?: st
 }
 
 /**
- * Fetch a single resolved blueprint by ID (with all references resolved)
+ * Fetch a single resolved blueprint by ID (with all references resolved).
+ * For team workspace, pass the team id as `userId`, `identityType: "team"`, and
+ * optional `displayName` (team name) so auth matches `require_identity_authorization`.
  */
-export async function fetchResolvedBlueprint(blueprintId: string, userId?: string): Promise<WorkflowBlueprint | null> {
+export async function fetchResolvedBlueprint(
+  blueprintId: string,
+  userId?: string,
+  identityType?: string,
+  displayName?: string,
+): Promise<WorkflowBlueprint | null> {
   const userIdParam = userId || 'default';
+  const idType = identityType || 'user';
+  const params = new URLSearchParams({
+    userId: userIdParam,
+    blueprintId,
+    identityType: idType,
+  });
+  if (displayName) {
+    params.set('displayName', displayName);
+  }
   const response = await axios.get<WorkflowBlueprint>(
-    `/blueprints/available.blueprints.resolved.get?userId=${userIdParam}&blueprintId=${blueprintId}`
+    `/blueprints/available.blueprints.resolved.get?${params.toString()}`
   );
   // Single blueprint mode returns flat document object (not wrapped in items)
   return response.data || null;

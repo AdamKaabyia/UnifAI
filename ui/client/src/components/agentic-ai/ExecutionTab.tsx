@@ -365,7 +365,12 @@ export default function ExecutionTab({
     } else if (session.blueprintId) {
       setIsLoadingBlueprintName(true);
       try {
-        const resolvedBlueprint = await fetchResolvedBlueprint(session.blueprintId, contextUserId);
+        const resolvedBlueprint = await fetchResolvedBlueprint(
+          session.blueprintId,
+          contextUserId,
+          identityType,
+          isTeam ? selectedTeam!.name : undefined,
+        );
 
         // Bail out if the user switched to a different session while we were fetching
         if (sessionSelectRequestId.current !== requestId) return;

@@ -11,7 +11,12 @@ Bidirectional migration between ``user_id`` strings and ``identity`` subdocument
   templates           | user_id                                | identity  (if present)
 
 Forward (default):
-  Wraps each ``user_id`` string into an identity subdocument::
+  Wraps each ``user_id`` string into an identity subdocument. If the string matches
+  a document in ``teams`` (by ``_id`` or by ``name``), the identity is team-shaped::
+
+      {"type": "team", "id": "<teams._id>", "display_name": "<teams.name>", "email": ""}
+
+  Otherwise it is a user identity::
 
       {"type": "user", "id": "<user_id>", "display_name": "<user_id>", "email": ""}
 
@@ -19,13 +24,15 @@ Forward (default):
 
 Reverse (--reverse):
   Extracts ``identity.id`` back into a flat ``user_id`` string, removes the
-  ``identity`` subdocument, and drops ``identity.*`` indexes.
+  ``identity`` subdocument, and drops ``identity.*`` indexes. If that id string
+  matches a row in ``teams`` (by ``_id`` or by ``name``), ``user_id`` is set to
+  the canonical ``teams._id`` so the flat field stays aligned with team ids.
 
   **Important:** reverse migration **cannot preserve** whether the owner was a
   ``user`` or a ``team`` — only the id string survives. After you run forward
-  again, every owner is initially wrapped as ``type: "user"``. The post-forward
-  ``_fix_team_types`` pass restores ``type: "team"`` where heuristics match
-  (see below).
+  again, owners are classified with ``_identity_from_user_id`` (team vs user)
+  using ``teams``. The post-forward ``_fix_team_types`` pass still corrects
+  remaining ``type: "user"`` rows where heuristics match (see below).
 
 Forward also corrects team-owned documents that were saved with
 ``identity.type="user"`` instead of ``"team"``:
@@ -123,13 +130,55 @@ def _resolve_nested(doc: dict, dot_path: str):
     return val
 
 
-def _make_identity(user_id: str) -> dict:
-    return {
-        "type": "user",
-        "id": user_id,
-        "display_name": user_id,
-        "email": "",
-    }
+def _load_team_lookups(db) -> tuple[dict[str, tuple[str, str]], dict[str, tuple[str, str]]]:
+    """Build lookup maps: team id string / team name -> (canonical_id, display_name).
+
+    ``teams`` uses ``_id`` as the canonical team id (see MongoTeamRepository).
+    """
+    by_id: dict[str, tuple[str, str]] = {}
+    by_name: dict[str, tuple[str, str]] = {}
+    if "teams" not in db.list_collection_names():
+        return by_id, by_name
+    for doc in db["teams"].find({}, {"_id": 1, "name": 1}):
+        tid = doc.get("_id")
+        name = doc.get("name")
+        if tid is None or not name:
+            continue
+        sid = str(tid)
+        name_s = str(name)
+        by_id[sid] = (sid, name_s)
+        by_name[name_s] = (sid, name_s)
+    return by_id, by_name
+
+
+def _identity_from_user_id(
+    user_id: str,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> dict:
+    """Map a legacy owner string to an identity; resolve teams via ``teams`` collection."""
+    uid = str(user_id)
+    if uid in team_by_id:
+        tid, tname = team_by_id[uid]
+        return {"type": "team", "id": tid, "display_name": tname, "email": ""}
+    if uid in team_by_name:
+        tid, tname = team_by_name[uid]
+        return {"type": "team", "id": tid, "display_name": tname, "email": ""}
+    return {"type": "user", "id": uid, "display_name": uid, "email": ""}
+
+
+def _canonical_user_id_string_for_reverse(
+    identity_id: str,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> str:
+    """If ``identity.id`` refers to a team (id or legacy name), return ``teams._id``."""
+    s = str(identity_id)
+    if s in team_by_id:
+        return team_by_id[s][0]
+    if s in team_by_name:
+        return team_by_name[s][0]
+    return s
 
 
 def _accumulate(total: dict, stats: dict) -> None:
@@ -180,7 +229,14 @@ def _drop_indexes(db, index_map: dict, match_keyword: str, dry_run: bool) -> int
 # Forward: user_id → identity
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _forward_collection(db, coll_name: str, field_pairs: list, dry_run: bool) -> dict:
+def _forward_collection(
+    db,
+    coll_name: str,
+    field_pairs: list,
+    dry_run: bool,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> dict:
     col = db[coll_name]
     stats = {"found": 0, "updated": 0, "skipped": 0, "errors": []}
 
@@ -202,7 +258,7 @@ def _forward_collection(db, coll_name: str, field_pairs: list, dry_run: bool) ->
                 stats["skipped"] += 1
                 continue
 
-            identity = _make_identity(uid)
+            identity = _identity_from_user_id(uid, team_by_id, team_by_name)
             if dry_run:
                 stats["updated"] += 1
                 print(f"    [DRY RUN] _id={doc['_id']}  "
@@ -220,7 +276,14 @@ def _forward_collection(db, coll_name: str, field_pairs: list, dry_run: bool) ->
     return stats
 
 
-def _forward_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> dict:
+def _forward_nested(
+    db,
+    coll_name: str,
+    nested_pairs: list,
+    dry_run: bool,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> dict:
     col = db[coll_name]
     stats = {"found": 0, "updated": 0, "skipped": 0, "errors": []}
 
@@ -242,7 +305,7 @@ def _forward_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> di
                 stats["skipped"] += 1
                 continue
 
-            identity = _make_identity(uid)
+            identity = _identity_from_user_id(uid, team_by_id, team_by_name)
             if dry_run:
                 stats["updated"] += 1
                 print(f"    [DRY RUN] _id={doc['_id']}  "
@@ -392,7 +455,14 @@ def _fix_team_types(db, dry_run: bool) -> dict:
 # Reverse: identity → user_id
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _reverse_collection(db, coll_name: str, field_pairs: list, dry_run: bool) -> dict:
+def _reverse_collection(
+    db,
+    coll_name: str,
+    field_pairs: list,
+    dry_run: bool,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> dict:
     col = db[coll_name]
     stats = {"found": 0, "updated": 0, "skipped": 0, "errors": []}
 
@@ -417,6 +487,7 @@ def _reverse_collection(db, coll_name: str, field_pairs: list, dry_run: bool) ->
             if not uid:
                 stats["skipped"] += 1
                 continue
+            uid = _canonical_user_id_string_for_reverse(uid, team_by_id, team_by_name)
 
             if dry_run:
                 stats["updated"] += 1
@@ -435,7 +506,14 @@ def _reverse_collection(db, coll_name: str, field_pairs: list, dry_run: bool) ->
     return stats
 
 
-def _reverse_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> dict:
+def _reverse_nested(
+    db,
+    coll_name: str,
+    nested_pairs: list,
+    dry_run: bool,
+    team_by_id: dict[str, tuple[str, str]],
+    team_by_name: dict[str, tuple[str, str]],
+) -> dict:
     col = db[coll_name]
     stats = {"found": 0, "updated": 0, "skipped": 0, "errors": []}
 
@@ -451,6 +529,7 @@ def _reverse_nested(db, coll_name: str, nested_pairs: list, dry_run: bool) -> di
             if not uid:
                 stats["skipped"] += 1
                 continue
+            uid = _canonical_user_id_string_for_reverse(uid, team_by_id, team_by_name)
 
             if dry_run:
                 stats["updated"] += 1
@@ -511,9 +590,9 @@ def main():
     print(f"Direction: {direction}")
     if reverse:
         print(
-            "\nNote: reverse drops identity.type — only the id string is kept as user_id.\n"
-            "After you migrate forward again, team rows look like type=user until the\n"
-            "FIX TEAM IDENTITY TYPES pass runs (automatic on forward --apply).",
+            "\nNote: reverse drops identity — only one owner string is kept as user_id.\n"
+            "If identity.id matched a team (by id or name), user_id is the canonical teams._id.\n"
+            "After forward migration, team owners get type=id+display_name from teams.",
         )
 
     if dry_run:
@@ -543,9 +622,14 @@ def main():
         if dropped == 0:
             print("  No stale indexes found — nothing to clean up.")
 
-    # Pick the right migration functions
-    migrate_col = _reverse_collection if reverse else _forward_collection
-    migrate_nest = _reverse_nested if reverse else _forward_nested
+    team_by_id, team_by_name = _load_team_lookups(db)
+    n_teams = len(team_by_id)
+    if n_teams:
+        print(
+            f"\nLoaded {n_teams} team(s) for "
+            f"{'reverse user_id canonicalization and ' if reverse else ''}"
+            f"forward owner → identity resolution (id + name lookup).",
+        )
 
     for coll_name in targets:
         cfg = COLLECTIONS_CONFIG.get(coll_name)
@@ -557,11 +641,37 @@ def main():
         print(f"COLLECTION: {coll_name}")
         print(f"{'=' * 60}")
 
-        _accumulate(total_stats, migrate_col(db, coll_name, cfg["fields"], dry_run))
+        if reverse:
+            _accumulate(
+                total_stats,
+                _reverse_collection(
+                    db, coll_name, cfg["fields"], dry_run, team_by_id, team_by_name
+                ),
+            )
+        else:
+            _accumulate(
+                total_stats,
+                _forward_collection(
+                    db, coll_name, cfg["fields"], dry_run, team_by_id, team_by_name
+                ),
+            )
 
         nested = cfg.get("nested", [])
         if nested:
-            _accumulate(total_stats, migrate_nest(db, coll_name, nested, dry_run))
+            if reverse:
+                _accumulate(
+                    total_stats,
+                    _reverse_nested(
+                        db, coll_name, nested, dry_run, team_by_id, team_by_name
+                    ),
+                )
+            else:
+                _accumulate(
+                    total_stats,
+                    _forward_nested(
+                        db, coll_name, nested, dry_run, team_by_id, team_by_name
+                    ),
+                )
 
     # On forward migration, fix team identity types
     if not reverse:

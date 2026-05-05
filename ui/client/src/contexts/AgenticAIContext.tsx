@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import axios from '@/http/axiosAgentConfig';
 import { useAuth } from './AuthContext';
+import { useView } from './ViewContext';
 import { catalogService } from '@/api/catalog';
 import { ElementValidationResult, CachedValidationResult, BlueprintValidationResult, BlueprintValidationRequest, CachedBlueprintValidationResult } from '@/types/validation';
 import { validateBlueprint as validateBlueprintApi } from '@/api/blueprints';
@@ -71,7 +72,12 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const USER_ID = user?.username || "default";
+  const { viewMode, selectedTeam } = useView();
+  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
+  /** Owner id for resource/blueprint APIs: team id in team view, else username. */
+  const USER_ID = isTeamWorkspace ? selectedTeam!.id : (user?.username || "default");
+  const WORKSPACE_IDENTITY_TYPE = isTeamWorkspace ? "team" : "user";
+  const WORKSPACE_DISPLAY_NAME = isTeamWorkspace ? (selectedTeam?.name || "") : "";
   
   // Use ref to access latest cache without causing re-renders in callbacks
   const validationCacheRef = useRef(validationCache);
@@ -202,7 +208,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
     try {
       const response = await axios.post<ElementValidationResult>(
         '/resources/resource.validate',
-        { resourceId: rid, userId: USER_ID }
+        { resourceId: rid, userId: USER_ID },
       );
       const result = response.data;
       updateDependencyParentMap(rid, result.dependency_results);
@@ -217,7 +223,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
       cacheValidationResult(rid, errorResult);
       return errorResult;
     }
-  }, [cacheValidationResult, createErrorResult, updateDependencyParentMap]);
+  }, [USER_ID, cacheValidationResult, createErrorResult, updateDependencyParentMap]);
 
   // ==================== Resource Mapping Functions ====================
 
@@ -237,6 +243,15 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
       await Promise.all(
         categories.map(async (category) => {
           try {
+            const listParams = new URLSearchParams({
+              userId: USER_ID,
+              category,
+              limit: "1000",
+              identityType: WORKSPACE_IDENTITY_TYPE,
+            });
+            if (WORKSPACE_DISPLAY_NAME) {
+              listParams.set("displayName", WORKSPACE_DISPLAY_NAME);
+            }
             const response = await axios.get<{
               resources: Array<{
                 rid: string;
@@ -244,7 +259,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
                 category: string;
                 type: string;
               }>;
-            }>(`/resources/resources.list?userId=${USER_ID}&category=${category}&limit=1000`);
+            }>(`/resources/resources.list?${listParams.toString()}`);
 
             response.data.resources.forEach((resource) => {
               nameMap.set(resource.rid, resource.name);
@@ -270,7 +285,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
     } finally {
       setIsLoading(false);
     }
-  }, [USER_ID]);
+  }, [USER_ID, WORKSPACE_IDENTITY_TYPE, WORKSPACE_DISPLAY_NAME]);
 
   // Get resource name from a ref (falls back to type if no name)
   const getResourceName = useCallback((ref: string | any): string => {
@@ -676,7 +691,7 @@ return String(ref);
     if (USER_ID) {
       fetchAllResources();
     }
-  }, [USER_ID, fetchAllResources]);
+  }, [USER_ID, WORKSPACE_IDENTITY_TYPE, fetchAllResources]);
 
   // ==================== Context Value ====================
 
