@@ -5,7 +5,7 @@ properties([
         string(name: "BRANCH", defaultValue: "main", description: "Git branch to build images from."),
         
         // 🔒 Vault Parameters
-        string(name: 'VAULT_SECRET_PATH', defaultValue: 'automation-and-tools/unifai/redis', description: 'Vault secret path'),
+        string(name: 'VAULT_SECRET_PATH', defaultValue: 'apps/automation-and-tools/unifai/redis', description: 'Vault secret path'),
         string(name: 'VAULT_SECRET_KEY', defaultValue: 'redis_port', description: 'Key within the secret')
     ])
 ])
