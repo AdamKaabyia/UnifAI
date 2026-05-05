@@ -1,8 +1,8 @@
 properties([
     parameters([
         // 🌐 Global Parameters
-        string(name: "PIPELINE_BRANCH", defaultValue: "main", description: "Git branch to take the pipeline from, for testing purpose"),
-        string(name: "BRANCH", defaultValue: "main", description: "Git branch to build images from."),
+        string(name: "PIPELINE_BRANCH", defaultValue: "GENIE-948_hashicorp_integration", description: "Git branch to take the pipeline from, for testing purpose"),
+        string(name: "BRANCH", defaultValue: "GENIE-948_hashicorp_integration", description: "Git branch to build images from."),
         
         // 🔒 Vault Parameters
         string(name: 'VAULT_SECRET_PATH', defaultValue: 'apps/automation-and-tools/unifai/redis', description: 'Vault secret path'),
