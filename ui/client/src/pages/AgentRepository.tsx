@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -62,13 +62,26 @@ export default function UserWorkspace() {
     setIsFormOpen(true);
   };
 
+  const existingNames = useMemo(
+    () =>
+      elementInstances
+        .map((el) => el.name)
+        .filter((name): name is string => !!name),
+    [elementInstances],
+  );
+
   const handleSaveElement = async (elementData: any) => {
-    if (selectedElementType) {
-      await saveElement(selectedElementType.category, selectedElementType.type, elementData, editingElement?.rid);
-      setIsFormOpen(false);
-      // Refresh instances
+    if (!selectedElementType) return null;
+    const result = await saveElement(
+      selectedElementType.category,
+      selectedElementType.type,
+      elementData,
+      editingElement?.rid,
+    );
+    if (result) {
       fetchElementInstances(selectedElementType.category, selectedElementType.type);
     }
+    return result;
   };
 
   const handleDeleteElement = (rid: string) => {
@@ -199,6 +212,7 @@ export default function UserWorkspace() {
               elementSchema={elementSchema}
               elementActions={elementActions}
               editingElement={editingElement}
+              existingNames={existingNames}
               onSave={handleSaveElement}
             />
           )}

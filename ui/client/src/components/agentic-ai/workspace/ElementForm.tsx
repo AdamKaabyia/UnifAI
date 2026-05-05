@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,13 @@ import {
 } from "../../../types/workspace";
 import { FieldRenderer, getStringEnumFromRef } from "./FieldRenderer";
 import { ItemValidationResult } from "./FieldValidation";
+
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
+
+function normalizeElementName(v: string): string {
+  return v.trim().toLowerCase();
+}
 
 interface ElementFormProps {
   isOpen: boolean;
@@ -26,7 +31,9 @@ interface ElementFormProps {
   elementSchema: ElementSchema;
   elementActions?: any[];
   editingElement: ElementInstance | null;
-  onSave: (data: any) => Promise<void>;
+  /** Names of other instances of this element type (used for duplicate name checks). */
+  existingNames?: string[];
+  onSave: (data: any) => Promise<unknown>;
 }
 
 export const ElementForm: React.FC<ElementFormProps> = ({
@@ -36,6 +43,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   elementSchema,
   elementActions = [],
   editingElement,
+  existingNames = [],
   onSave,
 }) => {
   const [formData, setFormData] = useState<any>({});
@@ -50,6 +58,35 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
   const { fetchResourcesForCategory } = useWorkspaceData();
 
+  const existingNamesSet = useMemo(
+    () =>
+      new Set(
+        existingNames
+          .map((n) => normalizeElementName(n))
+          .filter((n) => n.length > 0),
+      ),
+    [existingNames],
+  );
+
+  const nameError = useMemo(() => {
+    const raw = formData.name;
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    if (
+      editingElement?.name &&
+      normalizeElementName(editingElement.name) === normalizeElementName(raw)
+    ) {
+      return null;
+    }
+
+    if (existingNamesSet.has(normalizeElementName(raw))) {
+      return `A ${elementType.name} named "${trimmed}" already exists. Please choose a different name.`;
+    }
+    return null;
+  }, [formData.name, existingNamesSet, editingElement?.name, elementType.name]);
+
   // Helper to check if a field has validation hint
   const fieldHasValidation = useCallback((fieldName: string): boolean => {
     const fieldSchema = elementSchema?.config_schema.properties[fieldName];
@@ -57,6 +94,14 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     return fieldSchema.hints?.action?.hint_type === 'validate' || 
            fieldSchema.hints?.api?.hint_type === 'validate';
   }, [elementSchema]);
+
+  const isFieldConditionallyVisible = useCallback((fieldSchema: any): boolean => {
+    const conditions = fieldSchema?.hints?.conditional?.visible_when;
+    if (!conditions) return true;
+    return Object.entries(conditions).every(
+      ([field, requiredValue]) => formData[field] === requiredValue,
+    );
+  }, [formData]);
 
   const handleValidationChange = (fieldName: string, isValid: boolean, itemResults?: ItemValidationResult[]) => {
     setFieldValidationStates(prev => ({
@@ -106,8 +151,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       // Set default values from combined schema, excluding hidden fields
       Object.entries(elementSchema.config_schema.properties).forEach(
         ([key, property]: [string, any]) => {
-          // Skip hidden fields - don't initialize them
+          // Skip hidden fields - don't initialize them (except server_identifier/scheme_type needed by auth flow)
           if (property?.hints?.hidden?.hint_type === "hidden") {
+            if (key === "server_identifier" || key === "scheme_type") {
+              initialData[key] = property.default ?? "";
+            }
             return;
           }
           
@@ -138,8 +186,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
           Object.entries(editingElement.config).forEach(([key, value]) => {
             const fieldSchema = elementSchema.config_schema.properties[key];
             
-            // Skip hidden fields - don't populate them in edit mode
+            // Skip hidden fields - don't populate them in edit mode (except server_identifier/scheme_type)
             if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+              if (key === "server_identifier" || key === "scheme_type") {
+                initialData[key] = value;
+              }
               return;
             }
             
@@ -470,6 +521,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
         return true;
       }
+
+      // Skip validation for conditionally hidden fields
+      if (!isFieldConditionallyVisible(fieldSchema)) {
+        return true;
+      }
       
       const value = formData[field];
       
@@ -499,20 +555,29 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     // This handles both required and non-required fields with validation hints (ActionHint or ApiHint)
     const noFailedValidations = !Object.values(fieldValidationStates).some(isValid => isValid === false);
 
-    return allRequiredFieldsValid && noFailedValidations;
+    return allRequiredFieldsValid && noFailedValidations && !nameError;
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
 
-      // Validate all required fields from combined schema, excluding hidden fields
+      if (nameError) {
+        return;
+      }
+
+      // Validate all required fields from combined schema, excluding hidden and conditionally hidden fields
       const required = elementSchema.config_schema.required || [];
       const missing = required.filter((field) => {
         const fieldSchema = elementSchema.config_schema.properties[field];
         
         // Skip validation for hidden fields
         if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+          return false;
+        }
+
+        // Skip validation for conditionally hidden fields
+        if (!isFieldConditionallyVisible(fieldSchema)) {
           return false;
         }
         
@@ -537,7 +602,16 @@ export const ElementForm: React.FC<ElementFormProps> = ({
         const fieldSchema = elementSchema.config_schema.properties[fieldName];
 
         // Skip hidden fields - don't include them in save payload
+        // EXCEPT server_identifier and scheme_type which are needed for auth credential lookup
         if (fieldSchema?.hints?.hidden?.hint_type === "hidden") {
+          if (fieldName === "server_identifier" || fieldName === "scheme_type") {
+            configForSave[fieldName] = value ?? "";
+          }
+          return;
+        }
+
+        // Skip conditionally hidden fields
+        if (!isFieldConditionallyVisible(fieldSchema)) {
           return;
         }
 
@@ -632,8 +706,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
       const result = await onSave(saveData);
 
-      // Only close the dialog if save was successful (result is not null/false)
-      if (result !== null) {
+      if (result) {
         onClose();
       }
     } catch (error) {
@@ -647,12 +720,10 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     const isRequired = elementSchema.config_schema.required?.includes(fieldName);
     const value = formData[fieldName] || "";
     
-    // Check for validation hints - supports both ActionHint and ApiHint
     const actionValidationHint = fieldSchema.hints?.action?.hint_type === 'validate' ? fieldSchema.hints.action : null;
     const apiValidationHint = fieldSchema.hints?.api?.hint_type === 'validate' ? fieldSchema.hints.api : null;
     const validationHint = actionValidationHint || apiValidationHint;
 
-    // Check for populate hints - supports both ActionHint and ApiHint
     const actionPopulateHint = fieldSchema.hints?.action?.hint_type === 'populate' ? fieldSchema.hints.action : null;
     const apiPopulateHint = fieldSchema.hints?.api?.hint_type === 'populate' ? fieldSchema.hints.api : null;
     const populateHint = actionPopulateHint || apiPopulateHint;
@@ -726,6 +797,11 @@ export const ElementForm: React.FC<ElementFormProps> = ({
                   return false;
                 }
 
+                // Filter out conditionally hidden fields
+                if (!isFieldConditionallyVisible(fieldSchema)) {
+                  return false;
+                }
+
                 // For both Create New and Edit mode: show only first-level required fields (name) + all cfg_dict fields
                 // Show first-level required fields (name is required from resource.schema)
                 const firstLevelRequiredFields = ['name'];
@@ -763,7 +839,14 @@ export const ElementForm: React.FC<ElementFormProps> = ({
                 // Otherwise, maintain original order
                 return 0;
               })
-              .map(([fieldName, fieldSchema]) => renderFormField(fieldName, fieldSchema))}
+              .map(([fieldName, fieldSchema]) => (
+                <div key={fieldName}>
+                  {renderFormField(fieldName, fieldSchema)}
+                  {fieldName === "name" && nameError ? (
+                    <p className="text-destructive text-sm mt-1">{nameError}</p>
+                  ) : null}
+                </div>
+              ))}
           </div>
 
           <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t border-gray-800">

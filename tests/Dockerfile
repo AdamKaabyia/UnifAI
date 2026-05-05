@@ -1,55 +1,68 @@
 FROM registry.access.redhat.com/ubi9/python-311
 
 USER root
-RUN dnf update -y && dnf install -y vim less iputils mesa-libGL && dnf clean all
+RUN dnf update --nobest -y && dnf install -y vim less iputils mesa-libGL && dnf clean all
+
 
 USER default
+RUN pwd
+WORKDIR $HOME
+# --------------------------------------------------------------------------
+# Copy source trees
+# --------------------------------------------------------------------------
+ADD --chown=default:root --chmod=777 ./rag           $HOME/rag
+ADD --chown=default:root --chmod=777 ./multi-agent   $HOME/multi-agent
+ADD --chown=default:root --chmod=777 ./shared-resources/identity $HOME/shared-resources/identity
+ADD --chown=default:root --chmod=777 ./global_utils  $HOME/global_utils
 
-# Copy tests folder contents
-ADD  --chown=default:root --chmod=777 ./tests $HOME/tests
+RUN chmod -R g+w rag multi-agent global_utils
 
-WORKDIR $HOME/tests
-
-# Ensure scripts are executable
-RUN chmod +x docs/run_stress_test.sh && chmod -R g+w .
-
+# --------------------------------------------------------------------------
+# Virtual environment + dependencies
+# --------------------------------------------------------------------------
 RUN pip3 install --upgrade pip virtualenv
-RUN python3 -m venv venv
+RUN python3 -m venv --prompt "tests-venv" venv
 
-# Activate venv and install requirements
-RUN /bin/bash -c "source venv/bin/activate && \
-    pip install -r docs/requirements_stress_test.txt"
+ENV VIRTUAL_ENV=$HOME/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-WORKDIR $HOME/tests/docs
+# Install shared package
+RUN pip install -e ./global_utils/
 
-# =============================================================================
-# NOTE: SHARED VOLUME FOR DOCS
-# =============================================================================
-# This container MUST have access to a shared volume where documents are uploaded.
-# Mount the shared volume at runtime:
-#   docker run -v /path/to/shared/docs:/app/shared ...
-#
-# The UPLOAD_FOLDER environment variable should point to this mounted volume.
-# =============================================================================
+# RAG application dependencies
+RUN pip install -e ./rag/
 
-# =============================================================================
-# ENVIRONMENT VARIABLES
-# =============================================================================
-# The following ENV parameters can be declared when running this image:
-#
-#   API_BASE_URL    - Backend API URL (default: http://localhost:13457/api)
-#   MONGODB_HOST    - MongoDB host address (default: localhost)
-#   MONGODB_PORT    - MongoDB port number (default: 27017)
-#   UPLOAD_FOLDER   - Path to shared volume for uploaded docs (default: /app/shared)
-#
-# Example:
-#   docker run -e API_BASE_URL=http://backend:13457/api \
-#              -e MONGODB_HOST=mongo \
-#              -e MONGODB_PORT=27017 \
-#              -e UPLOAD_FOLDER=/app/shared \
-#              -v /host/shared/docs:/app/shared \
-#              tests-image
-# =============================================================================
+# Multi-agent application dependencies
+RUN pip install -e ./multi-agent/[all]
 
-ENTRYPOINT ["/bin/bash", "-c", "source ../venv/bin/activate && python3 verify_setup.py"]
+# Shared resources dependencies
+RUN pip install -e ./shared-resources/identity/
 
+# Stress test dependencies
+RUN pip install -r ./rag/tests/docs/requirements_stress_test.txt
+
+
+# Test framework and utilities
+RUN pip install \
+    pytest \
+    pytest-asyncio \
+    pytest-mock \
+    pytest-html \
+    pytest-cov \
+    pytest-xdist \
+    pytest-timeout \
+    pytest-benchmark \
+    pytest-clarity \
+    pytest-sugar \
+    aiohttp \
+    reportlab \
+    requests \
+    pyyaml
+
+# --------------------------------------------------------------------------
+# Entrypoint
+# --------------------------------------------------------------------------
+COPY --chown=default:root --chmod=755 ./tests/run_tests.sh $HOME/run_tests.sh
+
+ENTRYPOINT ["./run_tests.sh"]
+CMD ["all"]

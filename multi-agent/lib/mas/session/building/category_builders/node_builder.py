@@ -25,7 +25,7 @@ class NodeBuilder(CategoryBuilder):
     def _iter_specs(self, bp: BlueprintSpec) -> Iterable[NodeSpec]:
         return bp.nodes
 
-    def _extra_kwargs(self, cfg: NodeSpec, reg: SessionRegistry) -> Dict[str, Any]:
+    def _extra_kwargs(self, cfg: NodeSpec, reg: SessionRegistry, deps=None) -> Dict[str, Any]:
         """Resolve all Ref-typed fields to their instances."""
         return {
             name: self._resolve(getattr(cfg, name, None), cfg, reg)

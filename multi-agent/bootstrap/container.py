@@ -10,6 +10,8 @@ points (run/dev.py, run/wsgi.py, inbound/temporal/__main__.py, …)
 create an AppContainer and pass it — or individual services from it —
 into the layers that need them.
 """
+import logging
+
 from mas.catalog.element_registry import ElementRegistry
 from mas.catalog.service import CatalogService
 from mas.catalog.card_service import ElementCardService
@@ -29,6 +31,19 @@ from mas.sharing.service import ShareService
 from mas.statistics.service import StatisticsService
 from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
+
+# Auth layer
+from mas.core.auth.service import AuthService, AuthStrategyRegistry
+from mas.core.auth.discovery import AuthDetector
+from outbound.auth.oauth2_strategy import OAuth2Strategy
+from mas.core.auth.strategies.oauth2.detection import OAuth2DetectionStrategy
+from mas.core.auth.strategies.oauth2.state_manager import OAuthStateManager
+from outbound.auth.api_key_strategy import ApiKeyStrategy
+from outbound.mongo.client_config_repository import MongoServerConfigStore
+from mas.actions.auth.authenticate.action import AuthenticateAction
+from mas.actions.providers.mcp.validate_connection.validate_connection import ValidateConnectionAction
+from mas.actions.providers.mcp.get_tools_names.get_tools_names import GetToolsNamesAction
+
 from config.app_config import AppConfig
 
 from outbound.mongo import (
@@ -38,9 +53,16 @@ from outbound.mongo import (
     MongoShareRepository,
     MongoTemplateRepository,
 )
+# Auth layer — adapters
+from outbound.mongo.auth_token_repository import MongoCredentialStore
+from outbound.redis.auth_pending_store import RedisFlowStateStore
+from outbound.auth.http_oauth_client import HttpxAuthClient
 
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_redis_url
+
+
+logger = logging.getLogger(__name__)
 
 
 class AppContainer(metaclass=SingletonMeta):
@@ -108,9 +130,89 @@ class AppContainer(metaclass=SingletonMeta):
             card_service=self.card_service,
         )
 
+        # ── Auth layer ────────────────────────────────────────────────
+
+        http_client = HttpxAuthClient()
+        self.credential_store = MongoCredentialStore(
+            mongodb_ip=cfg.mongodb_ip,
+            mongodb_port=cfg.mongodb_port,
+            db_name=cfg.mongo_db,
+            coll_name=cfg.credentials_coll,
+            encryption_key=cfg.credential_encryption_key,
+        )
+
+        redis_url = get_redis_url()
+        pending_store = None
+        if redis_url:
+            import redis as redis_lib
+            redis_client = redis_lib.Redis.from_url(redis_url)
+            pending_store = RedisFlowStateStore(
+                redis_client=redis_client,
+                encryption_key=cfg.credential_encryption_key,
+            )
+
+        # Detection
+        oauth2_detection = OAuth2DetectionStrategy()
+        detector = AuthDetector(
+            strategies=[oauth2_detection],
+            http_client=http_client,
+        )
+
+        # Server config store
+        self.server_config_store = MongoServerConfigStore(
+            mongodb_ip=cfg.mongodb_ip,
+            mongodb_port=cfg.mongodb_port,
+            db_name=cfg.mongo_db,
+            coll_name="server_configs",
+        )
+
+        # OAuth2 state manager
+        if not cfg.mcp_auth_state_secret:
+            logger.warning("MCP_AUTH_STATE_SECRET not set — using random key (sessions won't survive restarts)")
+            import secrets as _secrets
+            cfg.mcp_auth_state_secret = _secrets.token_urlsafe(32)
+        state_manager = OAuthStateManager(secret=cfg.mcp_auth_state_secret)
+
+        # Strategy registry — self-contained strategies
+        oauth2_strategy = OAuth2Strategy(
+            pending_store=pending_store,
+            state_manager=state_manager,
+            callback_url=f"{cfg.identity_host.rstrip('/')}/api/credentials/callback",
+            client_config_store=self.server_config_store,
+            http_client=http_client,
+        )
+        api_key_strategy = ApiKeyStrategy()
+
+        strategy_registry = AuthStrategyRegistry()
+        strategy_registry.register(oauth2_strategy)
+        strategy_registry.register(api_key_strategy)
+
+        # AuthService — single owner of the credential lifecycle
+        self.auth_service = AuthService(
+            credential_store=self.credential_store,
+            strategy_registry=strategy_registry,
+            server_config_store=self.server_config_store,
+            detector=detector,
+        )
+
+        self.resources_service.set_auth_service(self.auth_service)
+        self.blueprint_service.set_auth_service(self.auth_service)
+
+        self.actions_service.register_instance(AuthenticateAction(
+            auth_service=self.auth_service,
+        ))
+        self.actions_service.register_instance(ValidateConnectionAction(
+            auth_service=self.auth_service,
+        ))
+        self.actions_service.register_instance(GetToolsNamesAction(
+            auth_service=self.auth_service,
+        ))
+
+        # ── Session factory ───────────────────────────────────────────
         self.session_factory = WorkflowSessionFactory(
             element_registry=self.element_registry,
-            engine_name=cfg.engine_name
+            engine_name=cfg.engine_name,
+            auth_service=self.auth_service,
         )
         self.session_repo = MongoSessionRepository(
             mongodb_port=cfg.mongodb_port,
