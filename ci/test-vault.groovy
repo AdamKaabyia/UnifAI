@@ -10,6 +10,19 @@ properties([
     ])
 ])
 
+
+def secret_lists = [
+    redis: ['redis_password', 'redis_port', 'redis_insight_port'],
+    rmq: ['rmq_username', 'rmq_password'],
+    hf: ['HF_TOKEN'],
+    secret_key: ['secret_key'],
+    umami: ['umami_app_secret', 'umami_password'],
+    keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
+    multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
+    rag: ['default_slack_bot_token', 'default_slack_user_token'],
+]
+
+
 pipeline {
     agent any
 
@@ -35,41 +48,24 @@ pipeline {
                 }
             }
         }
-        stage('Read Secret key from Vault using approle') {
+        stage('Read Secret key permodule') {
             steps {
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'vault_creds',
-                    usernameVariable: 'ROLE_ID',
-                    passwordVariable: 'SECRET_ID'
-                )
-            ]) {
-                script {
-                    def token = sh(
-                        script: '''
-                            export VAULT_ADDR='https://vault.corp.redhat.com:8200/'
-                            export VAULT_SKIP_VERIFY=true
-                            vault write -field=token auth/approle/login \
-                                role_id=$ROLE_ID \
-                                secret_id=$SECRET_ID
-                        ''',
-                        returnStdout: true
-                    ).trim()
-                    def json = sh(
-                        script: """
-                            export VAULT_ADDR='https://vault.corp.redhat.com:8200/'
-                            export VAULT_SKIP_VERIFY=true
-                            export VAULT_TOKEN=${token}
-                            vault kv get -format=json ${params.VAULT_SECRET_PATH}
-                        """,
-                        returnStdout: true
-                    ).trim()
-                    def secrets = readJSON text: json
-                    def data = secrets.data.data
-                    data.each { key, value -> echo "Key: ${key}" }
+                secret_lists.each { module, secrets ->
+                    withVault(
+                        configuration: [
+                            vaultUrl: '',           // leave empty to use global config
+                            vaultCredentialId: ''   // leave empty to use global config
+                        ],
+                        vaultSecrets: [
+                            [path: "${params.VAULT_SECRET_PATH}/${module}",
+                             secretValues: secrets.collect { [envVar: "${secret_key}", vaultKey: secret_key] }]
+                        ]
+                    ) {
+                        secrets.each { secret ->
+                            sh "echo 'Secret retrieved (masked): $secret'"
+                        }
+                    }
                 }
             }
-        }
-        }
-    }
+    }   
 }
