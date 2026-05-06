@@ -105,12 +105,13 @@ class ValidateConnectionAction(BaseAction):
             with anyio.fail_after(10.0):
                 await self._factory.create_async(config, auth_credential=auth_cred)
             elapsed = (time.time() - start) * 1000
+
             return ValidateConnectionOutput(
                 success=True, message=f"Connected ({elapsed:.0f}ms)",
                 is_reachable=True,
                 authenticated=bool(auth_cred) or bool(input_data.bearer_token),
                 status="authenticated" if (auth_cred or input_data.bearer_token) else "",
-                server_identifier=server_id,
+                server_identifier=server_id or str(input_data.mcp_url),
                 response_time_ms=elapsed,
             )
 
