@@ -54,6 +54,8 @@ spec:
                 name: multiagent-be-secret
             - configMapRef:
                 name: {{ .Values.globalConfigMapName }}
+            - secretRef:
+                name: {{ .Values.globalSecretName }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

@@ -51,7 +51,11 @@ spec:
             - configMapRef:
                 name: multiagent-temporal-worker-configmap
             - configMapRef:
-                name: multiagent-be-security
+                name: multiagent-be-configmap
+            - secretRef:
+                name: {{ .Values.MultiagentSecretName }}
+            - secretRef:
+                name: {{ .Values.globalSecretName }}
             - configMapRef:
                 name: {{ .Values.globalConfigMapName }}
           ports:

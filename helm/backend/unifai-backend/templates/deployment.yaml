@@ -52,7 +52,8 @@ spec:
               name: {{ .Values.globalConfigMapName }}
           - configMapRef:
               name: backend-be-configmap
-
+          - secretRef:
+              name: {{ .Values.globalSecretName }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

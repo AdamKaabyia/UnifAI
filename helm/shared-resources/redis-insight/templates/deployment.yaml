@@ -41,6 +41,8 @@ spec:
             - configMapRef:
                 name: {{ .Values.redisConfigMapName | quote }}
           {{- end }}
+            - secretRef:
+                name: {{ .Values.RedisSecretName }}
           ports:
           - containerPort: {{ .Values.service.port }} 
             protocol: TCP
