@@ -17,7 +17,7 @@ def secret_lists = [
     // rmq: ['rmq_username', 'rmq_password'],
     // hf: ['HF_TOKEN'],
     // secret_key: ['secret_key'],
-    umami: ['umami_app_secret', 'umami_password', 'umami_url'],
+    umami: ['umami_username', 'umami_password', 'umami_url'],
     // keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
     // multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
     // rag: ['default_slack_bot_token', 'default_slack_user_token'],
@@ -65,6 +65,8 @@ pipeline {
                         ) {
                             secrets.each { secret ->
                                 sh "echo 'Secret retrieved (masked): \$${secret}'"
+                                sh "echo '${secret}='\"\$${secret}\" >> secrets.env"
+                                sh "cat secrets.env"
                             }
                         }
                     }
