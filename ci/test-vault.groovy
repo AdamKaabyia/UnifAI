@@ -50,23 +50,26 @@ pipeline {
     //     }
         stage('Read Secret key permodule') {
             steps {
-                secret_lists.each { module, secrets ->
-                    withVault(
-                        configuration: [
-                            vaultUrl: '',           // leave empty to use global config
-                            vaultCredentialId: ''   // leave empty to use global config
-                        ],
-                        vaultSecrets: [
-                            [path: "${params.VAULT_SECRET_PATH}/${module}",
-                             secretValues: secrets.collect { [envVar: "${secret_key}", vaultKey: secret_key] }]
-                        ]
-                    ) {
-                        secrets.each { secret ->
-                            sh "echo 'Secret retrieved (masked): $secret'"
+                script {
+                    secret_lists.each { module, secrets ->
+                        withVault(
+                            configuration: [
+                                vaultUrl: '',           // leave empty to use global config
+                                vaultCredentialId: ''   // leave empty to use global config
+                            ],
+                            vaultSecrets: [
+                                [path: "${params.VAULT_SECRET_PATH}/${module}",
+                                secretValues: secrets.collect { secret_key -> [envVar: "${secret_key}", vaultKey: secret_key] }]
+                            ]
+                        ) {
+                            secrets.each { secret ->
+                                sh "echo 'Secret retrieved (masked): \$${secret}'"
+                            }
                         }
                     }
                 }
+
             }
-    } 
+        } 
     }  
 }
