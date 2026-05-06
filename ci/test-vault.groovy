@@ -12,14 +12,15 @@ properties([
 
 
 def secret_lists = [
-    redis: ['redis_password', 'redis_port', 'redis_insight_port'],
-    rmq: ['rmq_username', 'rmq_password'],
-    hf: ['HF_TOKEN'],
-    secret_key: ['secret_key'],
-    umami: ['umami_app_secret', 'umami_password'],
-    keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
-    multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
-    rag: ['default_slack_bot_token', 'default_slack_user_token'],
+    redis: ['redis_username', 'redis_password', 'redis_port', 'redis_insight_port'],
+    identity: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url', 'secret_key'],
+    // rmq: ['rmq_username', 'rmq_password'],
+    // hf: ['HF_TOKEN'],
+    // secret_key: ['secret_key'],
+    umami: ['umami_app_secret', 'umami_password', 'umami_url'],
+    // keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
+    // multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
+    // rag: ['default_slack_bot_token', 'default_slack_user_token'],
 ]
 
 
