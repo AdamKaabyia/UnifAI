@@ -51,7 +51,7 @@ spec:
           - configMapRef:
               name: {{ .Values.globalConfigMapName }}
           - configMapRef:
-              name: backend-be-security
+              name: backend-be-configmap
 
           ports:
             - name: http
