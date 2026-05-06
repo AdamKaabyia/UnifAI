@@ -26,7 +26,7 @@ def secret_lists = [
 pipeline {
     agent any
 
-    // stages {
+    stages {
     //     stage('Read Secret key from Vault natively') {
     //         steps {
     //             withVault(
@@ -67,5 +67,6 @@ pipeline {
                     }
                 }
             }
-    }   
+    } 
+    }  
 }
