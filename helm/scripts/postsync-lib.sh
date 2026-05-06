@@ -89,7 +89,7 @@ create_or_update_resource() {
   local resource_type=$1; shift
   local resource_name=$1; shift
   
-  kubectl create "$resource_type" "$resource_name" "$@" \
+  kubectl create $resource_type "$resource_name" "$@" \
     --dry-run=client -o yaml | kubectl apply -f -
   
   log_info "${resource_type} '${resource_name}' applied successfully"
