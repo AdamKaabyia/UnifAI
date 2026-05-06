@@ -2,7 +2,10 @@
 Decorators for Flask endpoints.
 """
 import logging
+import time
 from functools import wraps
+from threading import Lock
+
 from flask import jsonify, request, current_app
 
 import requests as http_requests
@@ -10,6 +13,42 @@ import requests as http_requests
 from inbound.flask.identity_helpers import resolve_identity
 
 logger = logging.getLogger(__name__)
+
+# Cache Identity ``teams.list`` results per user to avoid one HTTP call per
+# decorated request. TTL is short so membership revocations take effect quickly.
+_TEAM_IDS_CACHE_TTL_SEC = 45.0
+_team_ids_cache: dict[str, tuple[float, frozenset[str]]] = {}
+_team_ids_cache_lock = Lock()
+
+
+def _get_cached_team_ids(username: str) -> frozenset[str] | None:
+    now = time.monotonic()
+    with _team_ids_cache_lock:
+        entry = _team_ids_cache.get(username)
+        if entry is not None and (now - entry[0]) < _TEAM_IDS_CACHE_TTL_SEC:
+            return entry[1]
+    return None
+
+
+def _set_cached_team_ids(username: str, team_ids: frozenset[str]) -> None:
+    with _team_ids_cache_lock:
+        _team_ids_cache[username] = (time.monotonic(), team_ids)
+
+
+def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
+    resp = http_requests.get(
+        f"{base}/api/teams/teams.list",
+        params={"userId": username},
+        timeout=5,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"teams.list HTTP {resp.status_code}")
+    teams = resp.json().get("teams", [])
+    return frozenset(
+        str(t.get("team_id"))
+        for t in teams
+        if t.get("team_id") is not None
+    )
 
 
 def _identity_service_base() -> str:
@@ -79,13 +118,16 @@ def require_admin_access(f):
 def require_identity_authorization(f):
     """Validate that the caller is authorized for the claimed identity.
 
-    Reads ``X-Authenticated-User`` from the request header (set by the UI).
-    For **user** identity: the claimed ``userId`` must match the header.
-    For **team** identity: the authenticated user must be a member of the
-    claimed team (verified via the Identity service ``teams.list`` endpoint).
+    Reads ``X-Authenticated-User`` from the request header (set by the UI /
+    ingress from the SSO session). For **user** identity: the claimed
+    ``userId`` must match the header. For **team** identity: the authenticated
+    user must be a member of the claimed team (verified via the Identity pod
+    ``/api/teams/teams.list``, with a short in-process cache per user).
 
     Skipped when the header is absent (allows direct/internal calls) or
     when neither ``directory_sso_url`` nor ``identity_host`` is configured.
+    **Production:** expose user-facing routes only when the gateway sets
+    ``X-Authenticated-User``; otherwise team/user impersonation is possible.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -133,31 +175,27 @@ def require_identity_authorization(f):
 
 
 def _is_team_member(username: str, team_id: str) -> bool:
-    """Check team membership via the Identity service ``teams.list`` endpoint.
+    """Check team membership via the Identity pod ``teams.list`` endpoint.
 
     Fails **closed** (denies access) when the Identity base URL is configured but
     the service is unreachable or returns an error. Skips the check when no
     base URL is set (e.g. local dev without Identity).
+
+    Successful ``teams.list`` responses are cached briefly per username to
+    reduce load on Identity (see ``_TEAM_IDS_CACHE_TTL_SEC``).
     """
     base = _identity_service_base()
     if not base:
         return True
 
-    try:
-        resp = http_requests.get(
-            f"{base}/api/teams/teams.list",
-            params={"userId": username},
-            timeout=5,
-        )
-        if resp.status_code != 200:
-            logger.warning(
-                "Team membership check failed (HTTP %d) — denying access",
-                resp.status_code,
-            )
-            return False
+    cached = _get_cached_team_ids(username)
+    if cached is not None:
+        return team_id in cached
 
-        teams = resp.json().get("teams", [])
-        return any(t.get("team_id") == team_id for t in teams)
+    try:
+        team_ids = _fetch_team_ids_from_identity(username, base)
+        _set_cached_team_ids(username, team_ids)
+        return team_id in team_ids
     except Exception:
         logger.exception("Team membership check failed — denying access")
         return False

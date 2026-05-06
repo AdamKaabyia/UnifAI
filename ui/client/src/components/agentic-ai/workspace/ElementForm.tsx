@@ -33,10 +33,6 @@ function normalizeElementName(v: string): string {
   return v.trim().toLowerCase();
 }
 
-function normalizeElementName(v: string): string {
-  return v.trim().toLowerCase();
-}
-
 interface ElementFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -180,35 +176,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     user?.username,
     user?.name,
   ]);
-
-  const existingNamesSet = useMemo(
-    () =>
-      new Set(
-        existingNames
-          .map((n) => normalizeElementName(n))
-          .filter((n) => n.length > 0),
-      ),
-    [existingNames],
-  );
-
-  const nameError = useMemo(() => {
-    const raw = formData.name;
-    if (typeof raw !== "string") return null;
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-
-    if (
-      editingElement?.name &&
-      normalizeElementName(editingElement.name) === normalizeElementName(raw)
-    ) {
-      return null;
-    }
-
-    if (existingNamesSet.has(normalizeElementName(raw))) {
-      return `A ${elementType.name} named "${trimmed}" already exists. Please choose a different name.`;
-    }
-    return null;
-  }, [formData.name, existingNamesSet, editingElement?.name, elementType.name]);
 
   const existingNamesSet = useMemo(
     () =>

@@ -55,14 +55,26 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [userGroups, setUserGroups] = useState<string[]>([]);
-  const teamsLoadedOnce = useRef(false);
+  /** True after we finish a teams fetch attempt (success or error), or when there is no user to query. */
+  const [teamsBootstrapComplete, setTeamsBootstrapComplete] = useState(false);
+  /** True only after a successful teams list load (used to optionally re-fetch when entering team mode). */
+  const teamsListSucceededRef = useRef(false);
 
   const selectedTeamRef = useRef(selectedTeam);
   selectedTeamRef.current = selectedTeam;
 
   const refreshTeams = useCallback(async () => {
-    if (!user?.username) return;
+    if (!user?.username) {
+      setTeams([]);
+      setTeamsLoading(false);
+      setTeamsBootstrapComplete(true);
+      teamsListSucceededRef.current = false;
+      return;
+    }
+
+    setTeamsBootstrapComplete(false);
     setTeamsLoading(true);
+    teamsListSucceededRef.current = false;
     try {
       let groups: string[] = [];
       try {
@@ -77,7 +89,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
       const fetched = await listUserTeams(user.username, groups.length > 0 ? groups : undefined);
       const mapped = fetched.map(toTeamInfo);
       setTeams(mapped);
-      teamsLoadedOnce.current = true;
+      teamsListSucceededRef.current = true;
       const current = selectedTeamRef.current;
       if (current) {
         const updated = mapped.find((t) => t.id === current.id);
@@ -95,19 +107,27 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
       console.error("Failed to fetch teams:", err);
     } finally {
       setTeamsLoading(false);
+      setTeamsBootstrapComplete(true);
     }
   }, [user?.username]);
 
   useEffect(() => {
-    refreshTeams();
+    void refreshTeams();
   }, [refreshTeams]);
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeRaw(mode);
-    if (mode === "team" && !teamsLoadedOnce.current) {
-      refreshTeams();
+    if (
+      mode === "team" &&
+      user?.username &&
+      !teamsListSucceededRef.current &&
+      !teamsLoading
+    ) {
+      void refreshTeams();
     }
-  }, [refreshTeams]);
+  }, [refreshTeams, user?.username, teamsLoading]);
+
+  const teamsReady = teamsBootstrapComplete && !teamsLoading;
 
   return (
     <ViewContext.Provider
@@ -119,7 +139,7 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
         teams,
         refreshTeams,
         teamsLoading,
-        teamsReady: teamsLoadedOnce.current && !teamsLoading,
+        teamsReady,
         userGroups,
       }}
     >

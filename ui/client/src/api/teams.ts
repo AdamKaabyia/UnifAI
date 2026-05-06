@@ -17,9 +17,9 @@ export interface TeamMember {
  */
 export function getEffectiveMemberCount(
   members: TeamMember[],
-  backendCount?: number,
+  identityCount?: number,
 ): number {
-  if (typeof backendCount === 'number') return backendCount;
+  if (typeof identityCount === 'number') return identityCount;
   const userIds = new Set<string>();
   for (const m of members) {
     if (m.type === 'user') {

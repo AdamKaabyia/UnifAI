@@ -11,6 +11,7 @@ import logging
 
 from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
+from mas.collaboration.models import ParticipantRole
 from webargs import fields
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,6 @@ def join_session(session_id, user_id, display_name, role):
     if svc is None:
         return _unavailable()
     try:
-        from mas.collaboration.models import ParticipantRole
         participant_role = ParticipantRole(role)
         participants = svc.join_session(
             session_id=session_id,
