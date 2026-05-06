@@ -44,13 +44,20 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api2/, '/api'), // This rewrites /api2 to nothing
         // secure: false, // Only needed if this target is HTTPS and you have SSL issues
       },
-      // SSO backend (auth/login, auth/logout, auth/user, …) — see authClient baseURL `/api3`
+      // Proxy for api2 (assuming this is still local or another service)
       '/api3': {
-        target: 'http://127.0.0.1:13456',
+        target: process.env.IDENTITY_HOST,//'http://127.0.0.1:13457', // Your second backend
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api3/, '/api'),
-        secure: false,
+        rewrite: (path) => path.replace(/^\/api3/, '/api'), // This rewrites /api2 to nothing
+        // secure: false, // Only needed if this target is HTTPS and you have SSL issues
       },
+      '/api4': {
+        target: process.env.BACKEND_HOST,//'http://127.0.0.1:13457', // Your second backend
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api4/, '/api'), // This rewrites /api2 to nothing
+        // secure: false, // Only needed if this target is HTTPS and you have SSL issues
+      },
+      // You can add more proxies here if needed
     }
   },
 
