@@ -63,6 +63,11 @@ Usage:
 
     # Custom MongoDB connection
     MONGODB_IP=10.0.0.5 MONGODB_PORT=27017 python scripts/migrate_user_id_to_identity.py --apply
+
+**Deployment note:** Canonical ``teams`` documents and team APIs live in the
+Identity service MongoDB / pod. Run this script against the same database the
+Identity deployment uses for ``teams`` and workflow data so team id resolution
+stays consistent.
 """
 
 import argparse

@@ -1,5 +1,3 @@
-import logging
-
 from pymongo import MongoClient
 
 from admin_config.action_dispatcher import ActionDispatcher
@@ -9,8 +7,6 @@ from admin_config.template import ADMIN_CONFIG_TEMPLATE
 from config.app_config import AppConfig
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_mongo_url
-
-logger = logging.getLogger(__name__)
 
 
 class AppContainer(metaclass=SingletonMeta):

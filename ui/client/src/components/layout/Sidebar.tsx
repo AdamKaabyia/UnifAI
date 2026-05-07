@@ -291,45 +291,49 @@ export default function Sidebar() {
           />
         </ul>
         
-        {!isCollapsed && (
-          <motion.div 
-            initial={false}
-            animate={{ opacity: isCollapsed ? 0 : 1 }}
-            transition={{ duration: 0.2 }}
-            className="px-3 mt-6 mb-2"
-          >
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">RAG</span>
-          </motion.div>
+        {viewMode !== 'team' && (
+          <>
+            {!isCollapsed && (
+              <motion.div 
+                initial={false}
+                animate={{ opacity: isCollapsed ? 0 : 1 }}
+                transition={{ duration: 0.2 }}
+                className="px-3 mt-6 mb-2"
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">RAG</span>
+              </motion.div>
+            )}
+            <ul>
+              <NavItem 
+                icon={<FaTachometerAlt className="sidebar-icon" />} 
+                label="RAG Overview" 
+                to="/rag-overview"
+                isActive={location === '/rag-overview'}
+                status={null}
+                isCollapsed={isCollapsed}
+                disabled={false}
+              />
+              <NavItem 
+                icon={<FaSlack className="sidebar-icon" />} 
+                label="Slack Integration" 
+                to="/slack"
+                isActive={location === '/slack'}
+                status={null}
+                isCollapsed={isCollapsed}
+                disabled={true}
+              />
+              <NavItem 
+                icon={<FaFileAlt className="sidebar-icon" />} 
+                label="Documents" 
+                to="/documents"
+                isActive={location === '/documents'}
+                status={null}
+                isCollapsed={isCollapsed}
+                disabled={false}
+              />
+            </ul>
+          </>
         )}
-        <ul>
-          <NavItem 
-            icon={<FaTachometerAlt className="sidebar-icon" />} 
-            label="RAG Overview" 
-            to="/rag-overview"
-            isActive={location === '/rag-overview'}
-            status={null}
-            isCollapsed={isCollapsed}
-            disabled={false}
-          />
-          <NavItem 
-            icon={<FaSlack className="sidebar-icon" />} 
-            label="Slack Integration" 
-            to="/slack"
-            isActive={location === '/slack'}
-            status={null}
-            isCollapsed={isCollapsed}
-            disabled={true}
-          />
-          <NavItem 
-            icon={<FaFileAlt className="sidebar-icon" />} 
-            label="Documents" 
-            to="/documents"
-            isActive={location === '/documents'}
-            status={null}
-            isCollapsed={isCollapsed}
-            disabled={false}
-          />
-        </ul>
 
 
         {!isCollapsed && (

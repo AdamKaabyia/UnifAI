@@ -17,10 +17,11 @@ import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SharedProvider } from '@/contexts/SharedContext';
-import { ViewProvider } from '@/contexts/ViewContext';
+import { ViewProvider, useView } from '@/contexts/ViewContext';
 import DocumentsPage from "./features/docs/DocumentsPage";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AgenticAIProvider } from '@/contexts/AgenticAIContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import TermsApproval from '@/components/auth/TermsApproval';
 import SlackIntegration from "./features/slack/SlackIntegration";
@@ -31,16 +32,24 @@ import AgenticLayout from "./components/layout/AgenticLayout";
 import { Toaster } from "./components/ui/toaster";
 
 function AppRoutes() {
+  const { viewMode } = useView();
   const [isChat] = useRoute("/chat/:token");
   const [isAgenticOverview] = useRoute("/agentic-overview");
   const [isAgenticAI] = useRoute("/agentic-ai");
   const [isInventory] = useRoute("/inventory");
   const [isAgenticChats] = useRoute("/agentic-chats");
   const [isTemplates] = useRoute("/templates");
+  const [isRagOverview] = useRoute("/rag-overview");
+  const [isSlack] = useRoute("/slack");
+  const [isDocuments] = useRoute("/documents");
+  const [isSlackAddSource] = useRoute("/slack/add-source");
 
   const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
+  const isTeamBlockedRagRoute =
+    viewMode === "team" &&
+    (isRagOverview || isSlack || isDocuments || isSlackAddSource);
 
-  if (isAgenticRoute) {
+  if (isAgenticRoute || isTeamBlockedRagRoute) {
     return (
       <AgenticAIProvider>
         <AgenticLayout>
@@ -78,6 +87,7 @@ function AppRoutes() {
 /** /login outside ProtectedRoute; use full navigation (no wouter setLocation) to match app routing convention. */
 function LoginRouteContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { primaryHex } = useTheme();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -88,7 +98,10 @@ function LoginRouteContent() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          style={{ borderBottomColor: primaryHex || "#A60000" }}
+        />
       </div>
     );
   }

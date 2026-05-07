@@ -11,6 +11,7 @@ import logging
 
 from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
+from inbound.flask.decorators import _is_team_member
 from mas.collaboration.models import ParticipantRole
 from webargs import fields
 
@@ -49,6 +50,14 @@ def _validate_user(user_id: str):
     authenticated = request.headers.get("X-Authenticated-User", "").strip()
     if authenticated and authenticated != user_id:
         return jsonify({"error": "userId does not match authenticated user"}), 403
+    return None
+
+
+def _validate_team(team_id: str):
+    """Verify authenticated caller is a member of the requested team."""
+    authenticated = request.headers.get("X-Authenticated-User", "").strip()
+    if authenticated and not _is_team_member(authenticated, team_id):
+        return jsonify({"error": "Access denied: you are not a member of this team"}), 403
     return None
 
 
@@ -149,6 +158,9 @@ def get_participants(session_id):
     "team_id": fields.Str(data_key="teamId", required=True),
 })
 def get_team_sessions(team_id):
+    team_err = _validate_team(team_id)
+    if team_err:
+        return team_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
@@ -165,6 +177,9 @@ def get_team_sessions(team_id):
     "user_id": fields.Str(data_key="userId", required=True),
 })
 def get_user_active_sessions(user_id):
+    auth_err = _validate_user(user_id)
+    if auth_err:
+        return auth_err
     svc = _collab_svc()
     if svc is None:
         return _unavailable()
