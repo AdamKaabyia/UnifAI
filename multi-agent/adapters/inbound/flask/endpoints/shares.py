@@ -13,9 +13,21 @@ shares_bp = Blueprint("shares", __name__)
     "item_kind": fields.Str(data_key="itemKind", required=True),
     "item_id": fields.Str(data_key="itemId", required=True),
     "message": fields.Str(required=False),
-    "sender_user_id": fields.Str(data_key="senderUserId", required=False, load_default="alice")
+    "sender_user_id": fields.Str(data_key="senderUserId", required=False, load_default="alice"),
+    "sender_type": fields.Str(data_key="senderType", required=False, load_default="user"),
+    "sender_display_name": fields.Str(data_key="senderDisplayName", required=False),
+    "auto_accept": fields.Bool(data_key="autoAccept", required=False, load_default=False),
 })
-def create_share(recipient_user_id, item_kind, item_id, message=None, sender_user_id="alice"):
+def create_share(
+    recipient_user_id,
+    item_kind,
+    item_id,
+    message=None,
+    sender_user_id="alice",
+    sender_type="user",
+    sender_display_name=None,
+    auto_accept=False,
+):
     """Create share invitation."""
     try:
         # Validate item_kind
@@ -36,13 +48,21 @@ def create_share(recipient_user_id, item_kind, item_id, message=None, sender_use
             recipient_user_id=recipient_user_id,
             item_kind=kind,
             item_id=item_id,
-            message=message
+            message=message,
+            sender_type=sender_type,
+            sender_display_name=sender_display_name,
         )
 
-        return jsonify({
+        response = {
             "status": "success",
             "share_id": share_id
-        }), 201
+        }
+        if auto_accept:
+            result = svc.accept_invite(share_id, recipient_user_id=recipient_user_id)
+            response["result"] = result.model_dump(mode="json")
+            response["auto_accepted"] = True
+
+        return jsonify(response), 201
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -177,8 +197,14 @@ def list_shares(identity, direction="received", status=None, skip=0, limit=100):
         else:
             return jsonify({"error": "Direction must be 'received' or 'sent'"}), 400
 
+        def serialize_invite(invite):
+            payload = invite.model_dump(mode="json")
+            payload["sender_user_id"] = invite.sender_identity.display_name or invite.sender_identity.id
+            payload["recipient_user_id"] = invite.recipient_identity.display_name or invite.recipient_identity.id
+            return payload
+
         return jsonify({
-            "invites": [invite.model_dump(mode="json") for invite in invites],
+            "invites": [serialize_invite(invite) for invite in invites],
             "count": len(invites)
         }), 200
 
@@ -201,7 +227,10 @@ def get_share(share_id, user_id="alice"):
         if invite.sender_identity.id != user_id and invite.recipient_identity.id != user_id:
             return jsonify({"error": "Not authorized to view this invitation"}), 403
 
-        return jsonify(invite.model_dump(mode="json")), 200
+        payload = invite.model_dump(mode="json")
+        payload["sender_user_id"] = invite.sender_identity.display_name or invite.sender_identity.id
+        payload["recipient_user_id"] = invite.recipient_identity.display_name or invite.recipient_identity.id
+        return jsonify(payload), 200
 
     except KeyError:
         return jsonify({"error": "Share invitation not found"}), 404

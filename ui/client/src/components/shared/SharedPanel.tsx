@@ -40,7 +40,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
   } = useShared();
 
   const { viewMode, selectedTeam, teams } = useView();
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
 
   const [sendForm, setSendForm] = useState({
     recipientUserId: '',
@@ -120,6 +120,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
         itemKind: shareItem.itemKind,
         itemId: shareItem.itemId,
         message: 'Copied to personal workspace',
+        autoAccept: true,
       });
       setSendForm({ recipientUserId: '', message: '' });
       setSharedPanelView('list');
@@ -279,7 +280,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
                 {isSending ? 'Copying...' : 'Copy to Personal Workspace'}
               </div>
               <div className="text-xs text-gray-400">
-                Send to your account ({user.username})
+                Instantly copy to your account ({user.username})
               </div>
             </div>
           </div>
@@ -297,6 +298,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
             onSelect={handleRecipientSelect}
             onInputChange={handleRecipientInputChange}
             clearOnSelect={false}
+            accessToken={accessToken}
             placeholder="Search for a user..."
             inputClassName="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
           />

@@ -25,6 +25,7 @@ from directory.factory import build_directory_provider
 from teams.repository.mongo_repository import MongoTeamRepository
 from teams.service import TeamService
 from utils.user_groups_cache import UserGroupsCache
+from utils.directory_cache import DirectoryCache
 
 
 def create_app() -> Flask:
@@ -65,12 +66,17 @@ def create_app() -> Flask:
     
     auth_manager, redis_store = build_auth_stack(app, config)
     app.extensions['auth_manager'] = auth_manager
+    app.extensions['redis_store'] = redis_store
 
     user_groups_cache = UserGroupsCache(
         redis_store,
         ttl=config.user_groups_cache_ttl,
     )
     app.extensions['user_groups_cache'] = user_groups_cache
+    app.extensions['directory_cache'] = DirectoryCache(
+        redis_store,
+        ttl_seconds=config.directory_cache_ttl,
+    )
 
     mongo_client = MongoClient(get_mongo_url())
     teams_db = mongo_client[config.mongo_db]

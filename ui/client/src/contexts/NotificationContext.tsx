@@ -80,9 +80,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setError(null);
     
     try {
+      const senderType = viewMode === 'team' && selectedTeam ? 'team' : 'user';
+      const senderDisplayName = senderType === 'team'
+        ? (selectedTeam?.name || selectedTeam?.id)
+        : (user?.username || contextUserId);
       const requestWithSender = {
         ...request,
-        senderUserId: contextUserId
+        senderUserId: contextUserId,
+        senderType,
+        senderDisplayName,
       };
       
       await createShare(requestWithSender);

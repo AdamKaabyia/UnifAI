@@ -22,13 +22,21 @@ class ShareService:
 
     def create_invite(self, *, sender_user_id: str, recipient_user_id: str,
                      item_kind: ShareItemKind, item_id: str,
-                     message: Optional[str] = None, ttl_days: int = 10) -> str:
+                     message: Optional[str] = None, ttl_days: int = 10,
+                     sender_type: str = "user",
+                     sender_display_name: Optional[str] = None) -> str:
         """Create share invitation."""
         # Validate item exists and is owned by sender
         item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
+        sender_type_normalized = (sender_type or "user").strip().lower()
+        sender_label = sender_display_name or sender_user_id
+        if sender_type_normalized == "team":
+            sender_identity = Identity.team(sender_user_id, display_name=sender_label)
+        else:
+            sender_identity = Identity.user(sender_user_id, display_name=sender_label)
         
         invite = ShareInvite(
-            sender_identity=Identity.user(sender_user_id),
+            sender_identity=sender_identity,
             recipient_identity=Identity.user(recipient_user_id),
             item_kind=item_kind,
             item_id=item_id,
@@ -62,6 +70,7 @@ class ShareService:
         try:
             ctx = CloneContext(
                 sender_id=invite.sender_identity.id,
+                sender_display_name=invite.sender_identity.display_name or invite.sender_identity.id,
                 recipient_id=recipient_user_id,
             )
 

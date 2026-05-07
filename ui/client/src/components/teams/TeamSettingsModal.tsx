@@ -57,14 +57,18 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       } else {
         setTeamName("");
         setMembers(user?.username
-          ? [{ type: "user" as const, id: user.username, display_name: user.username }]
+          ? [{
+              type: "user" as const,
+              id: user.username,
+              display_name: user.name || user.username,
+            }]
           : []);
       }
       setError("");
       setExpandedGroups(new Set());
       setSearchResetKey((k) => k + 1);
     }
-  }, [open, team, user?.username]);
+  }, [open, team, user?.username, user?.name]);
 
   const addMemberFromDirectory = (dirUser: DirectoryUser) => {
     const alreadyExists = members.some((m) => m.type === "user" && m.id === dirUser.user_id);
@@ -108,6 +112,14 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
         next.delete(groupId);
         return next;
       });
+      return;
+    }
+
+    // Open instantly when we already have members; avoid refetching on every toggle.
+    const cached = getGroupMembers(groupId);
+    if (cached && cached.length > 0) {
+      setGroupMembersCache((prev) => ({ ...prev, [groupId]: cached }));
+      setExpandedGroups((prev) => new Set(prev).add(groupId));
       return;
     }
 
@@ -166,8 +178,8 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       } else {
         await createTeam(teamName.trim(), user!.username, members);
       }
-      await refreshTeams();
       onOpenChange(false);
+      void refreshTeams();
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Operation failed";
       setError(msg);
@@ -180,9 +192,9 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
     if (!team || !user?.username) return;
     try {
       await deleteTeam(team.id, user.username);
-      await refreshTeams();
       setDeleteConfirmOpen(false);
       onOpenChange(false);
+      void refreshTeams();
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || "Failed to delete team");
       console.error("Failed to delete team:", err);
@@ -190,6 +202,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   };
 
   const userMemberIds = members.filter((m) => m.type === "user").map((m) => m.id);
+  const userMemberIdSet = new Set(userMemberIds);
 
   return (
     <>
@@ -271,15 +284,26 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
                           {isExpanded && cachedMembers && (
                             <div className="px-3 pb-2 ml-[22px] border-l border-gray-800">
                               <div className="flex flex-wrap gap-1 pl-2">
-                                {cachedMembers.map((uid) => (
-                                  <span
-                                    key={uid}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-gray-400 bg-white/5"
-                                  >
-                                    <User className="w-2.5 h-2.5" />
-                                    {uid}
-                                  </span>
-                                ))}
+                                {cachedMembers.map((uid) => {
+                                  const alreadyInTeam = userMemberIdSet.has(uid);
+                                  return (
+                                    <span
+                                      key={uid}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] ${
+                                        alreadyInTeam
+                                          ? "text-gray-500 bg-gray-700/40"
+                                          : "text-gray-400 bg-white/5"
+                                      }`}
+                                      title={alreadyInTeam ? "Already in team" : undefined}
+                                    >
+                                      <User className="w-2.5 h-2.5" />
+                                      {uid}
+                                      {alreadyInTeam && (
+                                        <span className="text-[9px] text-gray-500">(already in team)</span>
+                                      )}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

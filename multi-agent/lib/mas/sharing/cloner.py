@@ -54,11 +54,16 @@ class CloneContext:
     """
     sender_id: str
     recipient_id: str
+    sender_display_name: Optional[str] = None
     is_team_contribution: bool = False
 
     @property
     def contributed_by(self) -> Optional[str]:
         return self.sender_id if self.is_team_contribution else None
+
+    @property
+    def sender_label(self) -> str:
+        return self.sender_display_name or self.sender_id
 
 
 class ShareCloner:
@@ -310,7 +315,7 @@ class ShareCloner:
         if ctx.is_team_contribution:
             base_name = preferred_name
         else:
-            base_name = f"{preferred_name} (from {ctx.sender_id})"
+            base_name = f"{preferred_name} (from {ctx.sender_label})"
 
         current_name = base_name
 
@@ -340,7 +345,7 @@ class ShareCloner:
         if ctx.is_team_contribution:
             clone_name = draft.name
         else:
-            clone_name = f"{draft.name} (from {ctx.sender_id})"
+            clone_name = f"{draft.name} (from {ctx.sender_label})"
 
         return BlueprintDraft(
             plan=self._clone_plan(draft.plan, rid_mapping),

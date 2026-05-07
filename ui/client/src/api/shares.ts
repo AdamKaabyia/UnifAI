@@ -38,6 +38,9 @@ export interface CreateShareRequest {
   message?: string;
   ttlDays?: number;
   senderUserId?: string;
+  senderType?: 'user' | 'team';
+  senderDisplayName?: string;
+  autoAccept?: boolean;
 }
 
 export interface CreateShareResponse {

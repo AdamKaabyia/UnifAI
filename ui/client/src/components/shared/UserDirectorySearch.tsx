@@ -5,6 +5,7 @@ import {
   DirectoryUser,
   DirectoryGroup,
   searchDirectory,
+  searchDirectoryUsers,
   getDirectoryStatus,
 } from '@/api/directory';
 
@@ -31,7 +32,7 @@ export default function UserDirectorySearch({
   accessToken,
   inputClassName,
 }: UserDirectorySearchProps) {
-  const [directoryEnabled, setDirectoryEnabled] = useState(false);
+  const [directoryEnabled, setDirectoryEnabled] = useState(true);
   const [query, setQuery] = useState('');
   const [userResults, setUserResults] = useState<DirectoryUser[]>([]);
   const [groupResults, setGroupResults] = useState<DirectoryGroup[]>([]);
@@ -50,7 +51,9 @@ export default function UserDirectorySearch({
   useEffect(() => {
     getDirectoryStatus()
       .then(({ enabled }) => setDirectoryEnabled(enabled))
-      .catch(() => setDirectoryEnabled(false));
+      .catch(() => {
+        setDirectoryEnabled(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -106,7 +109,9 @@ export default function UserDirectorySearch({
       debounceRef.current = setTimeout(async () => {
         const id = ++searchIdRef.current;
         try {
-          const result = await searchDirectory(value.trim(), 10, accessToken);
+          const result = onSelectGroup
+            ? await searchDirectory(value.trim(), 10, accessToken)
+            : { users: await searchDirectoryUsers(value.trim(), 10, accessToken), groups: [] };
           if (id !== searchIdRef.current) return;
           searchCacheRef.current.set(trimmed, result);
           const filteredUsers = result.users.filter((u) => !excludeUserIdsRef.current.includes(u.user_id));
@@ -114,6 +119,20 @@ export default function UserDirectorySearch({
           setGroupResults(result.groups);
         } catch (err: unknown) {
           if (id !== searchIdRef.current) return;
+          // Graceful fallback: if unified search fails, still try users-only
+          // so people can continue selecting users while group lookup is down.
+          if (onSelectGroup) {
+            try {
+              const users = await searchDirectoryUsers(value.trim(), 10, accessToken);
+              if (id !== searchIdRef.current) return;
+              const filteredUsers = users.filter((u) => !excludeUserIdsRef.current.includes(u.user_id));
+              setUserResults(filteredUsers);
+              setGroupResults([]);
+              return;
+            } catch {
+              // keep original error handling below
+            }
+          }
           setUserResults([]);
           setGroupResults([]);
           const axiosErr = err as { response?: { status?: number } };
@@ -127,7 +146,7 @@ export default function UserDirectorySearch({
         }
       }, 250);
     },
-    [directoryEnabled, accessToken, onInputChange],
+    [directoryEnabled, accessToken, onInputChange, onSelectGroup],
   );
 
   const handleSelectUser = (user: DirectoryUser) => {
