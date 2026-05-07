@@ -1,4 +1,4 @@
-import ssoApi from '@/http/ssoClient';
+import identityApi from '@/http/identityClient';
 
 export interface DirectoryUser {
   user_id: string;
@@ -27,7 +27,7 @@ function authHeaders(accessToken?: string | null): Record<string, string> {
 }
 
 export async function getDirectoryStatus(): Promise<{ enabled: boolean }> {
-  const { data } = await ssoApi.get<{ enabled: boolean }>('/directory/directory.status');
+  const { data } = await identityApi.get<{ enabled: boolean }>('/directory/directory.status');
   return data;
 }
 
@@ -36,7 +36,7 @@ export async function searchDirectoryUsers(
   limit: number = 10,
   accessToken?: string | null,
 ): Promise<DirectoryUser[]> {
-  const { data } = await ssoApi.get<{ users: DirectoryUser[] }>(
+  const { data } = await identityApi.get<{ users: DirectoryUser[] }>(
     '/directory/directory.search_users',
     { params: { q: query, limit }, headers: authHeaders(accessToken) },
   );
@@ -48,7 +48,7 @@ export async function searchDirectory(
   limit: number = 10,
   accessToken?: string | null,
 ): Promise<DirectorySearchResult> {
-  const { data } = await ssoApi.get<DirectorySearchResult>(
+  const { data } = await identityApi.get<DirectorySearchResult>(
     '/directory/directory.search',
     { params: { q: query, limit }, headers: authHeaders(accessToken) },
   );
@@ -59,7 +59,7 @@ export async function getDirectoryGroup(
   groupId: string,
   accessToken?: string | null,
 ): Promise<DirectoryGroup> {
-  const { data } = await ssoApi.get<DirectoryGroup>(
+  const { data } = await identityApi.get<DirectoryGroup>(
     '/directory/directory.get_group',
     { params: { groupId }, headers: authHeaders(accessToken) },
   );

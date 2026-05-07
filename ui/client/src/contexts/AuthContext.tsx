@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Initiate login by redirecting to backend auth endpoint
   const login = () => {
     const path = window.location.pathname + window.location.search;
-    // After SSO, return to the app root instead of the login screen
+    // After identity login, return to the app root instead of the login screen
     const originalUrl =
       path === '/login' || path.startsWith('/login?') ? '/' : path || '/';
     const stateData = { originalUrl };

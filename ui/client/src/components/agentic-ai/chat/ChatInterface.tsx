@@ -41,6 +41,7 @@ import {
   downloadFile,
   buildExportFilename,
 } from "./exportSession";
+import { sendTypingSignal as sendTypingSignalApi } from "@/api/collaboration";
 
 // Backend message format
 interface BackendMessage {
@@ -116,19 +117,11 @@ export default function ChatInterface({
   const sendTypingSignal = useCallback(() => {
     if (!collaborationMode || !runId) return;
     const username = authUser?.username || "default";
-    axios.post("/collaboration/session.typing", {
-      sessionId: runId,
-      userId: username,
-      isTyping: true,
-    }).catch(() => {});
+    sendTypingSignalApi(runId, username, true).catch(() => {});
     // Auto-clear after 4s if no new keystroke
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => {
-      axios.post("/collaboration/session.typing", {
-        sessionId: runId,
-        userId: username,
-        isTyping: false,
-      }).catch(() => {});
+      sendTypingSignalApi(runId, username, false).catch(() => {});
     }, 4000);
   }, [collaborationMode, runId, authUser?.username]);
 
@@ -136,11 +129,7 @@ export default function ChatInterface({
     if (!collaborationMode || !runId) return;
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     const username = authUser?.username || "default";
-    axios.post("/collaboration/session.typing", {
-      sessionId: runId,
-      userId: username,
-      isTyping: false,
-    }).catch(() => {});
+    sendTypingSignalApi(runId, username, false).catch(() => {});
   }, [collaborationMode, runId, authUser?.username]);
 
   const memberCache = useRef<Map<string, MemberDisplay>>(new Map());

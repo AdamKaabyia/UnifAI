@@ -10,6 +10,7 @@ from inbound.flask.endpoints.shares import shares_bp
 from inbound.flask.endpoints.statistics import statistics_bp
 from inbound.flask.endpoints.templates import templates_bp
 from inbound.flask.endpoints.collaboration import collaboration_bp
+from inbound.flask.endpoints.collaboration_locks import collaboration_locks_bp
 from inbound.flask.endpoints.workspace import workspace_bp
 from inbound.flask.endpoints.credentials import credentials_bp
 
@@ -28,6 +29,7 @@ def register_all_endpoints(app):
         {"bp": statistics_bp, "parent": 'statistics', "route": ''},
         {"bp": templates_bp, "parent": 'templates', "route": ''},
         {"bp": collaboration_bp, "parent": 'collaboration', "route": ''},
+        {"bp": collaboration_locks_bp, "parent": 'collaboration', "route": ''},
         {"bp": workspace_bp, "parent": 'workspace', "route": ''},
         {"bp": credentials_bp, "parent": 'credentials', "route": ''},
     ]

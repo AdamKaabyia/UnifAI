@@ -1,0 +1,90 @@
+import logging
+from typing import Optional, Tuple
+
+from flask import current_app, jsonify, request
+
+from inbound.flask.decorators import _is_team_member
+
+logger = logging.getLogger(__name__)
+
+EDIT_LOCK_KINDS = frozenset({"resource", "blueprint"})
+
+
+def collab_service():
+    return current_app.container.collaboration_service
+
+
+def unavailable():
+    return jsonify(
+        {"error": "Collaboration service not available - Redis is not configured"}
+    ), 501
+
+
+def invalid_edit_lock_kind():
+    return jsonify(
+        {"error": f"entityKind must be one of: {', '.join(sorted(EDIT_LOCK_KINDS))}"}
+    ), 400
+
+
+def internal_error(log: logging.Logger, action: str):
+    log.exception("%s failed", action)
+    return jsonify({"error": "Internal server error"}), 500
+
+
+def validate_user(user_id: str):
+    """Verify the claimed userId matches the authenticated caller."""
+    authenticated = request.headers.get("X-Authenticated-User", "").strip()
+    if authenticated and authenticated.casefold() != user_id.casefold():
+        return jsonify({"error": "userId does not match authenticated user"}), 403
+    return None
+
+
+def validate_team(team_id: str):
+    """Verify authenticated caller is a member of the requested team."""
+    authenticated = request.headers.get("X-Authenticated-User", "").strip()
+    if authenticated and not _is_team_member(authenticated, team_id):
+        return jsonify({"error": "Access denied: you are not a member of this team"}), 403
+    return None
+
+
+def validate_edit_lock_kind(entity_kind: str):
+    if entity_kind not in EDIT_LOCK_KINDS:
+        return invalid_edit_lock_kind()
+    return None
+
+
+def service_or_unavailable() -> Tuple[Optional[object], Optional[tuple]]:
+    svc = collab_service()
+    if svc is None:
+        return None, unavailable()
+    return svc, None
+
+
+def service_for_user(user_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+    auth_err = validate_user(user_id)
+    if auth_err:
+        return None, auth_err
+    return service_or_unavailable()
+
+
+def service_for_team(team_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+    team_err = validate_team(team_id)
+    if team_err:
+        return None, team_err
+    return service_or_unavailable()
+
+
+def service_for_user_team(user_id: str, team_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+    auth_err = validate_user(user_id)
+    if auth_err:
+        return None, auth_err
+    return service_for_team(team_id)
+
+
+def holder_to_json(holder):
+    if holder is None:
+        return None
+    return {
+        "userId": holder.user_id,
+        "displayName": holder.display_name or holder.user_id,
+    }
