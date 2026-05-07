@@ -43,7 +43,7 @@ def secret_lists = [
     rabbitmq: ['rmq_username', 'rmq_password'],
     umami: ['umami_username', 'umami_password'],
     // keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
-    global_config: [ 'secret_key'],
+    global_config: ['secret_key'],
     multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
     rag: ['default_slack_bot_token', 'default_slack_user_token'],
     ]
