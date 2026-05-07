@@ -120,8 +120,9 @@ class ShareCloner:
                 raise ValueError(f"Blueprint {blueprint_id} not owned by sender")
 
             draft = BlueprintDraft(**bp_doc.spec_dict)
-            # Use pre-computed external refs from the blueprint document
-            external_rids = set(bp_doc.rid_refs)
+            # Union stored rid_refs with a fresh walk of the draft (avoids stale rid_refs).
+            external_rids = set(bp_doc.rid_refs or [])
+            external_rids |= RefWalker.external_rids(draft)
             recipient = self._recipient_identity(ctx)
 
             # Clone dependencies and build RID mapping
@@ -158,7 +159,6 @@ class ShareCloner:
 
         logger.debug(f"Found external references: {external_rids}")
 
-        # Single pass: Load + analyze + cache all resource data
         closure_data = self._compute_closure(external_rids, ctx)
 
         if not closure_data:
@@ -216,7 +216,7 @@ class ShareCloner:
     def _compute_closure(self, root_rids: Set[str], ctx: CloneContext) -> Dict[str, ResourceCacheData]:
         """
         Compute resource closure and cache all data in a single pass.
-        
+
         Returns cached data for all resources in the dependency closure.
         Only includes resources owned by the sender.
         """
@@ -235,7 +235,9 @@ class ShareCloner:
                 doc = self.resources.get(rid)
 
                 if doc.identity.id != ctx.sender_id:
-                    logger.warning(f"Resource {rid} not owned by {ctx.sender_id}, owned by {doc.identity.id}")
+                    logger.warning(
+                        f"Resource {rid} not owned by {ctx.sender_id}, owned by {doc.identity.id}"
+                    )
                     continue
 
                 # Create schema model and compute dependencies

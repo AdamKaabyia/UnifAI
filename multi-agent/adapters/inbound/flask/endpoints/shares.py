@@ -57,16 +57,26 @@ def create_share(
         except ValueError:
             return jsonify({"error": "Invalid itemKind. Must be 'resource' or 'blueprint'"}), 400
 
+        recipient_raw = str(recipient_user_id).strip()
+
         directory = current_app.container.directory_provider
-        if directory and str(recipient_user_id).strip().casefold() != authenticated.casefold():
-            resolved = directory.get_user(recipient_user_id)
+        if directory and recipient_raw.casefold() != authenticated.casefold():
+            resolved = directory.get_user(recipient_raw)
             if not resolved:
-                return jsonify({"error": f"Recipient '{recipient_user_id}' not found in directory"}), 400
+                return jsonify({"error": f"Recipient '{recipient_raw}' not found in directory"}), 400
+
+        # Auto-accept self-copy: persist recipient as the canonical auth header value so
+        # accept_invite(..., recipient_user_id=X-Authenticated-User) always matches.
+        recipient_effective = (
+            authenticated
+            if (auto_accept and recipient_raw.casefold() == authenticated.casefold())
+            else recipient_raw
+        )
 
         svc = current_app.container.share_service
         share_id = svc.create_invite(
             sender_user_id=effective_sender_id,
-            recipient_user_id=recipient_user_id,
+            recipient_user_id=recipient_effective,
             item_kind=kind,
             item_id=item_id,
             message=message,
@@ -79,7 +89,7 @@ def create_share(
             "share_id": share_id
         }
         if auto_accept:
-            result = svc.accept_invite(share_id, recipient_user_id=recipient_user_id)
+            result = svc.accept_invite(share_id, recipient_user_id=recipient_effective)
             response["result"] = result.model_dump(mode="json")
             response["auto_accepted"] = True
 

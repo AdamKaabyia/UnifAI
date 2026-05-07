@@ -12,7 +12,7 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { useShared, SharedPanelView } from '@/contexts/SharedContext';
 import { useView } from '@/contexts/ViewContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShareInvite, shareToTeam } from '@/api/shares';
+import { ShareInvite, shareToTeam, formatShareSenderLabel } from '@/api/shares';
 import { getEffectiveMemberCount } from '@/api/teams';
 import UserDirectorySearch from '@/components/shared/UserDirectorySearch';
 import type { DirectoryUser } from '@/api/directory';
@@ -425,7 +425,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
                   <div className="flex items-center gap-4 text-xs text-gray-400 mb-2">
                     <span className="flex items-center gap-1">
                       <FaUser className="w-3 h-3" />
-                      {notification.sender_user_id}
+                      {formatShareSenderLabel(notification)}
                     </span>
                     <span className="flex items-center gap-1">
                       <FaCube className="w-3 h-3" />

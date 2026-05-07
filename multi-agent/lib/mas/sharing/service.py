@@ -2,7 +2,7 @@ import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, UTC
 
-from mas.core.identity import Identity
+from mas.core.identity import Identity, IdentityType
 from .models import ShareInvite, ShareResult, ShareStatus, ShareItemKind, ShareCleanupConfig, ShareCleanupResult
 from .repository.base import ShareRepository
 from .cloner import ShareCloner, CloneContext
@@ -13,7 +13,15 @@ class ShareService:
     Service layer for sharing functionality.
     Follows existing service patterns.
     """
-    
+
+    @staticmethod
+    def _principal_matches_identity(identity: Identity, principal_id: str) -> bool:
+        """Match authenticated principal to an identity id (case-insensitive for users)."""
+        pid = str(principal_id).strip()
+        if identity.type == IdentityType.USER:
+            return identity.id.strip().casefold() == pid.casefold()
+        return identity.id == pid
+
     def __init__(self, 
                  share_repository: ShareRepository,
                  cloner: ShareCloner):
@@ -51,10 +59,10 @@ class ShareService:
         """Accept invitation and perform cloning."""
         invite = self._repo.get(share_id)
         
-        # Validate recipient
-        if invite.recipient_identity.id != recipient_user_id:
+        # Validate recipient (case-insensitive for user ids — Keycloak vs UI drift)
+        if not self._principal_matches_identity(invite.recipient_identity, recipient_user_id):
             raise ValueError("Not authorized to accept this invite")
-        
+
         # Check if expired
         if invite.is_expired:
             raise ValueError("Invitation has expired")
@@ -66,12 +74,15 @@ class ShareService:
         if invite.status != ShareStatus.PENDING:
             raise ValueError(f"Invite is not pending (status: {invite.status})")
 
+        # Clone into the workspace id stored on the invite (canonical owner namespace).
+        recipient_owner_id = invite.recipient_identity.id
+
         # Perform cloning
         try:
             ctx = CloneContext(
                 sender_id=invite.sender_identity.id,
                 sender_display_name=invite.sender_identity.display_name or invite.sender_identity.id,
-                recipient_id=recipient_user_id,
+                recipient_id=recipient_owner_id,
             )
 
             if invite.item_kind == ShareItemKind.RESOURCE:
@@ -145,7 +156,7 @@ class ShareService:
         """Decline invitation."""
         invite = self._repo.get(share_id)
         
-        if invite.recipient_identity.id != recipient_user_id:
+        if not self._principal_matches_identity(invite.recipient_identity, recipient_user_id):
             raise ValueError("Not authorized to decline this invite")
         
         if invite.status != ShareStatus.PENDING:
@@ -261,8 +272,8 @@ class ShareService:
             return True
         
         # Recipient can delete DECLINED/CANCELED from their inbox
-        if (invite.recipient_identity.id == user_id and 
-            invite.status in [ShareStatus.DECLINED, ShareStatus.CANCELED]):
+        if (self._principal_matches_identity(invite.recipient_identity, user_id)
+            and invite.status in [ShareStatus.DECLINED, ShareStatus.CANCELED]):
             return True
         
         return False

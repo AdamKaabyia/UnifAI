@@ -20,6 +20,15 @@ export interface ShareInvite {
   result_mapping?: Record<string, string>;
 }
 
+/** Human-readable sender for notifications (prefers display name over raw id). */
+export function formatShareSenderLabel(
+  invite: Pick<ShareInvite, 'sender_display_name' | 'sender_user_id'>,
+): string {
+  const name = invite.sender_display_name?.trim();
+  if (name) return name;
+  return invite.sender_user_id;
+}
+
 export interface ShareResult {
   share_id: string;
   new_item_id: string;
@@ -77,9 +86,11 @@ export async function listShares(
   userId?: string,
   status?: 'pending' | 'accepted' | 'declined' | 'canceled',
   skip: number = 0,
-  limit: number = 100
+  limit: number = 100,
+  identityType?: 'user' | 'team',
+  displayName?: string,
 ): Promise<SharesListResponse> {
-  const params: any = {
+  const params: Record<string, string | number> = {
     direction,
     skip,
     limit,
@@ -91,6 +102,13 @@ export async function listShares(
 
   if (status) {
     params.status = status;
+  }
+
+  if (identityType) {
+    params.identityType = identityType;
+  }
+  if (displayName) {
+    params.displayName = displayName;
   }
 
   const { data } = await axios.get<SharesListResponse>('/shares/shares.list', { params });
