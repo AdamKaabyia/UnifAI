@@ -7,4 +7,3 @@ pymongo
 python-dotenv
 webargs
 requests
-ldap3
