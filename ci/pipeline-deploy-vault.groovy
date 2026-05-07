@@ -41,7 +41,7 @@ def secret_lists = [
     redis: ['redis_username', 'redis_password'],
     identity: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url'],
     rabbitmq: ['rmq_username', 'rmq_password'],
-    umami: ['umami_username', 'umami_password', 'umami_url'],
+    umami: ['umami_username', 'umami_password'],
     // keycloak: ['keycloak_base_url', 'client_id', 'client_secret', 'keycloak_realm'],
     global_config: [ 'secret_key'],
     multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
