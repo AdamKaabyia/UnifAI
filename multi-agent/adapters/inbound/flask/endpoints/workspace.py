@@ -32,8 +32,8 @@ def cleanup_workspace(identity_type, identity_id):
         logger.error("workspace.cleanup called but cleanup_secret is not configured")
         return jsonify({"error": "Endpoint not configured"}), 503
 
-    provided = str(request.headers.get(_CLEANUP_SECRET_HEADER, "") or "")
-    secret = str(cleanup_secret or "")
+    provided = request.headers.get(_CLEANUP_SECRET_HEADER, "")
+    secret = cleanup_secret or ""
     if not secrets.compare_digest(provided, secret):
         return jsonify({"error": "Unauthorized"}), 401
 

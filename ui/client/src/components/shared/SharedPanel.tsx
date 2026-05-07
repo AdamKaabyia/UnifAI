@@ -374,7 +374,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
               return (
                 <button
                   key={team.id}
-                  onClick={() => handleShareToTeam(team.id)}
+                  onClick={() => handleShareToTeam(team.name)}
                   disabled={isSending}
                   className="w-full p-3 bg-background-card border border-gray-700 rounded-lg hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left disabled:opacity-50"
                 >

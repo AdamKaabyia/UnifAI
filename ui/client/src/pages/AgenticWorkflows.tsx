@@ -73,9 +73,19 @@ export default function AgenticWorkflows() {
       setBuiltGraphId(graphId);
       setBuiltGraphName(graphName);
 
+      if (!isTeamWorkspace && !user?.username) {
+        toast({
+          title: "Authentication required",
+          description: "Sign in before starting a workflow session.",
+          variant: "destructive",
+        });
+        setIsLoadingFlow(false);
+        return;
+      }
+
       const contextUserId = isTeamWorkspace
         ? selectedTeam!.id
-        : (user?.username || "default");
+        : user!.username;
       const identityType = isTeamWorkspace ? "team" : "user";
       const selectedBlueprint = {
         blueprintId: graphId,

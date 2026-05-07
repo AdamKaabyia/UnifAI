@@ -79,6 +79,7 @@ export default function UserDirectorySearch({
   const handleChange = useCallback(
     (value: string) => {
       searchIdRef.current += 1;
+      const requestId = searchIdRef.current;
       setQuery(value);
       setSearchError('');
       onInputChange?.(value);
@@ -87,6 +88,7 @@ export default function UserDirectorySearch({
 
       const trimmed = value.trim().toLowerCase();
       if (!directoryEnabled || trimmed.length < 2) {
+        if (requestId !== searchIdRef.current) return;
         setUserResults([]);
         setGroupResults([]);
         setDropdownOpen(false);
@@ -96,6 +98,7 @@ export default function UserDirectorySearch({
 
       const cached = searchCacheRef.current.get(trimmed);
       if (cached) {
+        if (requestId !== searchIdRef.current) return;
         const filteredUsers = cached.users.filter((u) => !excludeUserIdsRef.current.includes(u.user_id));
         setUserResults(filteredUsers);
         setGroupResults(cached.groups);
@@ -108,7 +111,7 @@ export default function UserDirectorySearch({
       setDropdownOpen(true);
 
       debounceRef.current = setTimeout(async () => {
-        const id = searchIdRef.current;
+        const id = requestId;
         try {
           const result = onSelectGroup
             ? await searchDirectory(value.trim(), 10, accessToken)

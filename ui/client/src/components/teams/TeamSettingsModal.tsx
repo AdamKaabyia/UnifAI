@@ -53,6 +53,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
 
   useEffect(() => {
     if (open) {
+      setGroupMembersCache({});
       if (team) {
         setTeamName(team.name);
         setMembers([...team.members]);
@@ -180,7 +181,13 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       if (isEditing) {
         await updateTeam(team.id, { name: teamName.trim(), members });
       } else {
-        await createTeam(teamName.trim(), user!.username, members);
+        if (!user?.username) {
+          setError("Authentication required");
+          setSaving(false);
+          isSubmittingRef.current = false;
+          return;
+        }
+        await createTeam(teamName.trim(), user.username, members);
       }
       onOpenChange(false);
       void refreshTeams();

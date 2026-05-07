@@ -322,7 +322,7 @@ class ShareCloner:
         current_name = base_name
 
         for counter in range(2, 101):
-            existing = self.resources._repo.find_by_name(identity, category, type_, current_name)
+            existing = self.resources.exists_by_name(identity, category, type_, current_name)
             if not existing:
                 return current_name
 

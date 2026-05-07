@@ -145,7 +145,11 @@ export default function ExecutionTab({
   // checks "is this still the active request?" before writing state.  If the user
   // switched away in the meantime, the stale response is silently discarded.
   const sessionSelectRequestId = useRef(0);
-  
+  const selectedSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedSessionIdRef.current = selectedSession?.id ?? null;
+  }, [selectedSession?.id]);
+
   // Derived state: Chat-only mode is active for shared link sessions
   // This single flag drives all chat-only experience behaviors (no graph, no resize, etc.)
   const isChatOnlyMode = selectedSession?.fromSharedLink ?? false;
@@ -441,7 +445,10 @@ export default function ExecutionTab({
     // This enables persistent streaming - when user navigates away and returns,
     // they can reconnect to the live stream and continue seeing updates
     // Note: This runs in the background - we don't block session selection on it
-    sessionStream.checkAndReconnect(session.id).then(hasActiveStream => {
+    const reconnectSessionId = session.id;
+    sessionStream.checkAndReconnect(session.id).then((hasActiveStream) => {
+      if (sessionSelectRequestId.current !== requestId) return;
+      if (selectedSessionIdRef.current !== reconnectSessionId) return;
       if (hasActiveStream) {
         setIsLiveRequest(true);
       }

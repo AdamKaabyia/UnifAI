@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { Trash2, Users, Pencil, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,8 @@ export default function WorkflowsPanel({
   const isTeam = viewMode === "team" && !!selectedTeam;
   const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
   const identityType = isTeam ? "team" : "user";
+  const workspaceScopeRef = useRef({ contextUserId, identityType });
+  workspaceScopeRef.current = { contextUserId, identityType };
   
   // Blueprint validation hook
   const {
@@ -113,8 +115,16 @@ export default function WorkflowsPanel({
   // `forceAutoSelect` bypasses the `selectedFlow` check so the first item is always
   // picked after a scope change (where the closure still sees the stale value).
   const fetchAvailableFlows = async (forceAutoSelect = false): Promise<void> => {
+    const scopeAtStart = { contextUserId, identityType };
     try {
       const summaries = await fetchBlueprintSummaries(contextUserId, identityType);
+
+      if (
+        workspaceScopeRef.current.contextUserId !== scopeAtStart.contextUserId ||
+        workspaceScopeRef.current.identityType !== scopeAtStart.identityType
+      ) {
+        return;
+      }
 
       const processedFlows = summaries
         .map((summary, index) =>
@@ -140,7 +150,12 @@ export default function WorkflowsPanel({
       console.error("Error fetching available blueprints:", error);
       throw error;
     } finally {
-      setIsLoading(false);
+      if (
+        workspaceScopeRef.current.contextUserId === scopeAtStart.contextUserId &&
+        workspaceScopeRef.current.identityType === scopeAtStart.identityType
+      ) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -148,12 +163,24 @@ export default function WorkflowsPanel({
   const fetchActiveFlows = async (): Promise<void> => {
     if (!showActiveStatus) return;
 
+    const scopeAtStart = { contextUserId, identityType };
     try {
       const activeSessions = await fetchActiveSessions(contextUserId, identityType);
+      if (
+        workspaceScopeRef.current.contextUserId !== scopeAtStart.contextUserId ||
+        workspaceScopeRef.current.identityType !== scopeAtStart.identityType
+      ) {
+        return;
+      }
       setActiveFlowIds(activeSessions || []);
     } catch (error) {
       console.error("Error fetching active flows:", error);
-      setActiveFlowIds([]);
+      if (
+        workspaceScopeRef.current.contextUserId === scopeAtStart.contextUserId &&
+        workspaceScopeRef.current.identityType === scopeAtStart.identityType
+      ) {
+        setActiveFlowIds([]);
+      }
     }
   };
 

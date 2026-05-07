@@ -47,7 +47,7 @@ class ResourcesService:
         model_cls = self.element_registry.get_schema(ResourceCategory(category), type)
         cfg_model = model_cls(**config)
 
-        self._run_pre_save_hook(cfg_model, user_id)
+        self._run_pre_save_hook(cfg_model, identity.id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -78,7 +78,7 @@ class ResourcesService:
             ResourceCategory(doc.category), doc.type)
         cfg_model = model_cls(**config)
 
-        self._run_pre_save_hook(cfg_model, doc.user_id)
+        self._run_pre_save_hook(cfg_model, doc.identity.id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -92,7 +92,7 @@ class ResourcesService:
 
         new_server_id = doc.cfg_dict.get("server_identifier", "")
         if old_server_id and old_server_id != new_server_id:
-            self._cleanup_orphaned_credential(doc.user_id, old_server_id)
+            self._cleanup_orphaned_credential(doc.identity, old_server_id)
 
         return result
 
@@ -101,7 +101,7 @@ class ResourcesService:
         self._store.delete(rid)
         server_id = doc.cfg_dict.get("server_identifier", "")
         if server_id:
-            self._cleanup_orphaned_credential(doc.user_id, server_id)
+            self._cleanup_orphaned_credential(doc.identity, server_id)
 
     # ---------- READ ----------
     def get(self, rid: str) -> Resource:
@@ -310,15 +310,15 @@ class ResourcesService:
             raise KeyError(f"Resource not found: {rid}")
         return cards[rid]
 
-    def _cleanup_orphaned_credential(self, user_id: str, server_id: str) -> None:
+    def _cleanup_orphaned_credential(self, identity: Identity, server_id: str) -> None:
         """Delete the stored credential if no other resource uses the same server_identifier."""
         if not self._auth_service:
             return
         remaining = self._store.count_by_config_field(
-            user_id, "server_identifier", server_id,
+            identity, "server_identifier", server_id,
         )
         if remaining == 0:
-            self._auth_service.delete_credential(user_id, server_id)
+            self._auth_service.delete_credential(identity.id, server_id)
 
     # ---------- Helpers ----------
     def _run_pre_save_hook(self, cfg_model: BaseModel, user_id: str) -> None:

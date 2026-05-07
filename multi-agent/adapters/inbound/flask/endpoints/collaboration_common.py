@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 from flask import current_app, jsonify, request
 
 from inbound.flask.decorators import _is_team_member
+from mas.collaboration.service import CollaborationService
 from mas.core.identity import IdentityType
 
 logger = logging.getLogger(__name__)
@@ -76,28 +77,28 @@ def validate_edit_lock_kind(entity_kind: str):
     return None
 
 
-def service_or_unavailable() -> Tuple[Optional[object], Optional[tuple]]:
+def service_or_unavailable() -> Tuple[Optional[CollaborationService], Optional[tuple]]:
     svc = collab_service()
     if svc is None:
         return None, unavailable()
     return svc, None
 
 
-def service_for_user(user_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+def service_for_user(user_id: str) -> Tuple[Optional[CollaborationService], Optional[tuple]]:
     auth_err = validate_user(user_id)
     if auth_err:
         return None, auth_err
     return service_or_unavailable()
 
 
-def service_for_team(team_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+def service_for_team(team_id: str) -> Tuple[Optional[CollaborationService], Optional[tuple]]:
     team_err = validate_team(team_id)
     if team_err:
         return None, team_err
     return service_or_unavailable()
 
 
-def service_for_user_team(user_id: str, team_id: str) -> Tuple[Optional[object], Optional[tuple]]:
+def service_for_user_team(user_id: str, team_id: str) -> Tuple[Optional[CollaborationService], Optional[tuple]]:
     auth_err = validate_user(user_id)
     if auth_err:
         return None, auth_err

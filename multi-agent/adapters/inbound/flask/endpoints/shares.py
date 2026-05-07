@@ -1,7 +1,9 @@
 from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
+from mas.core.identity import IdentityType
 from mas.sharing.models import ShareItemKind, ShareStatus
+from mas.sharing.service import ShareService
 from inbound.flask.decorators import with_identity, _is_team_member
 
 shares_bp = Blueprint("shares", __name__)
@@ -273,8 +275,15 @@ def get_share(share_id):
         svc = current_app.container.share_service
         invite = svc.get_invite(share_id)
 
-        # Check authorization
-        if invite.sender_identity.id != user_id and invite.recipient_identity.id != user_id:
+        # Check authorization: sender (user or team member), or recipient
+        sender_ok = (
+            invite.sender_identity.type == IdentityType.TEAM
+            and _is_team_member(user_id, invite.sender_identity.id)
+        ) or ShareService._principal_matches_identity(invite.sender_identity, user_id)
+        recipient_ok = ShareService._principal_matches_identity(
+            invite.recipient_identity, user_id
+        )
+        if not (sender_ok or recipient_ok):
             return jsonify({"error": "Not authorized to view this invitation"}), 403
 
         payload = invite.model_dump(mode="json")

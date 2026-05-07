@@ -62,9 +62,13 @@ class ResourceRepository(ABC):
 
     @abstractmethod
     def count_by_config_field(
-        self, user_id: str, field: str, value: str, exclude_rid: str = "",
+        self,
+        identity: Identity,
+        field: str,
+        value: str,
+        exclude_rid: str = "",
     ) -> int:
-        """Count resources where cfg_dict.<field> == value for a user."""
+        """Count resources where cfg_dict.<field> == value for the given owner identity."""
         ...
 
     @abstractmethod

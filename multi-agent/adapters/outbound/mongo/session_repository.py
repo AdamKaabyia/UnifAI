@@ -400,7 +400,9 @@ class MongoSessionRepository(SessionRepository):
         group_id = {}
         for field in group_by:
             if field in (self._OWNER_ALIAS, "user_id"):
+                # Disambiguate user vs team when ids collide (same as analytics facets).
                 group_id[self._OWNER_ALIAS] = f"${self._IDENTITY_ID_FIELD}"
+                group_id[self._IDENTITY_TYPE_FIELD] = f"${self._IDENTITY_TYPE_FIELD}"
             else:
                 group_id[field] = f"${field}"
 

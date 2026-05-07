@@ -158,16 +158,31 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     const teamId = selectedTeam.id;
     const rid = editingElement.rid;
     const displayName = user.name?.trim() || user.username;
-    const interval = window.setInterval(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    interval = window.setInterval(() => {
       void heartbeatTeamEditLock({
         teamId,
         entityKind: "resource",
         entityId: rid,
         userId: user.username,
         displayName,
-      }).catch((err) => console.error("edit lock heartbeat failed", err));
+      }).catch((err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 501) return;
+        if (interval != null) window.clearInterval(interval);
+        interval = undefined;
+        setResourceLockHeld(false);
+        toast({
+          title: "Edit lock lost",
+          description: "We could not renew the team edit lock. The editor will close.",
+          variant: "destructive",
+        });
+        onClose();
+      });
     }, 45_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      if (interval != null) window.clearInterval(interval);
+    };
   }, [
     resourceLockHeld,
     needsResourceEditLock,
@@ -175,6 +190,8 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     editingElement?.rid,
     user?.username,
     user?.name,
+    toast,
+    onClose,
   ]);
 
   const existingNamesSet = useMemo(

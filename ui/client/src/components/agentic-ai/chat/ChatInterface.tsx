@@ -110,6 +110,7 @@ export default function ChatInterface({
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const [userPromptsMap, setUserPromptsMap] = useState<Record<string, string>>({});
+  const userPromptsMapRef = useRef<Record<string, string>>({});
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // Typing indicator: debounced POST to collaboration endpoint
@@ -134,14 +135,21 @@ export default function ChatInterface({
 
   const memberCache = useRef<Map<string, MemberDisplay>>(new Map());
   const resolveMember = useCallback((senderName: string): MemberDisplay => {
+    const found = teamMembers.find(m => m.id === senderName);
+    if (found) {
+      memberCache.current.set(senderName, found);
+      return found;
+    }
     const cached = memberCache.current.get(senderName);
     if (cached) return cached;
-    const found = teamMembers.find(m => m.id === senderName);
-    if (found) { memberCache.current.set(senderName, found); return found; }
     const built = buildMemberDisplay(senderName, memberCache.current.size + teamMembers.length);
     memberCache.current.set(senderName, built);
     return built;
   }, [teamMembers]);
+
+  useEffect(() => {
+    userPromptsMapRef.current = userPromptsMap;
+  }, [userPromptsMap]);
 
   // ────────────────────────────────────────────────────────────────────────────────
   // Auto-expanding textarea configuration
@@ -296,11 +304,17 @@ export default function ChatInterface({
           delete workPlanDataRef.current[oldMsg.id];
           streamDataChanged = true;
         }
+        if (userPromptsMapRef.current[oldMsg.id]) {
+          userPromptsMapRef.current[newMsg.id] = userPromptsMapRef.current[oldMsg.id];
+          delete userPromptsMapRef.current[oldMsg.id];
+          streamDataChanged = true;
+        }
       }
 
       if (streamDataChanged) {
         setStreamLogData({ ...streamLogDataRef.current });
         setWorkPlanData({ ...workPlanDataRef.current });
+        setUserPromptsMap({ ...userPromptsMapRef.current });
       }
 
       setMessages(transformedMessages);
@@ -730,23 +744,24 @@ export default function ChatInterface({
     const messageContent = messageToSend || inputMessage;
     if (messageContent.trim() === "") return;
 
+    if (isTyping || isLiveRequest) {
+      if (onQueueMessage) {
+        onQueueMessage(messageContent);
+        setInputMessage("");
+        setTimeout(() => {
+          resetTextareaHeight();
+          textareaRef.current?.focus();
+        }, 0);
+      }
+      return;
+    }
+
     if (!runId || runId.trim() === "") {
       toast({
         title: "No Flow Loaded",
         description: "You must load an existing flow before you can start chatting with the AI assistant.",
         variant: "destructive",
       });
-      return;
-    }
-
-    // If backend is busy (typing or live collaboration) and this is from user input (not from queue), queue it
-    if ((isTyping || isLiveRequest) && !messageToSend && onQueueMessage) {
-      onQueueMessage(messageContent);
-      setInputMessage("");
-      setTimeout(() => {
-        resetTextareaHeight();
-        textareaRef.current?.focus();
-      }, 0);
       return;
     }
 
@@ -882,8 +897,9 @@ export default function ChatInterface({
     return () => {
       stopStreamingLogs();
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      void clearTypingSignal();
     };
-  }, []);
+  }, [clearTypingSignal]);
 
   // Process queued messages when backend becomes available
   const handleSendMessageRef = useRef<((msg?: string) => Promise<void>) | null>(null);

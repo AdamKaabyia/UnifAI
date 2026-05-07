@@ -39,11 +39,13 @@ class CollaborationService:
         session_repo: SessionRepository,
         presence_ttl: int = 300,
         edit_lock_ttl: int = 180,
+        typing_ttl: int = 5,
     ):
         self._store = store
         self._session_repo = session_repo
         self._presence_ttl = presence_ttl
         self._edit_lock_ttl = edit_lock_ttl
+        self._typing_ttl = typing_ttl
 
     # ── Join / Leave ────────────────────────────────────────────────
 
@@ -131,7 +133,7 @@ class CollaborationService:
     # ── Typing ──────────────────────────────────────────────────────
 
     def set_typing(self, session_id: str, user_id: str) -> None:
-        self._store.set_typing(session_id, user_id, ttl=5)
+        self._store.set_typing(session_id, user_id, ttl=self._typing_ttl)
 
     def clear_typing(self, session_id: str, user_id: str) -> None:
         self._store.clear_typing(session_id, user_id)

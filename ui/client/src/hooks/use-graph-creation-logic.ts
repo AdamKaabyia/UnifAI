@@ -132,7 +132,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
-  const USER_ID = isTeam ? selectedTeam!.id : (user?.username || "default");
+  const USER_ID = isTeam ? selectedTeam!.id : user?.username;
   const identityType = isTeam ? "team" : "user";
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)
@@ -584,6 +584,14 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   }, [stableDeleteNode, stableAttachCondition, stableRemoveCondition]);
 
   const loadBuildingBlocks = useCallback(async () => {
+    if (!isTeam && !user?.username) {
+      setIsLoadingBlocks(false);
+      return;
+    }
+    if (!USER_ID) {
+      setIsLoadingBlocks(false);
+      return;
+    }
     try {
       setIsLoadingBlocks(true);
       const response = await axios.get(
@@ -622,7 +630,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
     } finally {
       setIsLoadingBlocks(false);
     }
-  }, [toast, USER_ID, identityType]);
+  }, [toast, USER_ID, identityType, isTeam, user?.username]);
 
   useEffect(() => {
     loadBuildingBlocks();
@@ -688,6 +696,8 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
               description: `Currently being edited by ${lockResult.lockedBy.displayName || lockResult.lockedBy.userId}.`,
               variant: "destructive",
             });
+            blueprintEditLockActiveRef.current = false;
+            setBlueprintEditLockHeld(false);
             setIsLoadingBlueprint(false);
             onEditLockDenied?.();
             return;
@@ -701,6 +711,8 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
             description: "Failed to acquire edit lock. Try again shortly.",
             variant: "destructive",
           });
+          blueprintEditLockActiveRef.current = false;
+          setBlueprintEditLockHeld(false);
           setIsLoadingBlueprint(false);
           onEditLockDenied?.();
           return;
@@ -777,16 +789,31 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
     const teamId = selectedTeam.id;
     const bpId = editBlueprintId;
     const displayName = user.name?.trim() || user.username;
-    const interval = window.setInterval(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    interval = window.setInterval(() => {
       void heartbeatTeamEditLock({
         teamId,
         entityKind: "blueprint",
         entityId: bpId,
         userId: user.username,
         displayName,
-      }).catch((err) => console.error("edit lock heartbeat failed", err));
+      }).catch((err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 501) return;
+        if (interval != null) window.clearInterval(interval);
+        interval = undefined;
+        setBlueprintEditLockHeld(false);
+        blueprintEditLockActiveRef.current = false;
+        toast({
+          title: "Edit lock lost",
+          description: "We could not renew the team edit lock. Editing is disabled.",
+          variant: "destructive",
+        });
+      });
     }, 45_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      if (interval != null) window.clearInterval(interval);
+    };
   }, [
     blueprintEditLockHeld,
     isTeam,
@@ -794,6 +821,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
     editBlueprintId,
     user?.username,
     user?.name,
+    toast,
   ]);
 
   // Sync allBlocks data to existing nodes when blocks change
@@ -1104,6 +1132,15 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
           response = await updateBlueprint(editBlueprintId, yamlString);
           blueprintId = editBlueprintId;
         } else {
+          if (!USER_ID) {
+            toast({
+              title: "❌ Cannot save workflow",
+              description: "Sign in or select a workspace before saving.",
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
           response = await saveBlueprint(yamlString, USER_ID, identityType);
           blueprintId = response.blueprint_id;
         }

@@ -67,10 +67,19 @@ class ResourcesRegistry:
         return self._repo.exists(rid)
 
     def count_by_config_field(
-        self, user_id: str, field: str, value: str, exclude_rid: str = "",
+        self,
+        identity: Identity,
+        field: str,
+        value: str,
+        exclude_rid: str = "",
     ) -> int:
-        """Count resources where cfg_dict.<field> == value for a user."""
-        return self._repo.count_by_config_field(user_id, field, value, exclude_rid)
+        """Count resources where cfg_dict.<field> == value for the given owner identity."""
+        return self._repo.count_by_config_field(identity, field, value, exclude_rid)
+
+    def exists_by_name(
+        self, identity: Identity, category: str, type_: str, name: str
+    ) -> bool:
+        return self._repo.find_by_name(identity, category, type_, name) is not None
 
     # ---------- statistics ----------
     def count(self, identity: Identity, filter: Dict[str, Any] | None = None) -> int:

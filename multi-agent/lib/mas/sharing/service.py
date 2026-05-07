@@ -168,7 +168,7 @@ class ShareService:
         """Cancel sent invitation."""
         invite = self._repo.get(share_id)
         
-        if invite.sender_identity.id != sender_user_id:
+        if not self._principal_matches_identity(invite.sender_identity, sender_user_id):
             raise ValueError("Not authorized to cancel this invite")
         
         if invite.status != ShareStatus.PENDING:
@@ -268,7 +268,10 @@ class ShareService:
     def _can_delete_invite(self, invite: ShareInvite, user_id: str) -> bool:
         """Check if user can delete this invite."""
         # Sender can delete their own invites (except ACCEPTED)
-        if invite.sender_identity.id == user_id and invite.status != ShareStatus.ACCEPTED:
+        if (
+            self._principal_matches_identity(invite.sender_identity, user_id)
+            and invite.status != ShareStatus.ACCEPTED
+        ):
             return True
         
         # Recipient can delete DECLINED/CANCELED from their inbox
