@@ -34,7 +34,7 @@ def buildParams = [
     ImageRegistry      : "images.paas.redhat.com",
     ImageRegistryPath  : "unifai",
     ImageRegistryCreds : "images.paas.registry-unifai",
-    vaultBasePath      : "apps/automation-and-tools/unifai",
+    VaultBasePath      : "apps/automation-and-tools/unifai",
 ]
 
 def secret_lists = [
@@ -328,7 +328,7 @@ pipeline {
                         }
                         def ClusterAddress = configMap.cluster_address
                         def NameSpace = configMap.namespace
-                        def ClusterAccessToken = configMap.cluster_access_token_id
+                        def ClusterAccessToken = configMap.cluster_access_token
 
                         // switch(params.deploy_location) {
                         //     case 'STAGING':
@@ -346,7 +346,7 @@ pipeline {
                         //         error("Invalid deployment location: ${params.deploy_location}")
                         // }
                         if (params.deploy_location == 'PRODUCTION') {
-                        updateGlobalConfigYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/global-config.yaml")
+                            updateGlobalConfigYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/global-config.yaml")
                         }
                         
                         // def module = "helmfile"
@@ -357,7 +357,7 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            def vaultEnvFile = generateVaultSecretsEnvFile(buildParams.vaultBasePath, secret_lists)
+                            def vaultEnvFile = generateVaultSecretsEnvFile(buildParams.VaultBasePath, secret_lists)
                             // def (identity_env_file, redis_env_file, multiagent_env_file) = updateDeployerEnv()
                             // def configEnvFile = "./UnifAI-secrets/${params.deploy_location.toLowerCase()}/.env"
                             echo("Deploy Helm container")
