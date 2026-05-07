@@ -54,4 +54,7 @@ class AppConfig(SharedConfig):
     # MCP Auth
     mcp_auth_state_secret: str = ""
     identity_host: str = "http://localhost:13456"
+    # When true, ``require_identity_authorization`` rejects requests without
+    # ``X-Authenticated-User`` even if no Identity HTTP base URL is configured.
+    require_auth_header: bool = False
     credential_encryption_key: str = ""

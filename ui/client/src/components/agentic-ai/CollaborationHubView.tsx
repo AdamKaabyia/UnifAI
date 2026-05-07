@@ -407,16 +407,18 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       } finally {
         setIsLiveRequest(false);
         streamCompleteResolverRef.current = null;
-        try {
-          const res = await axios.get(
-            `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`,
-          );
-          return res.data.output;
-        } catch (err) {
-          console.error("Error fetching session state:", err);
-          throw err;
-        }
       }
+
+      let output: unknown;
+      try {
+        const res = await axios.get(
+          `/sessions/session.state.get?sessionId=${sessionPayload.sessionId}`,
+        );
+        output = res.data.output;
+      } catch (err) {
+        console.error("Error fetching session state:", err);
+      }
+      return output;
     },
     [globalScope, user?.username, subscribeRemoteStream],
   );

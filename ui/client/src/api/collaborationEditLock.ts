@@ -7,6 +7,10 @@ export interface TeamEditLockHolder {
   displayName: string;
 }
 
+/** Present when the server could not confirm lock state (do not assume unlocked). */
+export const TEAM_EDIT_LOCK_UNKNOWN = "unknown" as const;
+export type TeamEditLockResolved = TeamEditLockHolder | null | typeof TEAM_EDIT_LOCK_UNKNOWN;
+
 function isUnavailable(status: number | undefined): boolean {
   return status === 501;
 }
@@ -90,7 +94,7 @@ export async function heartbeatTeamEditLock(params: {
     if (isUnavailable(status)) {
       return;
     }
-    console.warn("edit lock heartbeat failed", e);
+    throw e;
   }
 }
 
@@ -98,10 +102,13 @@ export async function fetchTeamEditLockStatuses(params: {
   teamId: string;
   entityKind: TeamEditLockEntityKind;
   entityIds: string[];
-}): Promise<Record<string, TeamEditLockHolder | null>> {
+}): Promise<Record<string, TeamEditLockResolved>> {
   if (params.entityIds.length === 0) {
     return {};
   }
+  const unknownMap = (): Record<string, TeamEditLockResolved> =>
+    Object.fromEntries(params.entityIds.map((id) => [id, TEAM_EDIT_LOCK_UNKNOWN]));
+
   try {
     const { data } = await axios.post<{ locks: Record<string, TeamEditLockHolder | null> }>(
       "/collaboration/edit_lock.statuses",
@@ -111,13 +118,12 @@ export async function fetchTeamEditLockStatuses(params: {
         entityIds: params.entityIds,
       },
     );
-    return data.locks ?? {};
+    return (data.locks ?? {}) as Record<string, TeamEditLockResolved>;
   } catch (e: unknown) {
     const status = (e as { response?: { status?: number } })?.response?.status;
     if (isUnavailable(status)) {
       return {};
     }
-    console.warn("edit lock statuses failed", e);
-    return {};
+    return unknownMap();
   }
 }

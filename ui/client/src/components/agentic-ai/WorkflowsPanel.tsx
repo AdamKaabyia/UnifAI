@@ -355,13 +355,16 @@ export default function WorkflowsPanel({
             ) : (
               filteredFlows.map((flow) => {
                 const bpLock = blueprintEditLocks[flow.id];
+                const bpLockUnknown = bpLock === "unknown";
                 const bpLockedByOther =
                   isTeam &&
+                  !bpLockUnknown &&
                   !!bpLock &&
                   !!user?.username &&
                   bpLock.userId !== user.username;
-                const bpLockedByLabel =
-                  bpLock?.displayName?.trim() || bpLock?.userId || "another teammate";
+                const bpLockedByLabel = bpLockUnknown
+                  ? "unknown"
+                  : bpLock?.displayName?.trim() || bpLock?.userId || "another teammate";
 
                 return (
                 <motion.div
@@ -389,7 +392,9 @@ export default function WorkflowsPanel({
                       {showEditButton && (
                         <SimpleTooltip
                           content={
-                            bpLockedByOther ? (
+                            bpLockUnknown ? (
+                              <p>Could not verify edit lock — try again shortly</p>
+                            ) : bpLockedByOther ? (
                               <p>Currently being edited by {bpLockedByLabel}</p>
                             ) : (
                               <p>Edit this workflow</p>
@@ -402,7 +407,7 @@ export default function WorkflowsPanel({
                             size="sm"
                             className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
                             onClick={(e) => handleEditClick(flow, e)}
-                            disabled={bpLockedByOther}
+                            disabled={bpLockedByOther || bpLockUnknown}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>

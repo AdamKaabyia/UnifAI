@@ -20,7 +20,8 @@ def create_app(container, config: AppConfig = None) -> Flask:
     app.config["admin_allowed_users"] = config.admin_allowed_users
     identity_base = (config.directory_sso_url or config.identity_host or "").rstrip("/")
     app.config["directory_sso_url"] = identity_base
-    app.config["identity_host"] = (config.identity_host or "").rstrip("/")
+    app.config["identity_host"] = identity_base
+    app.config["require_auth_header"] = config.require_auth_header
 
     CORS(app, resources={r"/api/*": {"origins": "*",
                                      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

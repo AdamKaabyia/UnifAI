@@ -298,8 +298,9 @@ export default function ExecutionTab({
       setChatSessions(sortedSessions);
 
       // Auto-select: prefer the session matching runId (from "Load Workflow"),
-      // otherwise fall back to the most recent session.
-      if (sortedSessions.length > 0 && !selectedSession) {
+      // otherwise fall back to the most recent session (do not rely on selectedSession
+      // — this fetch often runs right after clearing selection for workspace switches).
+      if (sortedSessions.length > 0) {
         const target = runId
           ? sortedSessions.find(s => s.id === runId) ?? sortedSessions[0]
           : sortedSessions[0];
@@ -538,13 +539,6 @@ export default function ExecutionTab({
     setSelectedFlowForModal(null);
   };
 
-  // Initialize component with API call, re-fetch when user/team context changes
-  useEffect(() => {
-    setSelectedSession(null);
-    setCurrentSessionMessages([]);
-    fetchChatSessions();
-  }, [contextUserId, identityType]);
-
   // Cleanup effect when modal closes to prevent ReactFlow state interference
   useEffect(() => {
     if (!showAddFlowModal && selectedFlowForModal) {
@@ -702,6 +696,17 @@ export default function ExecutionTab({
       }
     }, []),
   });
+
+  // Initialize / re-fetch when workspace (user vs team) changes — after stream hook exists
+  // so we can cancel any in-flight subscription from the prior workspace.
+  useEffect(() => {
+    sessionSelectRequestId.current += 1;
+    sessionStream.cancelStream();
+    clearStream();
+    setSelectedSession(null);
+    setCurrentSessionMessages([]);
+    fetchChatSessions();
+  }, [contextUserId, identityType]);
 
   /**
    * Submit a session for execution and stream results.

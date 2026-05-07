@@ -84,14 +84,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const senderDisplayName = senderType === 'team'
         ? (selectedTeam?.name || selectedTeam?.id)
         : (user?.username || contextUserId);
-      const requestWithSender = {
+      await createShare({
         ...request,
-        senderUserId: contextUserId,
+        senderIdentityId: contextUserId,
         senderType,
         senderDisplayName,
-      };
-      
-      await createShare(requestWithSender);
+      });
       await refreshNotifications();
     } catch (err) {
       console.error('Failed to send notification:', err);
@@ -105,12 +103,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setError(null);
     
     try {
-      const request: AcceptShareRequest = {
-        shareId,
-        recipientUserId: userId
-      };
-      
-      await acceptShare(request);
+      await acceptShare({ shareId });
       
       // Update the local state to reflect the change
       setReceivedNotifications(prev => 
@@ -132,12 +125,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setError(null);
     
     try {
-      const request: DeclineShareRequest = {
-        shareId,
-        recipientUserId: userId
-      };
-      
-      await declineShare(request);
+      await declineShare({ shareId });
       
       // Update the local state to reflect the change
       setReceivedNotifications(prev => 

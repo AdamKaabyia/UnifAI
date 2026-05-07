@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchTeamEditLockStatuses,
   type TeamEditLockEntityKind,
-  type TeamEditLockHolder,
+  type TeamEditLockResolved,
 } from "@/api/collaborationEditLock";
 
 const POLL_MS = 8000;
@@ -15,8 +15,8 @@ export function useTeamEditLockPoll(
   entityKind: TeamEditLockEntityKind,
   entityIds: string[],
   enabled: boolean,
-): Record<string, TeamEditLockHolder | null> {
-  const [locks, setLocks] = useState<Record<string, TeamEditLockHolder | null>>({});
+): Record<string, TeamEditLockResolved> {
+  const [locks, setLocks] = useState<Record<string, TeamEditLockResolved>>({});
   const idsKey = JSON.stringify(entityIds);
 
   useEffect(() => {

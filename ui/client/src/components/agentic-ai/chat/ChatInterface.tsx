@@ -739,8 +739,8 @@ export default function ChatInterface({
       return;
     }
 
-    // If backend is busy and this is from user input (not from queue), queue it
-    if (isTyping && !messageToSend && onQueueMessage) {
+    // If backend is busy (typing or live collaboration) and this is from user input (not from queue), queue it
+    if ((isTyping || isLiveRequest) && !messageToSend && onQueueMessage) {
       onQueueMessage(messageContent);
       setInputMessage("");
       setTimeout(() => {
@@ -890,11 +890,11 @@ export default function ChatInterface({
   handleSendMessageRef.current = handleSendMessage;
 
   useEffect(() => {
-    if (queuedMessageToProcess && !isTyping) {
+    if (queuedMessageToProcess && !isTyping && !isLiveRequest) {
       handleSendMessageRef.current?.(queuedMessageToProcess);
       onQueuedMessageProcessed?.();
     }
-  }, [queuedMessageToProcess, isTyping, onQueuedMessageProcessed]);
+  }, [queuedMessageToProcess, isTyping, isLiveRequest, onQueuedMessageProcessed]);
 
   // Memoized typing indicator
   const TypingIndicator = useMemo(
@@ -1386,7 +1386,7 @@ export default function ChatInterface({
             >
               <Button
                 onClick={() => handleSendMessage()}
-                disabled={inputMessage.trim() === "" || (isTyping && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest}
+                disabled={inputMessage.trim() === "" || ((isTyping || isLiveRequest) && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
                 className="bg-primary hover:bg-[#7525c9] mb-0"
                 title="Send message"
               >

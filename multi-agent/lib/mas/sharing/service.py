@@ -139,7 +139,7 @@ class ShareService:
                 name_conflicts=name_conflicts
             )
         except Exception as e:
-            raise ValueError(f"Failed to share to team: {str(e)}")
+            raise ValueError(f"Failed to share to team: {str(e)}") from e
 
     def decline_invite(self, share_id: str, *, recipient_user_id: str) -> None:
         """Decline invitation."""

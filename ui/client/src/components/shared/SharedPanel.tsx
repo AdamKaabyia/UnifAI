@@ -131,10 +131,6 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
     }
   };
 
-  const senderUserId = viewMode === 'team' && selectedTeam
-    ? selectedTeam.id
-    : (user?.username || '');
-
   const handleShareToTeam = async (teamName: string) => {
     if (!shareItem) return;
 
@@ -142,7 +138,6 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
     setTeamShareError(null);
     try {
       await shareToTeam({
-        senderUserId,
         teamName,
         itemKind: shareItem.itemKind,
         itemId: shareItem.itemId,

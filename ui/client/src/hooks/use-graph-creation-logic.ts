@@ -784,7 +784,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
         entityId: bpId,
         userId: user.username,
         displayName,
-      });
+      }).catch((err) => console.error("edit lock heartbeat failed", err));
     }, 45_000);
     return () => window.clearInterval(interval);
   }, [

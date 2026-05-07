@@ -1,8 +1,8 @@
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify, current_app, request
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.sharing.models import ShareItemKind, ShareStatus
-from inbound.flask.decorators import with_identity
+from inbound.flask.decorators import with_identity, _is_team_member
 
 shares_bp = Blueprint("shares", __name__)
 
@@ -13,9 +13,9 @@ shares_bp = Blueprint("shares", __name__)
     "item_kind": fields.Str(data_key="itemKind", required=True),
     "item_id": fields.Str(data_key="itemId", required=True),
     "message": fields.Str(required=False),
-    "sender_user_id": fields.Str(data_key="senderUserId", required=False, load_default="alice"),
     "sender_type": fields.Str(data_key="senderType", required=False, load_default="user"),
     "sender_display_name": fields.Str(data_key="senderDisplayName", required=False),
+    "sender_identity_id": fields.Str(data_key="senderIdentityId", required=False),
     "auto_accept": fields.Bool(data_key="autoAccept", required=False, load_default=False),
 })
 def create_share(
@@ -23,13 +23,34 @@ def create_share(
     item_kind,
     item_id,
     message=None,
-    sender_user_id="alice",
     sender_type="user",
     sender_display_name=None,
+    sender_identity_id=None,
     auto_accept=False,
 ):
     """Create share invitation."""
     try:
+        authenticated = request.headers.get("X-Authenticated-User", "").strip()
+        if not authenticated:
+            return jsonify({"error": "Missing authenticated user"}), 401
+
+        sender_type_norm = str(sender_type or "user").strip().lower()
+        claimed_owner = str(sender_identity_id or "").strip()
+        if sender_type_norm == "team":
+            if not claimed_owner:
+                return jsonify(
+                    {"error": "senderIdentityId (team id) is required when senderType is team"},
+                ), 400
+            if not _is_team_member(authenticated, claimed_owner):
+                return jsonify({"error": "Not authorized to share as this team"}), 403
+            effective_sender_id = claimed_owner
+        else:
+            if claimed_owner and claimed_owner.casefold() != authenticated.casefold():
+                return jsonify(
+                    {"error": "senderIdentityId must match the authenticated user for personal shares"},
+                ), 403
+            effective_sender_id = authenticated
+
         # Validate item_kind
         try:
             kind = ShareItemKind(item_kind)
@@ -37,14 +58,14 @@ def create_share(
             return jsonify({"error": "Invalid itemKind. Must be 'resource' or 'blueprint'"}), 400
 
         directory = current_app.container.directory_provider
-        if directory:
+        if directory and str(recipient_user_id).strip().casefold() != authenticated.casefold():
             resolved = directory.get_user(recipient_user_id)
             if not resolved:
                 return jsonify({"error": f"Recipient '{recipient_user_id}' not found in directory"}), 400
 
         svc = current_app.container.share_service
         share_id = svc.create_invite(
-            sender_user_id=sender_user_id,
+            sender_user_id=effective_sender_id,
             recipient_user_id=recipient_user_id,
             item_kind=kind,
             item_id=item_id,
@@ -73,11 +94,14 @@ def create_share(
 @shares_bp.route("/share.accept", methods=["POST"])
 @from_body({
     "share_id": fields.Str(data_key="shareId", required=True),
-    "recipient_user_id": fields.Str(data_key="recipientUserId", required=False, load_default="alice")
 })
-def accept_share(share_id, recipient_user_id="alice"):
+def accept_share(share_id):
     """Accept share invitation."""
     try:
+        recipient_user_id = request.headers.get("X-Authenticated-User", "").strip()
+        if not recipient_user_id:
+            return jsonify({"error": "Missing authenticated user"}), 401
+
         svc = current_app.container.share_service
         result = svc.accept_invite(share_id, recipient_user_id=recipient_user_id)
 
@@ -97,11 +121,14 @@ def accept_share(share_id, recipient_user_id="alice"):
 @shares_bp.route("/share.decline", methods=["POST"])
 @from_body({
     "share_id": fields.Str(data_key="shareId", required=True),
-    "recipient_user_id": fields.Str(data_key="recipientUserId", required=False, load_default="alice")
 })
-def decline_share(share_id, recipient_user_id="alice"):
+def decline_share(share_id):
     """Decline share invitation."""
     try:
+        recipient_user_id = request.headers.get("X-Authenticated-User", "").strip()
+        if not recipient_user_id:
+            return jsonify({"error": "Missing authenticated user"}), 401
+
         svc = current_app.container.share_service
         svc.decline_invite(share_id, recipient_user_id=recipient_user_id)
 
@@ -117,14 +144,19 @@ def decline_share(share_id, recipient_user_id="alice"):
 
 @shares_bp.route("/share.to_team", methods=["POST"])
 @from_body({
-    "sender_user_id": fields.Str(data_key="senderUserId", required=True),
     "team_name": fields.Str(data_key="teamName", required=True),
     "item_kind": fields.Str(data_key="itemKind", required=True),
     "item_id": fields.Str(data_key="itemId", required=True),
 })
-def share_to_team(sender_user_id, team_name, item_kind, item_id):
+def share_to_team(team_name, item_kind, item_id):
     """Share item directly to a team workspace."""
     try:
+        sender_user_id = request.headers.get("X-Authenticated-User", "").strip()
+        if not sender_user_id:
+            return jsonify({"error": "Missing authenticated user"}), 401
+        if not _is_team_member(sender_user_id, team_name):
+            return jsonify({"error": "Not authorized to share to this team"}), 403
+
         try:
             kind = ShareItemKind(item_kind)
         except ValueError:
@@ -152,11 +184,14 @@ def share_to_team(sender_user_id, team_name, item_kind, item_id):
 @shares_bp.route("/share.cancel", methods=["POST"])
 @from_body({
     "share_id": fields.Str(data_key="shareId", required=True),
-    "sender_user_id": fields.Str(data_key="senderUserId", required=False, load_default="alice")
 })
-def cancel_share(share_id, sender_user_id="alice"):
+def cancel_share(share_id):
     """Cancel share invitation."""
     try:
+        sender_user_id = request.headers.get("X-Authenticated-User", "").strip()
+        if not sender_user_id:
+            return jsonify({"error": "Missing authenticated user"}), 401
+
         svc = current_app.container.share_service
         svc.cancel_invite(share_id, sender_user_id=sender_user_id)
 
@@ -199,8 +234,10 @@ def list_shares(identity, direction="received", status=None, skip=0, limit=100):
 
         def serialize_invite(invite):
             payload = invite.model_dump(mode="json")
-            payload["sender_user_id"] = invite.sender_identity.display_name or invite.sender_identity.id
-            payload["recipient_user_id"] = invite.recipient_identity.display_name or invite.recipient_identity.id
+            payload["sender_user_id"] = invite.sender_identity.id
+            payload["sender_display_name"] = invite.sender_identity.display_name
+            payload["recipient_user_id"] = invite.recipient_identity.id
+            payload["recipient_display_name"] = invite.recipient_identity.display_name
             return payload
 
         return jsonify({
@@ -215,11 +252,14 @@ def list_shares(identity, direction="received", status=None, skip=0, limit=100):
 @shares_bp.route("/share.get", methods=["GET"])
 @from_query({
     "share_id": fields.Str(data_key="shareId", required=True),
-    "user_id": fields.Str(data_key="userId", required=False, load_default="alice")
 })
-def get_share(share_id, user_id="alice"):
+def get_share(share_id):
     """Get share invitation details."""
     try:
+        user_id = request.headers.get("X-Authenticated-User", "").strip()
+        if not user_id:
+            return jsonify({"error": "Missing authenticated user"}), 401
+
         svc = current_app.container.share_service
         invite = svc.get_invite(share_id)
 
@@ -228,8 +268,10 @@ def get_share(share_id, user_id="alice"):
             return jsonify({"error": "Not authorized to view this invitation"}), 403
 
         payload = invite.model_dump(mode="json")
-        payload["sender_user_id"] = invite.sender_identity.display_name or invite.sender_identity.id
-        payload["recipient_user_id"] = invite.recipient_identity.display_name or invite.recipient_identity.id
+        payload["sender_user_id"] = invite.sender_identity.id
+        payload["sender_display_name"] = invite.sender_identity.display_name
+        payload["recipient_user_id"] = invite.recipient_identity.id
+        payload["recipient_display_name"] = invite.recipient_identity.display_name
         return jsonify(payload), 200
 
     except KeyError:

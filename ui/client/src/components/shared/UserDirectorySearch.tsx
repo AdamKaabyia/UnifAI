@@ -78,6 +78,7 @@ export default function UserDirectorySearch({
 
   const handleChange = useCallback(
     (value: string) => {
+      searchIdRef.current += 1;
       setQuery(value);
       setSearchError('');
       onInputChange?.(value);
@@ -107,7 +108,7 @@ export default function UserDirectorySearch({
       setDropdownOpen(true);
 
       debounceRef.current = setTimeout(async () => {
-        const id = ++searchIdRef.current;
+        const id = searchIdRef.current;
         try {
           const result = onSelectGroup
             ? await searchDirectory(value.trim(), 10, accessToken)

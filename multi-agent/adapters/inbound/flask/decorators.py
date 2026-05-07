@@ -63,6 +63,13 @@ def _identity_service_base() -> str:
     ).rstrip("/")
 
 
+def _require_auth_header_enforced() -> bool:
+    """Whether ``X-Authenticated-User`` must be present for guarded decorators."""
+    if current_app.config.get("require_auth_header"):
+        return True
+    return bool(_identity_service_base())
+
+
 def require_admin_access(f):
     """
     Decorator to require admin access for an endpoint.
@@ -124,15 +131,22 @@ def require_identity_authorization(f):
     user must be a member of the claimed team (verified via the Identity pod
     ``/api/teams/teams.list``, with a short in-process cache per user).
 
-    Skipped when the header is absent (allows direct/internal calls) or
-    when neither ``directory_sso_url`` nor ``identity_host`` is configured.
-    **Production:** expose user-facing routes only when the gateway sets
-    ``X-Authenticated-User``; otherwise team/user impersonation is possible.
+    When ``_require_auth_header_enforced()`` is true (Identity base URL is
+    configured and/or ``REQUIRE_AUTH_HEADER`` / ``require_auth_header`` is set),
+    requests without ``X-Authenticated-User`` receive **401**.
+
+    Otherwise the header is optional (direct/internal calls); when present,
+    claimed user/team identity is still validated below.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
         if not authenticated_user:
+            if _require_auth_header_enforced():
+                return jsonify({
+                    "error": "Missing authenticated user",
+                    "error_type": "AUTHENTICATION_REQUIRED",
+                }), 401
             return f(*args, **kwargs)
 
         body = request.get_json(silent=True) or {}

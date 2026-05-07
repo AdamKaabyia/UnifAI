@@ -165,7 +165,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
         entityId: rid,
         userId: user.username,
         displayName,
-      });
+      }).catch((err) => console.error("edit lock heartbeat failed", err));
     }, 45_000);
     return () => window.clearInterval(interval);
   }, [

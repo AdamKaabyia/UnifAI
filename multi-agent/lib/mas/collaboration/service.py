@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 from mas.core.identity import Identity, IdentityType
+from mas.session.domain.session_record import SessionRecord
 from mas.session.repository.repository import SessionRepository
 from .models import (
     Participant,
@@ -76,20 +77,21 @@ class CollaborationService:
         if record.identity.type == IdentityType.TEAM:
             self._store.register_team_session(record.identity.id, session_id)
 
-        return self._store.get_participants(session_id)
+        participants = self._store.get_participants(session_id)
+        self._reconcile_team_session_index_if_empty(session_id, record, participants)
+        return participants
 
     def leave_session(self, session_id: str, user_id: str) -> None:
         """Remove a user from a session's participant list."""
         self._store.remove_participant(session_id, user_id)
 
         participants = self._store.get_participants(session_id)
-        if not participants.participants:
-            try:
-                record = self._session_repo.fetch(session_id)
-                if record.identity.type == IdentityType.TEAM:
-                    self._store.unregister_team_session(record.identity.id, session_id)
-            except KeyError:
-                pass
+        try:
+            record = self._session_repo.fetch(session_id)
+        except KeyError:
+            record = None
+        if record is not None:
+            self._reconcile_team_session_index_if_empty(session_id, record, participants)
 
     def heartbeat(self, session_id: str, user_id: str) -> None:
         """Refresh presence TTL for a user in a session."""
@@ -98,7 +100,26 @@ class CollaborationService:
     # ── Queries ─────────────────────────────────────────────────────
 
     def get_participants(self, session_id: str) -> SessionParticipants:
-        return self._store.get_participants(session_id)
+        """Return live participants; drop stale team-session index when everyone TTL'd out."""
+        participants = self._store.get_participants(session_id)
+        try:
+            record = self._session_repo.fetch(session_id)
+        except KeyError:
+            return participants
+        self._reconcile_team_session_index_if_empty(session_id, record, participants)
+        return participants
+
+    def _reconcile_team_session_index_if_empty(
+        self,
+        session_id: str,
+        record: SessionRecord,
+        participants: SessionParticipants,
+    ) -> None:
+        if record.identity.type != IdentityType.TEAM:
+            return
+        if participants.participants:
+            return
+        self._store.unregister_team_session(record.identity.id, session_id)
 
     def get_team_sessions(self, team_id: str) -> TeamSessionIndex:
         return self._store.get_team_sessions(team_id)

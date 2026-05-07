@@ -22,7 +22,7 @@ class BlueprintExecutionStats(BaseModel):
     failed_runs: int = Field(0, description="Number of FAILED executions")
     last_run: Optional[str] = Field(None, description="ISO timestamp of most recent execution")
     avg_duration_ms: Optional[float] = Field(None, description="Average duration in milliseconds")
-    users: List[str] = Field(default_factory=list, description="List of user IDs who ran this blueprint")
+    users: List[str] = Field(default_factory=list, description="Distinct runner identities as ``type:id`` strings (e.g. ``user:alice``, ``team:acme``)")
 
 # -----------------------------------------------------------------------------
 # Import the *catalog* specs (single source of truth for field validation)

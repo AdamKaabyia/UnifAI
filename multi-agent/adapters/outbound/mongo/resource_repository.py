@@ -109,7 +109,9 @@ class MongoResourceRepository(ResourceRepository):
         return self.col.count_documents(filter_dict)
 
     def count(self, identity: Identity, filter: dict | None = None) -> int:
-        return self.col.count_documents({**self._identity_q(identity), **(filter or {})})
+        # Identity keys must not be overridden by caller-supplied filter.
+        merged = {**(filter or {}), **self._identity_q(identity)}
+        return self.col.count_documents(merged)
 
     def meta(self, rid: str) -> tuple[str, str]:
         doc = self.col.find_one({"_id": rid}, {"category": 1, "type": 1})
@@ -151,7 +153,7 @@ class MongoResourceRepository(ResourceRepository):
         Transforms MongoDB's {"_id": {...}, "count": N} format to 
         database-agnostic GroupedCount DTOs.
         """
-        match = {**self._identity_q(identity), **(filter or {})}
+        match = {**(filter or {}), **self._identity_q(identity)}
         group_id = {field: f"${field}" for field in group_by}
         
         pipeline = [

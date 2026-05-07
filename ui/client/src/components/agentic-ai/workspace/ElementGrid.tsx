@@ -161,13 +161,16 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {elements.map((element, index) => {
         const lockHolder = resourceEditLocks[element.rid];
+        const lockUnknown = lockHolder === "unknown";
         const lockedByOther =
           isTeamWorkspace &&
+          !lockUnknown &&
           !!lockHolder &&
           !!user?.username &&
           lockHolder.userId !== user.username;
-        const lockedByLabel =
-          lockHolder?.displayName?.trim() || lockHolder?.userId || "another teammate";
+        const lockedByLabel = lockUnknown
+          ? "unknown"
+          : lockHolder?.displayName?.trim() || lockHolder?.userId || "another teammate";
 
         return (
         <motion.div
@@ -282,7 +285,9 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
               <div className="flex gap-2 w-full">
                 <SimpleTooltip
                   content={
-                    lockedByOther ? (
+                    lockUnknown ? (
+                      <p>Could not verify edit lock — try again shortly</p>
+                    ) : lockedByOther ? (
                       <p>Currently being edited by {lockedByLabel}</p>
                     ) : (
                       <p>Configure this element</p>
@@ -295,7 +300,7 @@ export const ElementGrid: React.FC<ElementGridProps> = ({
                   size="sm" 
                   className="flex-1 flex items-center justify-center gap-2"
                   onClick={() => onEditElement(element)}
-                  disabled={lockedByOther}
+                  disabled={lockedByOther || lockUnknown}
                 >
                   <Settings className="h-3 w-3" />
                   Configure

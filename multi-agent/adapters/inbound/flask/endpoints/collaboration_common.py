@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 from flask import current_app, jsonify, request
 
 from inbound.flask.decorators import _is_team_member
+from mas.core.identity import IdentityType
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,9 @@ def internal_error(log: logging.Logger, action: str):
 def validate_user(user_id: str):
     """Verify the claimed userId matches the authenticated caller."""
     authenticated = request.headers.get("X-Authenticated-User", "").strip()
-    if authenticated and authenticated.casefold() != user_id.casefold():
+    if not authenticated:
+        return jsonify({"error": "Missing authenticated user"}), 401
+    if authenticated.casefold() != user_id.casefold():
         return jsonify({"error": "userId does not match authenticated user"}), 403
     return None
 
@@ -42,9 +45,29 @@ def validate_user(user_id: str):
 def validate_team(team_id: str):
     """Verify authenticated caller is a member of the requested team."""
     authenticated = request.headers.get("X-Authenticated-User", "").strip()
-    if authenticated and not _is_team_member(authenticated, team_id):
+    if not authenticated:
+        return jsonify({"error": "Missing authenticated user"}), 401
+    if not _is_team_member(authenticated, team_id):
         return jsonify({"error": "Access denied: you are not a member of this team"}), 403
     return None
+
+
+def validate_session_access(session_id: str):
+    """Require auth header and Mongo session ownership (user or team member)."""
+    authenticated = request.headers.get("X-Authenticated-User", "").strip()
+    if not authenticated:
+        return None, (jsonify({"error": "Missing authenticated user"}), 401)
+    repo = current_app.container.session_repo
+    try:
+        record = repo.fetch(session_id)
+    except KeyError:
+        return None, (jsonify({"error": f"Session {session_id} not found"}), 404)
+    if record.identity.type == IdentityType.TEAM:
+        if not _is_team_member(authenticated, record.identity.id):
+            return None, (jsonify({"error": "Access denied"}), 403)
+    elif authenticated.casefold() != record.identity.id.casefold():
+        return None, (jsonify({"error": "Access denied"}), 403)
+    return record, None
 
 
 def validate_edit_lock_kind(entity_kind: str):

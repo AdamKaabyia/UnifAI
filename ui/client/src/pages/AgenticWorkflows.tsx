@@ -46,7 +46,6 @@ export default function AgenticWorkflows() {
   const { viewMode, selectedTeam } = useView();
   /** Team API identity only when a team is selected (matches ExecutionTab / graph builder hooks). */
   const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
-  const isTeam = viewMode === "team";
   const [, navigate] = useLocation();
   
   // Handle validation changes from the flow graph
@@ -131,7 +130,7 @@ export default function AgenticWorkflows() {
   return (
     <>
       <Header
-        title={isTeam ? `Team Workflows — ${selectedTeam?.name ?? 'Team'}` : "Agentic AI System"}
+        title={isTeamWorkspace ? `Team Workflows — ${selectedTeam?.name ?? 'Team'}` : "Agentic AI System"}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
@@ -209,7 +208,7 @@ export default function AgenticWorkflows() {
                   </CardHeader>
                   <CardContent className="pt-2 px-4 pb-4">
                     <p className="text-sm text-gray-400">
-                      {isTeam
+                      {isTeamWorkspace
                         ? `Browse and manage shared workflows for ${selectedTeam?.name ?? 'your team'}. Select a workflow and click "Load Workflow" to execute it, or build a new one to share with your team.`
                         : 'Configure your agent workflow. Select a pre-existing flow and click "Load Workflow" to execute it, or click "Build Workflow" to create a custom workflow with drag-and-drop components.'}
                     </p>

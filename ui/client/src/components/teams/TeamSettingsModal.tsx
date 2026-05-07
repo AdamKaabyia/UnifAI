@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView, TeamInfo } from "@/contexts/ViewContext";
 import { createTeam, updateTeam, deleteTeam, TeamMember, getEffectiveMemberCount } from "@/api/teams";
@@ -40,7 +40,9 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchResetKey, setSearchResetKey] = useState(0);
+  const isSubmittingRef = useRef(false);
 
   // Track which groups are expanded to show their members
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -162,6 +164,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
   };
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
     if (!teamName.trim()) {
       setError("Team name is required");
       return;
@@ -170,6 +173,7 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       setError("At least one member is required");
       return;
     }
+    isSubmittingRef.current = true;
     setSaving(true);
     setError("");
     try {
@@ -185,11 +189,13 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
       setError(msg);
     } finally {
       setSaving(false);
+      isSubmittingRef.current = false;
     }
   };
 
   const handleDelete = async () => {
-    if (!team || !user?.username) return;
+    if (!team || !user?.username || isDeleting) return;
+    setIsDeleting(true);
     try {
       await deleteTeam(team.id, user.username);
       setDeleteConfirmOpen(false);
@@ -198,6 +204,8 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || "Failed to delete team");
       console.error("Failed to delete team:", err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -392,8 +400,12 @@ export default function TeamSettingsModal({ open, onOpenChange, team }: TeamSett
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

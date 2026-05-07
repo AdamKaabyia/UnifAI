@@ -62,7 +62,9 @@ class MongoSessionRepository(SessionRepository):
 
         self._col.create_index(
             [(self._RUN_ID_FIELD, pymongo.ASCENDING)],
+            unique=True,
             background=True,
+            name="uq_session_run_id",
         )
 
         self._col.create_index(
@@ -142,7 +144,8 @@ class MongoSessionRepository(SessionRepository):
     # ---------- Owner-scoped Statistics ----------
 
     def count(self, identity: Identity, filter: Dict[str, Any]) -> int:
-        query = {**self._identity_match(identity), **filter}
+        # Identity keys must not be overridden by caller-supplied filter.
+        query = {**filter, **self._identity_match(identity)}
         return self._col.count_documents(query)
 
     def group_count(
@@ -163,7 +166,7 @@ class MongoSessionRepository(SessionRepository):
         Returns:
             List of GroupedCount DTOs with grouped field values and count.
         """
-        match = {**self._identity_match(identity), **(filter or {})}
+        match = {**(filter or {}), **self._identity_match(identity)}
         return self._aggregate_group_count(match, group_by)
 
     # ---------- System-wide Statistics (for admin analytics) ----------
@@ -339,7 +342,15 @@ class MongoSessionRepository(SessionRepository):
                         ]
                     }
                 },
-                "users": {"$addToSet": f"${self._IDENTITY_ID_FIELD}"}
+                "users": {
+                    "$addToSet": {
+                        "$concat": [
+                            f"${self._IDENTITY_TYPE_FIELD}",
+                            ":",
+                            f"${self._IDENTITY_ID_FIELD}",
+                        ]
+                    }
+                }
             }}
         ]
 

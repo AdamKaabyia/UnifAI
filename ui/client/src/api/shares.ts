@@ -3,7 +3,9 @@ import axios from '@/http/axiosAgentConfig';
 export interface ShareInvite {
   share_id: string;
   sender_user_id: string;
+  sender_display_name?: string | null;
   recipient_user_id: string;
+  recipient_display_name?: string | null;
   item_kind: 'resource' | 'blueprint';
   item_id: string;
   item_name: string;
@@ -37,7 +39,7 @@ export interface CreateShareRequest {
   itemId: string;
   message?: string;
   ttlDays?: number;
-  senderUserId?: string;
+  senderIdentityId?: string;
   senderType?: 'user' | 'team';
   senderDisplayName?: string;
   autoAccept?: boolean;
@@ -50,7 +52,6 @@ export interface CreateShareResponse {
 
 export interface AcceptShareRequest {
   shareId: string;
-  recipientUserId?: string;
 }
 
 export interface AcceptShareResponse {
@@ -60,7 +61,6 @@ export interface AcceptShareResponse {
 
 export interface DeclineShareRequest {
   shareId: string;
-  recipientUserId?: string;
 }
 
 export interface DeclineShareResponse {
@@ -108,7 +108,6 @@ export async function declineShare(request: DeclineShareRequest): Promise<Declin
 }
 
 export interface ShareToTeamRequest {
-  senderUserId: string;
   teamName: string;
   itemKind: 'resource' | 'blueprint';
   itemId: string;
@@ -124,12 +123,7 @@ export async function shareToTeam(request: ShareToTeamRequest): Promise<ShareToT
   return data;
 }
 
-export async function getShare(shareId: string, userId?: string): Promise<ShareInvite> {
-  const params: any = { shareId };
-  if (userId) {
-    params.userId = userId;
-  }
-
-  const { data } = await axios.get<ShareInvite>('/shares/share.get', { params });
+export async function getShare(shareId: string): Promise<ShareInvite> {
+  const { data } = await axios.get<ShareInvite>('/shares/share.get', { params: { shareId } });
   return data;
 }
