@@ -131,14 +131,14 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
     }
   };
 
-  const handleShareToTeam = async (teamName: string) => {
+  const handleShareToTeam = async (teamId: string) => {
     if (!shareItem) return;
 
     setIsSending(true);
     setTeamShareError(null);
     try {
       await shareToTeam({
-        teamName,
+        teamName: teamId,
         itemKind: shareItem.itemKind,
         itemId: shareItem.itemId,
       });
@@ -374,7 +374,7 @@ export default function SharedPanel({ isOpen, onClose }: SharedPanelProps) {
               return (
                 <button
                   key={team.id}
-                  onClick={() => handleShareToTeam(team.name)}
+                  onClick={() => handleShareToTeam(team.id)}
                   disabled={isSending}
                   className="w-full p-3 bg-background-card border border-gray-700 rounded-lg hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left disabled:opacity-50"
                 >

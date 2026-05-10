@@ -24,6 +24,7 @@ import ShareWorkflow from "./ShareWorkflow";
 import { BlueprintValidationResult } from "@/types/validation";
 import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
 import { useTeamEditLockPoll } from "@/hooks/use-team-edit-lock-poll";
+import { cn } from "@/lib/utils";
 
 export interface WorkflowsPanelProps {
   selectedFlow: FlowObject | null;
@@ -418,6 +419,9 @@ export default function WorkflowsPanel({
                       )}
                       {showEditButton && (
                         <SimpleTooltip
+                          side="left"
+                          align="center"
+                          collisionPadding={12}
                           content={
                             bpLockUnknown ? (
                               <p>Could not verify edit lock — try again shortly</p>
@@ -428,16 +432,24 @@ export default function WorkflowsPanel({
                             )
                           }
                         >
-                          <span className="inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
-                            onClick={(e) => handleEditClick(flow, e)}
-                            disabled={bpLockedByOther || bpLockUnknown}
+                          <span
+                            className={cn(
+                              "inline-flex",
+                              (bpLockedByOther || bpLockUnknown) && "cursor-not-allowed",
+                            )}
                           >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary",
+                                (bpLockedByOther || bpLockUnknown) && "pointer-events-none",
+                              )}
+                              onClick={(e) => handleEditClick(flow, e)}
+                              disabled={bpLockedByOther || bpLockUnknown}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
                           </span>
                         </SimpleTooltip>
                       )}

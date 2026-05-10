@@ -4,7 +4,7 @@ from webargs import fields
 from mas.core.identity import IdentityType
 from mas.sharing.models import ShareItemKind, ShareStatus
 from mas.sharing.service import ShareService
-from inbound.flask.decorators import with_identity, _is_team_member
+from inbound.flask.decorators import with_identity, _is_team_member, _resolve_team_id_for_member
 
 shares_bp = Blueprint("shares", __name__)
 
@@ -166,7 +166,8 @@ def share_to_team(team_name, item_kind, item_id):
         sender_user_id = request.headers.get("X-Authenticated-User", "").strip()
         if not sender_user_id:
             return jsonify({"error": "Missing authenticated user"}), 401
-        if not _is_team_member(sender_user_id, team_name):
+        team_id = _resolve_team_id_for_member(sender_user_id, team_name)
+        if team_id is None:
             return jsonify({"error": "Not authorized to share to this team"}), 403
 
         try:
@@ -177,7 +178,7 @@ def share_to_team(team_name, item_kind, item_id):
         svc = current_app.container.share_service
         result = svc.share_to_team(
             sender_user_id=sender_user_id,
-            team_name=team_name,
+            team_name=team_id,
             item_kind=kind,
             item_id=item_id
         )

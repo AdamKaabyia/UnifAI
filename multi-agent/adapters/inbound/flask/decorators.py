@@ -35,7 +35,8 @@ def _set_cached_team_ids(username: str, team_ids: frozenset[str]) -> None:
         _team_ids_cache[username] = (time.monotonic(), team_ids)
 
 
-def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
+def _fetch_teams_payload_from_identity(username: str, base: str) -> list:
+    """Raw ``teams`` array from Identity ``teams.list`` for *username*."""
     resp = http_requests.get(
         f"{base}/api/teams/teams.list",
         params={"userId": username},
@@ -43,12 +44,54 @@ def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
     )
     if resp.status_code != 200:
         raise RuntimeError(f"teams.list HTTP {resp.status_code}")
-    teams = resp.json().get("teams", [])
+    return resp.json().get("teams", []) or []
+
+
+def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
+    teams = _fetch_teams_payload_from_identity(username, base)
     return frozenset(
         str(t.get("team_id"))
         for t in teams
         if t.get("team_id") is not None
     )
+
+
+def _resolve_team_id_for_member(username: str, team_name_or_id: str) -> str | None:
+    """Map a team display name or ``team_id`` to the canonical id for teams the user may access.
+
+    Used by APIs that accept a human-readable ``teamName`` while membership checks
+    and workspace ownership use ``team_id``.
+
+    When no Identity base URL is configured, returns *team_name_or_id* stripped
+    (legacy / local dev — no server-side validation).
+
+    Returns ``None`` when Identity is configured but the user has no matching team
+    or ``teams.list`` fails.
+    """
+    raw = str(team_name_or_id).strip()
+    if not raw:
+        return None
+
+    base = _identity_service_base()
+    if not base:
+        return raw
+
+    try:
+        teams = _fetch_teams_payload_from_identity(username, base)
+    except Exception:
+        logger.exception("teams.list failed during team id resolution")
+        return None
+
+    for t in teams:
+        tid = str(t.get("team_id") or "").strip()
+        if not tid:
+            continue
+        if raw.casefold() == tid.casefold():
+            return tid
+        nm = str(t.get("name") or "").strip()
+        if nm and raw.casefold() == nm.casefold():
+            return tid
+    return None
 
 
 def _identity_service_base() -> str:
