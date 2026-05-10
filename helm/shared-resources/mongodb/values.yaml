@@ -294,7 +294,7 @@ storage:
   volumeName: "unifai-mongodb-volume"
 
   ## Alternative set requestedSize to define a size for a dynamically created PVC
-  requestedSize: 100G
+  requestedSize: 10G
 
   ## the storage class name
   className: aws-ebs

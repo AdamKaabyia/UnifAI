@@ -1,6 +1,6 @@
 storage:
   volumeName: unifai-rag-shared-storage
-  requestedSize: 100Gi
+  requestedSize: 10Gi
   className: aws-efs-tier-c1
   accessModes:
     - ReadWriteMany
