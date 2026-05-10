@@ -295,6 +295,9 @@ class AuthManager:
         def get_user_groups():
             """Return the logged-in user's ROVER/directory groups (cached in Redis).
 
+            Query ``fresh=1`` (or ``true``) skips the Redis cache and re-fetches
+            from the directory so UI reloads reflect Rover membership changes.
+
             On every call, also syncs ``group_members`` on teams in
             MongoDB so the effective member count stays accurate.
             """
@@ -306,15 +309,16 @@ class AuthManager:
             if not username:
                 return jsonify({'groups': []}), 200
 
+            fresh = request.args.get('fresh', '').lower() in ('1', 'true', 'yes')
             groups = None
             cache = current_app.extensions.get('user_groups_cache')
-            if cache:
+            if cache and not fresh:
                 groups = cache.get_groups(username)
 
             if groups is None:
                 access_token = session_data.get('access_token')
                 groups = self._fetch_user_groups(username, access_token)
-                if cache and groups:
+                if cache:
                     cache.set_groups(username, groups)
 
             if groups:

@@ -76,17 +76,20 @@ export function ViewProvider({ children }: { children: React.ReactNode }) {
     setTeamsLoading(true);
     teamsListSucceededRef.current = false;
     try {
-      let groups: string[] = [];
+      let roverGroupIds: string[] | undefined;
       try {
         const { api } = await import('@/http/authClient');
-        const res = await api.get<{ groups: string[] }>('/auth/user/groups');
-        groups = res.data.groups || [];
-        setUserGroups(groups);
+        const res = await api.get<{ groups: string[] }>('/auth/user/groups', {
+          params: { fresh: '1' },
+        });
+        roverGroupIds = res.data.groups ?? [];
+        setUserGroups(roverGroupIds);
       } catch {
         // Groups endpoint may not be available; fall back gracefully
+        roverGroupIds = undefined;
       }
 
-      const fetched = await listUserTeams(user.username, groups.length > 0 ? groups : undefined);
+      const fetched = await listUserTeams(user.username, roverGroupIds);
       const mapped = fetched.map(toTeamInfo);
       setTeams(mapped);
       teamsListSucceededRef.current = true;

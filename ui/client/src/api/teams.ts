@@ -65,7 +65,7 @@ export async function listUserTeams(
   groupIds?: string[],
 ): Promise<Team[]> {
   const params: Record<string, string> = { userId };
-  if (groupIds && groupIds.length > 0) {
+  if (groupIds !== undefined) {
     params.groupIds = groupIds.join(',');
   }
   const { data } = await identityApi.get<TeamsListResponse>('/teams/teams.list', {

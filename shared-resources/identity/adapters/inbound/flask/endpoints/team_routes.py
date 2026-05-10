@@ -37,8 +37,17 @@ def list_teams():
     if not user_id:
         return jsonify({"error": "userId parameter is required"}), 400
 
-    group_ids_str = request.args.get("groupIds", "").strip()
-    group_ids = group_ids_str.split(",") if group_ids_str else None
+    # ``groupIds`` omitted => unknown / legacy (do not filter by Rover groups).
+    # Present but empty => caller knows the user has no Rover groups (strict).
+    if "groupIds" in request.args:
+        group_ids_str = request.args.get("groupIds", "").strip()
+        group_ids = (
+            [p.strip() for p in group_ids_str.split(",") if p.strip()]
+            if group_ids_str
+            else []
+        )
+    else:
+        group_ids = None
 
     try:
         teams = svc.list_user_teams(user_id, group_ids=group_ids)

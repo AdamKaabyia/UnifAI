@@ -31,14 +31,22 @@ class MongoTeamRepository(TeamRepository):
 
     def find_by_member(self, member_id: str,
                        group_ids: Optional[List[str]] = None) -> List[Team]:
+        """Teams visible to *member_id*.
+
+        * ``group_ids is None``: legacy — include stale ``group_members`` matches.
+        * ``group_ids == []``: Rover groups known empty — direct membership only.
+        * non-empty ``group_ids``: LDAP/Rover is authoritative for group access;
+          do not match standalone ``group_members`` (avoids stale snapshots).
+        """
         conditions = [
             {"members.id": member_id},
             {"members": member_id},
-            {"members.group_members": member_id},
         ]
-        if group_ids:
+        if group_ids is None:
+            conditions.append({"members.group_members": member_id})
+        elif group_ids:
             conditions.append({
-                "members": {"$elemMatch": {"type": "group", "id": {"$in": group_ids}}}
+                "members": {"$elemMatch": {"type": "group", "id": {"$in": group_ids}}},
             })
         cursor = self.col.find({"$or": conditions}).sort("created_at", pymongo.DESCENDING)
         return [Team(**doc) for doc in cursor]
