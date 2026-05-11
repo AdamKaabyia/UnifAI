@@ -93,7 +93,7 @@ class ValidateConnectionAction(BaseAction):
         scheme_type = input_data.scheme_type
 
         auth_cred = None
-        if self._auth and user_id and not input_data.bearer_token:
+        if auth_method != "access_token" and self._auth and user_id and not input_data.bearer_token:
             lookup_id = server_id or str(input_data.mcp_url)
             auth_cred = self._auth.bind(user_id, lookup_id, scheme_type=scheme_type)
 
