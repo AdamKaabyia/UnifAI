@@ -71,11 +71,20 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
   const [blueprintValidationStatusMap, setBlueprintValidationStatusMap] = useState<Map<string, ValidationStatus>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Bumped when workspace or credential user changes so consumers re-run validateResources. */
+  const [validationRevision, setValidationRevision] = useState(0);
   const { user } = useAuth();
   const { viewMode, selectedTeam } = useView();
   const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
   /** Owner id for resource/blueprint APIs: team id in team view, else username. */
   const USER_ID = isTeamWorkspace ? selectedTeam!.id : (user?.username || "default");
+  /**
+   * Mongo auth keys are always per logged-in user. Team workspaces list resources under
+   * USER_ID (team id), but validators that call AuthService must use this id or OAuth
+   * probes look up (teamId, issuer) and get AUTH_EXPIRED while Configure still shows
+   * the user's tokens.
+   */
+  const CREDENTIAL_USER_ID = user?.username || "default";
   const WORKSPACE_IDENTITY_TYPE = isTeamWorkspace ? "team" : "user";
   const WORKSPACE_DISPLAY_NAME = isTeamWorkspace ? (selectedTeam?.name || "") : "";
   
@@ -97,6 +106,8 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
   // Use ref to access latest blueprint validation cache without causing stale closures
   const blueprintValidationCacheRef = useRef(blueprintValidationCache);
   blueprintValidationCacheRef.current = blueprintValidationCache;
+
+  const prevWorkspaceCredentialKeyRef = useRef<string | null>(null);
 
   // ==================== Helper Functions ====================
 
@@ -208,7 +219,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
     try {
       const response = await axios.post<ElementValidationResult>(
         '/resources/resource.validate',
-        { resourceId: rid, userId: USER_ID },
+        { resourceId: rid, userId: CREDENTIAL_USER_ID },
       );
       const result = response.data;
       updateDependencyParentMap(rid, result.dependency_results);
@@ -223,7 +234,7 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
       cacheValidationResult(rid, errorResult);
       return errorResult;
     }
-  }, [USER_ID, cacheValidationResult, createErrorResult, updateDependencyParentMap]);
+  }, [CREDENTIAL_USER_ID, cacheValidationResult, createErrorResult, updateDependencyParentMap]);
 
   // ==================== Resource Mapping Functions ====================
 
@@ -490,7 +501,7 @@ return String(ref);
     await Promise.all(
       uncachedRids.map(rid => fetchAndCacheValidation(rid))
     );
-  }, [setValidationStatus, fetchAndCacheValidation]);
+  }, [setValidationStatus, fetchAndCacheValidation, validationRevision]);
 
   // Get all ancestors (parents, grandparents, etc.) of a resource recursively
   // Uses ref to access latest map and avoid stale closures
@@ -671,7 +682,10 @@ return String(ref);
     setBlueprintValidationStatus(blueprintId, 'loading');
     
     try {
-      const result = await validateBlueprintApi({ ...request, userId: request.userId || USER_ID });
+      const result = await validateBlueprintApi({
+        ...request,
+        userId: request.userId || CREDENTIAL_USER_ID,
+      });
       
       // Cache the result
       cacheBlueprintResult(blueprintId, result);
@@ -682,9 +696,27 @@ return String(ref);
       setBlueprintValidationStatus(blueprintId, 'invalid');
       throw error;
     }
-  }, [setBlueprintValidationStatus, cacheBlueprintResult]);
+  }, [setBlueprintValidationStatus, cacheBlueprintResult, CREDENTIAL_USER_ID]);
 
   // ==================== Effects ====================
+
+  // Results were keyed only by rid; team view cached INVALID (wrong userId) until we
+  // cleared. Also invalidate when switching team or user so ElementGrid re-validates.
+  useEffect(() => {
+    const key = `${USER_ID}|${user?.username || ""}`;
+    if (prevWorkspaceCredentialKeyRef.current === null) {
+      prevWorkspaceCredentialKeyRef.current = key;
+      return;
+    }
+    if (prevWorkspaceCredentialKeyRef.current === key) {
+      return;
+    }
+    prevWorkspaceCredentialKeyRef.current = key;
+    setValidationCache(new Map());
+    setValidationStatusMap(new Map());
+    setDependencyParentMap(new Map());
+    setValidationRevision((r) => r + 1);
+  }, [USER_ID, user?.username]);
 
   // Fetch resources when user changes or component mounts
   useEffect(() => {
