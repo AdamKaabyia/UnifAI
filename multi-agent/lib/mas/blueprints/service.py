@@ -182,6 +182,7 @@ class BlueprintService:
         blueprint_id: str,
         user_id: str = "",
         timeout_seconds: float = 10.0,
+        credential_user_id: str = "",
     ) -> BlueprintValidationResult:
         """
         Validate all elements in a saved blueprint.
@@ -200,13 +201,17 @@ class BlueprintService:
         """
         self._ensure_validation_service()
         spec = self.load_resolved(blueprint_id)
-        return self._validate_spec(spec, blueprint_id, timeout_seconds, user_id=user_id)
+        return self._validate_spec(
+            spec, blueprint_id, timeout_seconds,
+            user_id=user_id, credential_user_id=credential_user_id,
+        )
 
     def validate_draft(
         self,
         draft_dict: dict,
         user_id: str = "",
         timeout_seconds: float = 10.0,
+        credential_user_id: str = "",
     ) -> BlueprintValidationResult:
         """
         Validate a blueprint draft before saving.
@@ -216,7 +221,10 @@ class BlueprintService:
         """
         self._ensure_validation_service()
         spec = self.resolve_draft_dict(draft_dict)
-        return self._validate_spec(spec, "draft", timeout_seconds, user_id=user_id)
+        return self._validate_spec(
+            spec, "draft", timeout_seconds,
+            user_id=user_id, credential_user_id=credential_user_id,
+        )
 
     # ────────── Card Building ──────────
     def get_blueprint_cards(
@@ -258,12 +266,14 @@ class BlueprintService:
         blueprint_id: str,
         timeout_seconds: float,
         user_id: str = "",
+        credential_user_id: str = "",
     ) -> BlueprintValidationResult:
         """Collect configs from spec, validate, and build result."""
         configs = self._config_collector.collect(spec)
         context = ValidationContext(
             timeout_seconds=timeout_seconds,
             user_id=user_id,
+            credential_user_id=credential_user_id,
             auth_service=self._auth_service,
         )
         results = self._validation_service.validate_ordered(configs, context)

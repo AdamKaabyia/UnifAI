@@ -88,7 +88,12 @@ class AuthHandle:
                 return ""
             from_tag = (ctx.tags or {}).get(CREDENTIAL_USER_ID_TAG)
             if from_tag:
-                return str(from_tag).strip()
+                cu = str(from_tag).strip()
+                # Never use team id as OAuth key (legacy bad payloads / client bugs).
+                if ctx.identity.is_team and cu == ctx.identity.id:
+                    cu = ""
+                if cu:
+                    return cu
             # Per-user OAuth (Google MCP, etc.) is never stored under a team id.
             if ctx.identity.is_team:
                 return ""

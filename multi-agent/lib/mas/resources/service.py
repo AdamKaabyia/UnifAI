@@ -160,6 +160,7 @@ class ResourcesService:
         rid: str,
         user_id: str = "",
         timeout_seconds: float = 10.0,
+        credential_user_id: str = "",
     ) -> ElementValidationResult:
         """
         Validate a saved resource and all its transitive dependencies.
@@ -172,7 +173,10 @@ class ResourcesService:
 
         ordered_configs = self._build_configs_from_rids(ordered_rids)
 
-        return self._validate_and_get(ordered_configs, rid, timeout_seconds, user_id=user_id)
+        return self._validate_and_get(
+            ordered_configs, rid, timeout_seconds,
+            user_id=user_id, credential_user_id=credential_user_id,
+        )
 
     def validate_resources(
         self,
@@ -180,6 +184,7 @@ class ResourcesService:
         user_id: str = "",
         timeout_seconds: float = 10.0,
         max_workers: int = 10,
+        credential_user_id: str = "",
     ) -> List[ElementValidationResult]:
         """
         Validate multiple resources in parallel.
@@ -193,9 +198,15 @@ class ResourcesService:
             return []
 
         if len(rids) == 1:
-            return [self._validate_resource_safe(rids[0], user_id, timeout_seconds)]
+            return [
+                self._validate_resource_safe(
+                    rids[0], user_id, timeout_seconds, credential_user_id,
+                ),
+            ]
 
-        return self._validate_in_parallel(rids, user_id, timeout_seconds, max_workers)
+        return self._validate_in_parallel(
+            rids, user_id, timeout_seconds, max_workers, credential_user_id,
+        )
 
     def _validate_in_parallel(
         self,
@@ -203,6 +214,7 @@ class ResourcesService:
         user_id: str,
         timeout_seconds: float,
         max_workers: int,
+        credential_user_id: str = "",
     ) -> List[ElementValidationResult]:
         """Execute validations concurrently with order preservation."""
         results: List[Optional[ElementValidationResult]] = [None] * len(rids)
@@ -210,7 +222,8 @@ class ResourcesService:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
                 executor.submit(
-                    self._validate_resource_safe, rid, user_id, timeout_seconds
+                    self._validate_resource_safe,
+                    rid, user_id, timeout_seconds, credential_user_id,
                 ): idx
                 for idx, rid in enumerate(rids)
             }
@@ -226,10 +239,16 @@ class ResourcesService:
         rid: str,
         user_id: str,
         timeout_seconds: float,
+        credential_user_id: str = "",
     ) -> ElementValidationResult:
         """Validate a single resource with exception handling."""
         try:
-            return self.validate_resource(rid=rid, user_id=user_id, timeout_seconds=timeout_seconds)
+            return self.validate_resource(
+                rid=rid,
+                user_id=user_id,
+                timeout_seconds=timeout_seconds,
+                credential_user_id=credential_user_id,
+            )
         except KeyError:
             return ElementValidationResult.create_error(
                 rid=rid,
@@ -362,11 +381,13 @@ class ResourcesService:
         target_rid: str,
         timeout_seconds: float,
         user_id: str = "",
+        credential_user_id: str = "",
     ) -> ElementValidationResult:
         """Validate configs in order and return result for target rid."""
         context = ValidationContext(
             timeout_seconds=timeout_seconds,
             user_id=user_id,
+            credential_user_id=credential_user_id,
             auth_service=self._auth_service,
         )
         results = self._validation_service.validate_ordered(ordered_configs, context)

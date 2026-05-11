@@ -2,6 +2,8 @@ import logging
 
 from flask import Blueprint, jsonify, current_app
 
+from inbound.flask.identity_helpers import authenticated_username
+
 logger = logging.getLogger(__name__)
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
@@ -89,7 +91,10 @@ def list_actions(category=None, type=None, action_type=None, tags=None):
 def execute_action(uid, input_data, context, user_id):
     """Execute a specific action by UID (synchronously)."""
     try:
-        if user_id and "user_id" not in input_data:
+        auth_user = authenticated_username()
+        if auth_user:
+            input_data["user_id"] = auth_user
+        elif user_id and "user_id" not in input_data:
             input_data["user_id"] = user_id
 
         svc = current_app.container.actions_service

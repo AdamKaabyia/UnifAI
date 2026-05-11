@@ -8,6 +8,8 @@ For endpoint-level usage prefer the ``@with_identity`` decorator in
 ``inbound.flask.decorators`` — it reads the params from the Flask request
 automatically and injects the resolved ``Identity`` as a kwarg.
 """
+from __future__ import annotations
+
 from global_utils.identity import Identity, IdentityType
 
 _TYPE_MAP = {
@@ -16,6 +18,15 @@ _TYPE_MAP = {
 }
 
 _VALID_TYPES = frozenset(_TYPE_MAP.keys())
+
+
+def authenticated_username() -> str:
+    """Username from the auth gateway (trusted). Empty if unset (e.g. local dev)."""
+    from flask import has_request_context, request
+
+    if not has_request_context():
+        return ""
+    return (request.headers.get("X-Authenticated-User") or "").strip()
 
 
 def resolve_identity(

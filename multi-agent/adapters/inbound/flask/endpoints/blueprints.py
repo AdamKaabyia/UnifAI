@@ -11,6 +11,7 @@ from mas.blueprints.exceptions import (
     BlueprintMetadataError,
 )
 from inbound.flask.decorators import require_identity_authorization, with_identity
+from inbound.flask.identity_helpers import authenticated_username
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +341,7 @@ def validate_blueprint(blueprint_id, user_id, timeout_seconds):
             blueprint_id=blueprint_id,
             user_id=user_id,
             timeout_seconds=timeout_seconds,
+            credential_user_id=authenticated_username(),
         )
         return jsonify(result.model_dump()), 200
     except BlueprintNotFoundError as e:

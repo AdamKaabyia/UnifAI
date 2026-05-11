@@ -744,6 +744,10 @@ export default function ExecutionTab({
         scope: sessionPayload.scope || globalScope,
         loggedInUser: (() => {
           const raw = (sessionPayload.loggedInUser || "").trim();
+          // Team workspace: never send team id as acting user (OAuth is per member).
+          if (isTeam && raw && raw === contextUserId) {
+            return user?.username || "default";
+          }
           if (raw && raw !== "default") return raw;
           return user?.username || "default";
         })(),

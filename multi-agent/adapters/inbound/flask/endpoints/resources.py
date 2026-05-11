@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, current_app
+
+from inbound.flask.identity_helpers import authenticated_username
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.resources.errors import ResourceInUseError
@@ -153,6 +155,7 @@ def validate_resource(resource_id, user_id, timeout_seconds):
             rid=resource_id,
             user_id=user_id,
             timeout_seconds=timeout_seconds,
+            credential_user_id=authenticated_username(),
         )
         return jsonify(result.model_dump()), 200
     except KeyError as e:
@@ -206,6 +209,7 @@ def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
             user_id=user_id,
             timeout_seconds=timeout_seconds,
             max_workers=max_workers,
+            credential_user_id=authenticated_username(),
         )
         return jsonify([r.model_dump() for r in results]), 200
     except RuntimeError as e:

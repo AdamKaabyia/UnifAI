@@ -6,16 +6,17 @@ from pydantic.json import pydantic_encoder
 from mas.core.channels import with_heartbeats
 from mas.session.domain.exceptions import BlueprintNotFoundError
 from inbound.flask.decorators import require_identity_authorization, with_identity
+from inbound.flask.identity_helpers import authenticated_username
 
 sessions_bp = Blueprint("sessions", __name__)
 
 
 def _acting_user_for_credentials(logged_in_user: str) -> str:
-    """Body wins; else UI agent client sends ``X-Authenticated-User`` (see axiosAgentConfig)."""
-    v = (logged_in_user or "").strip()
-    if v:
-        return v
-    return (request.headers.get("X-Authenticated-User") or "").strip()
+    """OAuth keys are per human. Prefer gateway identity over client ``loggedInUser`` (team UIs may send team id)."""
+    header_user = authenticated_username()
+    if header_user:
+        return header_user
+    return (logged_in_user or "").strip()
 
 
 @sessions_bp.route("/user.session.create", methods=["POST"])

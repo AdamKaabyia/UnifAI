@@ -112,10 +112,24 @@ class ValidationContext(BaseModel):
     """
     timeout_seconds: float = 10.0
     dependency_results: Dict[str, ElementValidationResult] = Field(default_factory=dict)
-    user_id: str = ""
+    user_id: str = Field(
+        default="",
+        description="Workspace owner id (may be a team id when validating team resources).",
+    )
+    credential_user_id: str = Field(
+        default="",
+        description="Logged-in human for OAuth/token lookup; overrides user_id when non-empty.",
+    )
     auth_service: Optional[Any] = Field(default=None, exclude=True)
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    def oauth_lookup_user_id(self) -> str:
+        """User id passed to AuthService for bearer/OAuth headers (never a team id when credential_user_id is set)."""
+        c = (self.credential_user_id or "").strip()
+        if c:
+            return c
+        return (self.user_id or "").strip()
 
     def get_dependency_result(self, rid: str) -> Optional[ElementValidationResult]:
         """Look up a dependency's validation result."""

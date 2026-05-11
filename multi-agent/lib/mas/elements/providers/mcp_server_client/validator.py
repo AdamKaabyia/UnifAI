@@ -82,10 +82,11 @@ class McpProviderValidator(BaseElementValidator):
         server_id = getattr(config, "server_identifier", "")
         scheme_type = getattr(config, "scheme_type", "")
 
-        if server_id and context.user_id and context.auth_service:
+        auth_uid = context.oauth_lookup_user_id()
+        if server_id and auth_uid and context.auth_service:
             try:
                 auth_headers = await context.auth_service.get_headers(
-                    context.user_id, server_id,
+                    auth_uid, server_id,
                     scheme_type=scheme_type,
                 )
                 headers.update(auth_headers)
