@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, current_app, Response
+from flask import Blueprint, jsonify, current_app, Response, request
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 import json
@@ -8,6 +8,14 @@ from mas.session.domain.exceptions import BlueprintNotFoundError
 from inbound.flask.decorators import require_identity_authorization, with_identity
 
 sessions_bp = Blueprint("sessions", __name__)
+
+
+def _acting_user_for_credentials(logged_in_user: str) -> str:
+    """Body wins; else UI agent client sends ``X-Authenticated-User`` (see axiosAgentConfig)."""
+    v = (logged_in_user or "").strip()
+    if v:
+        return v
+    return (request.headers.get("X-Authenticated-User") or "").strip()
 
 
 @sessions_bp.route("/user.session.create", methods=["POST"])
@@ -49,6 +57,7 @@ def execute_user_session(session_id, inputs, stream_mode, stream, scope, logged_
     - If `stream` is False (default), returns the full result as JSON.
     - If `stream` is True, returns an NDJSON stream of channel events.
     """
+    logged_in_user = _acting_user_for_credentials(logged_in_user)
     svc = current_app.container.session_service
     try:
         status = svc.get_status(session_id)
@@ -101,6 +110,7 @@ def submit_user_session(session_id, inputs, scope, logged_in_user):
     Poll /session.status.get?sessionId=<id> for status updates.
     """
     try:
+        logged_in_user = _acting_user_for_credentials(logged_in_user)
         svc = current_app.container.session_service
         workflow_id = svc.submit(
             session_id=session_id,

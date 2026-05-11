@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from mas.core.identity import Identity
 
+# Session staging (SessionInputProjector) sets this tag so OAuth (e.g. Google MCP) looks up
+# tokens for the acting human while ``identity`` remains the team (or other owner).
+CREDENTIAL_USER_ID_TAG = "credential_user_id"
+
 
 class ExecutionContext(BaseModel):
     """Runtime execution context — who, what scope, when.
@@ -44,6 +48,15 @@ class ExecutionContext(BaseModel):
 
     def with_scope(self, scope: str) -> ExecutionContext:
         return self.model_copy(update={"scope": scope})
+
+    def with_credential_user(self, credential_user_id: str = "") -> ExecutionContext:
+        """Copy with per-user OAuth key in ``tags`` (used when ``identity`` is a team)."""
+        cu = (credential_user_id or "").strip()
+        if not cu:
+            return self
+        tags = dict(self.tags or {})
+        tags[CREDENTIAL_USER_ID_TAG] = cu
+        return self.model_copy(update={"tags": tags})
 
     def mark_finished(self) -> ExecutionContext:
         return self.model_copy(update={"finished_at": datetime.now(timezone.utc)})

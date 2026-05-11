@@ -59,5 +59,10 @@ class SessionInputProjector:
                 )
             )
 
+        # Persist acting user for OAuth (team sessions, etc.) on the durable record so
+        # Temporal / workers always see tags after reload — not only on the submit payload.
+        if (logged_in_user or "").strip():
+            record.run_context = record.run_context.with_credential_user(logged_in_user)
+
         record.status = SessionStatus.QUEUED
         self._repo.save(record)

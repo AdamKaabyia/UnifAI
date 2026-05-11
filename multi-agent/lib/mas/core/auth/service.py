@@ -21,7 +21,10 @@ from .credentials.models import (
 from .credentials.ports import CredentialStore, ServerConfigStore
 from .credentials.credential import AuthCredential
 from .ports import AuthStrategy, AuthChallenge
-from mas.core.execution_context import ExecutionContextHolder
+from mas.core.execution_context import (
+    ExecutionContextHolder,
+    CREDENTIAL_USER_ID_TAG,
+)
 
 if TYPE_CHECKING:
     from .discovery.detector import AuthDetector
@@ -79,6 +82,16 @@ class AuthHandle:
         if isinstance(uid, str):
             return uid
         if isinstance(uid, ExecutionContextHolder):
+            try:
+                ctx = uid.context
+            except RuntimeError:
+                return ""
+            from_tag = (ctx.tags or {}).get(CREDENTIAL_USER_ID_TAG)
+            if from_tag:
+                return str(from_tag).strip()
+            # Per-user OAuth (Google MCP, etc.) is never stored under a team id.
+            if ctx.identity.is_team:
+                return ""
             return uid.identity_id
         return uid.user_id
 

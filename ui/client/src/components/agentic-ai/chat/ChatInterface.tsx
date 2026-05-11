@@ -813,7 +813,7 @@ export default function ChatInterface({
         sessionId: runId || "",
         inputs: { user_prompt: messageContent },
         scope: "public",
-        loggedInUser: "default",
+        loggedInUser: authUser?.username || "default",
       };
 
       const response = await triggerExecution(sessionPayload);

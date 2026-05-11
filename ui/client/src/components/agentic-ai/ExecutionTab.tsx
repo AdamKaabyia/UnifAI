@@ -742,7 +742,11 @@ export default function ExecutionTab({
         sessionId: sessionPayload.sessionId,
         inputs: sessionPayload.inputs,
         scope: sessionPayload.scope || globalScope,
-        loggedInUser: sessionPayload.loggedInUser || user?.username || "default",
+        loggedInUser: (() => {
+          const raw = (sessionPayload.loggedInUser || "").trim();
+          if (raw && raw !== "default") return raw;
+          return user?.username || "default";
+        })(),
       });
 
       // Wait for streaming to complete (resolved by onStreamEnd callback)
