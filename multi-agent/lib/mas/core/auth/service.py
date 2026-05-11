@@ -21,6 +21,7 @@ from .credentials.models import (
 from .credentials.ports import CredentialStore, ServerConfigStore
 from .credentials.credential import AuthCredential
 from .ports import AuthStrategy, AuthChallenge
+from mas.core.execution_context import ExecutionContextHolder
 
 if TYPE_CHECKING:
     from .discovery.detector import AuthDetector
@@ -77,6 +78,8 @@ class AuthHandle:
         uid = self._user_id_or_holder
         if isinstance(uid, str):
             return uid
+        if isinstance(uid, ExecutionContextHolder):
+            return uid.identity_id
         return uid.user_id
 
     async def get_headers(self) -> Dict[str, str]:
