@@ -180,32 +180,32 @@ class DeepAgentNode(
         task = packet.extract_task()
         task.mark_processed(self.uid)
 
-        try:
-            if task.thread_id:
-                self.workspaces.add_task(task.thread_id, task)
+        # try:
+        if task.thread_id:
+            self.workspaces.add_task(task.thread_id, task)
 
-            conversation_context = self._build_conversation_context(task)
-            execution_result = self._invoke(conversation_context)
-            agent_result = self._to_agent_result(execution_result)
+        conversation_context = self._build_conversation_context(task)
+        execution_result = self._invoke(conversation_context)
+        agent_result = self._to_agent_result(execution_result)
 
-            if task.thread_id:
-                self.workspaces.add_result(task.thread_id, agent_result)
+        if task.thread_id:
+            self.workspaces.add_result(task.thread_id, agent_result)
 
-            self._route_response(task, agent_result, packet)
-            logger.info("DeepAgent %s: processed task successfully", self.uid)
+        self._route_response(task, agent_result, packet)
+        logger.info("DeepAgent %s: processed task successfully", self.uid)
 
-        except Exception as exc:
-            logger.error("DeepAgent %s: error processing task: %s", self.uid, exc)
-            error_result = AgentResult(
-                content=f"Error processing task: {exc}",
-                agent_id=self.uid,
-                agent_name=self.display_name,
-                success=False,
-                error=str(exc),
-            )
-            if task.thread_id:
-                self.workspaces.add_result(task.thread_id, error_result)
-            self._route_response(task, error_result, packet)
+        # except Exception as exc:
+            # logger.error("DeepAgent %s: error processing task: %s", self.uid, exc)
+            # error_result = AgentResult(
+            #     content=f"Error processing task: {exc}",
+            #     agent_id=self.uid,
+            #     agent_name=self.display_name,
+            #     success=False,
+            #     error=str(exc),
+            # )
+            # if task.thread_id:
+            #     self.workspaces.add_result(task.thread_id, error_result)
+            # self._route_response(task, error_result, packet)
 
     # ==================================================================
     # Context building
