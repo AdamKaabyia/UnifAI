@@ -1,17 +1,26 @@
-from typing import List
+from typing import Iterator, List, Union
 
 from ..common.base_llm import BaseLLM
+from ..common.chat.message import ChatMessage, Role
 from ...tools.common.base_tool import BaseTool
 
 
 class MockLLM(BaseLLM):
+
+    def chat(self, messages: List[ChatMessage]) -> ChatMessage:
+        last_content = messages[-1].content if messages else ""
+        return ChatMessage(
+            role=Role.ASSISTANT,
+            content=f"[MOCK RESPONSE] Hello! You said: {last_content}",
+        )
+
+    def stream(self, messages: List[ChatMessage], **call_params) -> Iterator[Union[str, ChatMessage]]:
+        response = self.chat(messages)
+        yield response.content
+
     def bind_tools(self, tools: List[BaseTool]) -> "MockLLM":
-        """Return a copy of the MockLLM (tools don't affect mock behavior)."""
-        new_mock = MockLLM()
-        return new_mock
+        return MockLLM()
 
-    def chat(self, messages: list[dict], stream: bool = False) -> str:
-        return "[MOCK RESPONSE] Hello! You said: " + messages[-1]["content"]
-
+    @property
     def name(self) -> str:
         return "mock"

@@ -6,8 +6,12 @@ from pydantic import BaseModel
 
 class BaseTool(ABC):
     """
-    A reusable base class for LangChain-compatible tools.
+    Abstract base class for all tools.
+
     Subclass this and implement `run()` (and optionally `arun()`).
+    Provide ``name``, ``description``, and an optional Pydantic
+    ``args_schema`` whose JSON Schema is used by LLM providers
+    for function-calling.
     """
 
     name: str

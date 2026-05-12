@@ -6,6 +6,7 @@ langchain
 langchain-core
 langchain-openai
 langchain-google-genai
+google-genai
 openai
 langgraph
 gunicorn
@@ -25,3 +26,4 @@ authlib
 anyio
 typing-inspection
 a2a-sdk[all]<1.0
+deepagents

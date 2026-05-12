@@ -10,10 +10,11 @@ class BaseLLM(ABC):
     """
 
     @abstractmethod
-    def chat(self, messages: List[ChatMessage], stream: bool = False) -> ChatMessage:
+    def chat(self, messages: List[ChatMessage]) -> ChatMessage:
         """
-        Perform a conversational completion.
-        messages = list of {"role": "user"/"assistant", "content": "..."}
+        Perform a single conversational completion and return the full response.
+
+        For streaming, use the separate stream() method.
         """
         pass
 

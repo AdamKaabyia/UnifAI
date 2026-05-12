@@ -6,10 +6,7 @@ from .identifiers import Identifier
 
 
 class GoogleGenAIConfig(BaseModel):
-    """
-    Configuration for Google Generative AI (Gemini) API.
-    Uses langchain-google-genai's ChatGoogleGenerativeAI.
-    """
+    """Configuration for Google Generative AI (Gemini) API."""
     type: Literal[Identifier.TYPE] = Identifier.TYPE
 
     model_name: str = Field(

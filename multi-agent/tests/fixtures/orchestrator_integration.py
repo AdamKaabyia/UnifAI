@@ -125,12 +125,11 @@ class PredictableLLM(BaseLLM):
         )
         self.responses.append(response)
     
-    def chat(self, messages: List[ChatMessage], stream: bool = False, **kwargs) -> ChatMessage:
+    def chat(self, messages: List[ChatMessage], **kwargs) -> ChatMessage:
         """Return the next pre-configured response and track the call."""
         self.call_count += 1
         self.call_history.append({
             'messages': messages,
-            'stream': stream,
             'kwargs': kwargs
         })
         
@@ -145,7 +144,7 @@ class PredictableLLM(BaseLLM):
     
     def stream(self, messages: List[ChatMessage], **call_params: Any) -> Iterator[Union[str, ChatMessage]]:
         """Stream implementation - just yields the final response."""
-        response = self.chat(messages, stream=True, **call_params)
+        response = self.chat(messages)
         yield response.content
         yield response
     
