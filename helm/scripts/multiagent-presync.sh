@@ -14,8 +14,8 @@ source "$(dirname "$0")/postsync-lib.sh"
 #   --from-literal=CREDENTIAL_ENCRYPTION_KEY="$CREDENTIAL_ENCRYPTION_KEY" \
 #   --from-literal=MCP_AUTH_STATE_SECRET="$MCP_AUTH_STATE_SECRET"
 
-create_or_update_resource configmap multiagent-be-configmap \
-  --from-literal=admin_allowed_users="$admin_allowed_users" 
+# create_or_update_resource configmap multiagent-be-configmap \
+#   --from-literal=admin_allowed_users="$admin_allowed_users" 
 
 #create secret
 create_or_update_resource "secret generic" multiagent-be-secret \

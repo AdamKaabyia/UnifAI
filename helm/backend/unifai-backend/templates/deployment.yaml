@@ -50,8 +50,8 @@ spec:
           envFrom:
           - configMapRef:
               name: {{ .Values.globalConfigMapName }}
-          - configMapRef:
-              name: backend-be-configmap
+          # - configMapRef:
+          #     name: backend-be-configmap
           - secretRef:
               name: {{ .Values.globalSecretName }}
           ports:

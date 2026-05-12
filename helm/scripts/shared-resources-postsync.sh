@@ -48,6 +48,7 @@ create_or_update_resource configmap shared-config \
   --from-literal=TEMPORAL_IP="$TEMPORAL_IP" \
   --from-literal=UMAMI_URL="$UMAMI_URL" \
   --from-literal=UMAMI_WEBSITE_NAME="$UMAMI_WEBSITE_NAME" \
+  --from-literal=admin_allowed_users="$admin_allowed_users"
 
 create_or_update_resource "secret generic" shared-secret \
   --from-literal=UMAMI_USERNAME="$UMAMI_USERNAME" \
