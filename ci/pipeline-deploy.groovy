@@ -63,7 +63,7 @@ def generateVaultSecretsEnvFile(String vaultBasePath, Map secretMap ) {
             ],
             vaultSecrets: [
                 [
-                    path: "${vaultBasePath}/${module}",
+                    path: "${vaultBasePath}/${params.deploy_location.toLowerCase()}/${module}",
                     engineVersion: 2,
                     secretValues: secrets.collect { key -> [envVar: key, vaultKey: key] }
                 ]
