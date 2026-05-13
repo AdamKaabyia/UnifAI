@@ -38,6 +38,10 @@ spec:
             - configMapRef:
                 name: {{ .Values.redisConfigMapName | quote }}
           {{- end }}
+          {{- if .Values.redisSecretName }}
+          - secretRef:
+              name: {{ .Values.redisSecretName | quote }}
+          {{- end }}
           volumeMounts:
             - name: redis-volume
               mountPath: /data

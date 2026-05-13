@@ -13,6 +13,7 @@ image:
   pullPolicy: IfNotPresent
 
 redisConfigMapName: redis-config
+redisSecretName: redis-secret
 
 storage:
   accessModes:
