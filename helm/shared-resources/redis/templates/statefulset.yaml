@@ -21,6 +21,7 @@ spec:
         - name: redis
           image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           #args: ["--requirepass", "admin", "--appendonly", "yes", "--save", "900", "1", "--save", "30", "2"]
+          args: ["--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes", "--save", "900", "1", "--save", "30", "2"]
           ports:
             - containerPort: {{ .Values.service.port }}
               name: {{ .Values.service.name }}
@@ -33,14 +34,14 @@ spec:
             - name: {{ .name | quote }}
               value: {{ .value | quote }}
           {{- end }}
-          {{- if .Values.redisConfigMapName }}
           envFrom:
+          {{- if .Values.redisConfigMapName }}
             - configMapRef:
                 name: {{ .Values.redisConfigMapName | quote }}
           {{- end }}
           {{- if .Values.redisSecretName }}
-          - secretRef:
-              name: {{ .Values.redisSecretName | quote }}
+            - secretRef:
+                name: {{ .Values.redisSecretName | quote }}
           {{- end }}
           volumeMounts:
             - name: redis-volume
