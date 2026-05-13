@@ -19,8 +19,46 @@ You receive one of:
 ## Design Process
 
 1. **Understand the requirement** — clarify the problem, scope, and success criteria.
-2. **Explore the codebase** — identify existing patterns, modules, and conventions that the design must align with. See the **Codebase Exploration Checklist** below.
-3. **Produce the design** — following the output format below.
+2. **Explore the codebase** — identify existing patterns, modules, and conventions that the design must align with.
+3. **Run the mandatory pre-design checks below** before writing the design.
+4. **Produce the design** — following the output format below.
+
+## Mandatory Pre-Design Checks
+
+Before writing any design, answer all of the following. Address each explicitly in the relevant section of your output (Edge Cases & Risks, Affected Components, or Open Questions).
+
+### UI Layer Check
+- Does the feature introduce new resource types, field types, or auth flows that a user must interact with through the UI?
+- If yes, the **UI layer MUST be represented in Affected Components**. UI is a first-class adapter layer — omitting it is an incomplete design.
+- Common triggers: new placeholder/schema field types, OAuth sign-in flows, new wizard steps, new template instantiation inputs.
+
+### External Auth / OAuth Protocol Check
+- Does the feature reference OAuth, MCP sign-in, or any external auth protocol?
+- If yes, you MUST trace the **full discovery chain** for the specific provider:
+  - Does the MCP server expose AS metadata directly, or does it use RFC 9728 Protected Resource Metadata (PRM) at `/.well-known/oauth-protected-resource`?
+  - What is the real OAuth issuer (it may differ from the MCP URL)?
+  - How are credentials stored — keyed by MCP URL, issuer URL, or server identifier? Verify the lookup key matches the storage key.
+- Labeling a component as "Google OAuth via MCP" without tracing the actual discovery flow is insufficient.
+
+### External Dependency Failure Mode Check
+- For every new external dependency (MCP server, OAuth provider, Redis, external API):
+  - What happens at runtime if it returns 401, 503, or a timeout?
+  - Is the failure silent (returns empty data) or noisy (crashes the session)?
+  - Does the design specify a graceful degradation path?
+- Every external dependency MUST have an explicit failure mode documented in Edge Cases & Risks.
+
+### LLM / AI Provider Compatibility Check
+- Does the feature wire a specific LLM provider (Gemini, OpenAI, Anthropic, etc.)?
+- If yes, check for known provider-specific behavioral constraints that affect multi-turn or tool-use correctness (e.g., required fields in function-call parts, streaming chunk structure, retry behavior).
+- Reference the actual provider's API documentation or existing wrapper code in the codebase.
+
+### Async / Concurrency Context Check
+- Does the feature introduce async code that runs inside a `BlockingPortal`, thread executor, or other synchronous-to-async bridge?
+- If yes, verify compatibility with any timeout/cancellation primitives already in use (e.g., `anyio.fail_after` vs `asyncio.wait_for` cannot be mixed across cancel-scope boundaries).
+
+### Template / Seed Data Integrity Check (for template features)
+- Does a seed JSON or fixture reference resources by external `$ref` (UUID pointer) rather than inline config?
+- Templates must embed all non-system resource configs inline so materialisation creates independent copies per user. Flag any `$ref`-only entries as a design risk.
 
 ## Architectural Constraints
 
