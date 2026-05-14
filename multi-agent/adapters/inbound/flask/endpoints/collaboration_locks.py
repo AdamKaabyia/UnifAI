@@ -7,7 +7,8 @@ from flask import Blueprint, jsonify
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 
-from inbound.flask.endpoints.collaboration_common import (
+from inbound.flask.collaboration_helpers import (
+    _acting_user_id,
     holder_to_json,
     internal_error,
     service_for_team,
@@ -26,11 +27,11 @@ collaboration_locks_bp = Blueprint("collaboration_locks", __name__)
         "team_id": fields.Str(data_key="teamId", required=True),
         "entity_kind": fields.Str(data_key="entityKind", required=True),
         "entity_id": fields.Str(data_key="entityId", required=True),
-        "user_id": fields.Str(data_key="userId", required=True),
         "display_name": fields.Str(data_key="displayName", load_default=""),
     }
 )
-def edit_lock_acquire(team_id, entity_kind, entity_id, user_id, display_name):
+def edit_lock_acquire(team_id, entity_kind, entity_id, display_name):
+    user_id = _acting_user_id()
     svc, err = service_for_user_team(user_id, team_id)
     if err:
         return err
@@ -59,10 +60,10 @@ def edit_lock_acquire(team_id, entity_kind, entity_id, user_id, display_name):
         "team_id": fields.Str(data_key="teamId", required=True),
         "entity_kind": fields.Str(data_key="entityKind", required=True),
         "entity_id": fields.Str(data_key="entityId", required=True),
-        "user_id": fields.Str(data_key="userId", required=True),
     }
 )
-def edit_lock_release(team_id, entity_kind, entity_id, user_id):
+def edit_lock_release(team_id, entity_kind, entity_id):
+    user_id = _acting_user_id()
     svc, err = service_for_user_team(user_id, team_id)
     if err:
         return err
@@ -82,11 +83,11 @@ def edit_lock_release(team_id, entity_kind, entity_id, user_id):
         "team_id": fields.Str(data_key="teamId", required=True),
         "entity_kind": fields.Str(data_key="entityKind", required=True),
         "entity_id": fields.Str(data_key="entityId", required=True),
-        "user_id": fields.Str(data_key="userId", required=True),
         "display_name": fields.Str(data_key="displayName", load_default=""),
     }
 )
-def edit_lock_heartbeat(team_id, entity_kind, entity_id, user_id, display_name):
+def edit_lock_heartbeat(team_id, entity_kind, entity_id, display_name):
+    user_id = _acting_user_id()
     svc, err = service_for_user_team(user_id, team_id)
     if err:
         return err

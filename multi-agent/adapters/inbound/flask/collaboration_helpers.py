@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 EDIT_LOCK_KINDS = frozenset({"resource", "blueprint"})
 
 
+def _acting_user_id() -> str | None:
+    return request.headers.get("X-Authenticated-User", "").strip() or None
+
+
 def collab_service():
     return current_app.container.collaboration_service
 
@@ -38,7 +42,7 @@ def validate_user(user_id: str):
     authenticated = request.headers.get("X-Authenticated-User", "").strip()
     if not authenticated:
         return jsonify({"error": "Missing authenticated user"}), 401
-    if authenticated.casefold() != user_id.casefold():
+    if authenticated.casefold() != (user_id or "").casefold():
         return jsonify({"error": "userId does not match authenticated user"}), 403
     return None
 

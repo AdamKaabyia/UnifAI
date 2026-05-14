@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from flask import Flask
 from config.app_config import AppConfig
 from global_utils.redis import RedisKVStore, build_redis_client
+from global_utils.utils.util import get_mongo_url
 import logging
 
 if TYPE_CHECKING:
@@ -28,3 +29,20 @@ def build_auth_stack(app: Flask, config: AppConfig) -> tuple["AuthManager", Redi
 def build_redis_store(config: AppConfig) -> RedisKVStore:
     client = build_redis_client(config.redis_db)
     return RedisKVStore(client)
+
+
+def build_team_service(config: AppConfig):
+    """Create MongoClient, MongoTeamRepository, and TeamService."""
+    from pymongo import MongoClient
+    from teams.repository.mongo_repository import MongoTeamRepository
+    from teams.service import TeamService
+    from directory.factory import build_directory_provider
+
+    mongo_client = MongoClient(get_mongo_url())
+    teams_db = mongo_client[config.mongo_db]
+    team_repo = MongoTeamRepository(db=teams_db, coll_name=config.teams_coll)
+    directory_provider = build_directory_provider(config)
+    return TeamService(
+        repository=team_repo,
+        directory_provider=directory_provider,
+    )

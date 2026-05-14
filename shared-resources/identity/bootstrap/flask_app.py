@@ -14,16 +14,11 @@ import os
 import logging
 from flask import Flask
 from flask_cors import CORS
-from pymongo import MongoClient
 
 from config.app_config import AppConfig
 from config.logging_config import LoggingConfig
 from global_utils.flask.request_rules import RequestRules
-from global_utils.utils.util import get_mongo_url
-from bootstrap.factories import build_auth_stack
-from directory.factory import build_directory_provider
-from teams.repository.mongo_repository import MongoTeamRepository
-from teams.service import TeamService
+from bootstrap.factories import build_auth_stack, build_team_service
 from utils.user_groups_cache import UserGroupsCache
 from utils.directory_cache import DirectoryCache
 
@@ -78,15 +73,7 @@ def create_app() -> Flask:
         ttl_seconds=config.directory_cache_ttl,
     )
 
-    mongo_client = MongoClient(get_mongo_url())
-    teams_db = mongo_client[config.mongo_db]
-    team_repo = MongoTeamRepository(db=teams_db, coll_name=config.teams_coll)
-    directory_provider = build_directory_provider(config)
-    team_service = TeamService(
-        repository=team_repo,
-        directory_provider=directory_provider,
-    )
-    app.extensions['team_service'] = team_service
+    app.extensions['team_service'] = build_team_service(config)
     # Register HTTP adapters (blueprints)
     _register_blueprints(app)
     

@@ -15,7 +15,7 @@ from ldap3.core.exceptions import LDAPException
 
 from directory.models import DirectoryUser, DirectoryGroup
 from directory.provider import DirectoryProvider
-from directory.config import LdapConfig
+from directory.models import LdapConfig
 
 logger = logging.getLogger(__name__)
 

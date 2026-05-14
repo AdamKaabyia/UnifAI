@@ -1,6 +1,5 @@
-from directory.models import DirectoryUser, DirectoryGroup
+from directory.models import DirectoryUser, DirectoryGroup, LdapConfig
 from directory.provider import DirectoryProvider
-from directory.config import LdapConfig
 
 
 def __getattr__(name: str):

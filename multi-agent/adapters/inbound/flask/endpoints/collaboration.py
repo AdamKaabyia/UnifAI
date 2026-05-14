@@ -3,12 +3,13 @@ Flask collaboration presence and typing endpoints.
 """
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from global_utils.helpers.apiargs import from_body, from_query
 from mas.collaboration.models import ParticipantRole
 from webargs import fields
 
-from inbound.flask.endpoints.collaboration_common import (
+from inbound.flask.collaboration_helpers import (
+    _acting_user_id,
     internal_error,
     service_for_team,
     service_for_user,
@@ -21,33 +22,15 @@ logger = logging.getLogger(__name__)
 collaboration_bp = Blueprint("collaboration", __name__)
 
 
-def _acting_user_id() -> str | None:
-    return request.headers.get("X-Authenticated-User", "").strip() or None
-
-
-def _reject_user_id_mismatch(claimed_user_id: str) -> tuple | None:
-    """403 if body/query userId does not match the authenticated user."""
-    acting = _acting_user_id()
-    if not acting:
-        return (jsonify({"error": "Missing authenticated user"}), 401)
-    if str(claimed_user_id).strip().casefold() != acting.casefold():
-        return (jsonify({"error": "userId does not match authenticated user"}), 403)
-    return None
-
-
 # ── Join / Leave / Heartbeat ────────────────────────────────────────
 
 @collaboration_bp.route("/session.join", methods=["POST"])
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
-    "user_id": fields.Str(data_key="userId", required=True),
     "display_name": fields.Str(data_key="displayName", load_default=""),
     "role": fields.Str(data_key="role", load_default="collaborator"),
 })
-def join_session(session_id, user_id, display_name, role):
-    mismatch = _reject_user_id_mismatch(user_id)
-    if mismatch:
-        return mismatch
+def join_session(session_id, display_name, role):
     acting = _acting_user_id()
     svc, err = service_for_user(acting)
     if err:
@@ -72,12 +55,8 @@ def join_session(session_id, user_id, display_name, role):
 @collaboration_bp.route("/session.leave", methods=["POST"])
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
-    "user_id": fields.Str(data_key="userId", required=True),
 })
-def leave_session(session_id, user_id):
-    mismatch = _reject_user_id_mismatch(user_id)
-    if mismatch:
-        return mismatch
+def leave_session(session_id):
     acting = _acting_user_id()
     svc, err = service_for_user(acting)
     if err:
@@ -92,12 +71,8 @@ def leave_session(session_id, user_id):
 @collaboration_bp.route("/session.heartbeat", methods=["POST"])
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
-    "user_id": fields.Str(data_key="userId", required=True),
 })
-def heartbeat(session_id, user_id):
-    mismatch = _reject_user_id_mismatch(user_id)
-    if mismatch:
-        return mismatch
+def heartbeat(session_id):
     acting = _acting_user_id()
     svc, err = service_for_user(acting)
     if err:
@@ -145,13 +120,7 @@ def get_team_sessions(team_id):
 
 
 @collaboration_bp.route("/user.active_sessions", methods=["GET"])
-@from_query({
-    "user_id": fields.Str(data_key="userId", required=True),
-})
-def get_user_active_sessions(user_id):
-    mismatch = _reject_user_id_mismatch(user_id)
-    if mismatch:
-        return mismatch
+def get_user_active_sessions():
     acting = _acting_user_id()
     svc, err = service_for_user(acting)
     if err:
@@ -168,13 +137,9 @@ def get_user_active_sessions(user_id):
 @collaboration_bp.route("/session.typing", methods=["POST"])
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
-    "user_id": fields.Str(data_key="userId", required=True),
     "is_typing": fields.Bool(data_key="isTyping", load_default=True),
 })
-def set_typing(session_id, user_id, is_typing):
-    mismatch = _reject_user_id_mismatch(user_id)
-    if mismatch:
-        return mismatch
+def set_typing(session_id, is_typing):
     acting = _acting_user_id()
     svc, err = service_for_user(acting)
     if err:
