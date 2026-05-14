@@ -52,7 +52,36 @@ Evaluate the design across ALL of the following:
 - Propose cleaner alternatives that reduce long-term maintenance costs.
 - Challenge any tight coupling or framework-dependent business logic.
 
-### 6. Adversarial Challenge Techniques (STRICT)
+### 6. Layer Completeness Check (MANDATORY)
+
+Before evaluating architectural correctness, verify that every affected layer is represented in the design:
+
+- **UI layer**: If the feature introduces new resource types, field types, placeholder schemas, or auth flows that a user touches during session setup or template instantiation, the design MUST include a UI component. A design that adds an OAuth-backed agent but has no UI entry is incomplete.
+- **Inbound adapter layer**: Any new business rule that originates from an HTTP request must have a corresponding inbound adapter change called out.
+- **Data / seed layer**: If the feature is delivered via seed data (JSON, YAML, fixtures), the seed must be listed as a component and its structural constraints validated.
+
+Flag any missing layer as **CRITICAL — INCOMPLETE DESIGN**.
+
+### 7. External Auth / Protocol Realism Check (MANDATORY)
+
+When the design references OAuth, MCP sign-in, or any external auth mechanism:
+
+- **Do not accept label-level descriptions** like "Google OAuth via MCP." Require the designer to trace the actual discovery flow:
+  - Does the server expose AS metadata directly or via RFC 9728 PRM (`/.well-known/oauth-protected-resource`)?
+  - What is the real OAuth issuer? Does it differ from the service URL?
+  - How are credentials stored and retrieved — by MCP URL, issuer URL, or server identifier? Verify these keys are consistent end-to-end.
+- If these questions are not answered in the design, mark the auth section as **UNVERIFIED** and require a revision.
+
+### 8. External Dependency Failure Mode Check (MANDATORY)
+
+For every external dependency introduced or touched (MCP server, OAuth provider, Redis, external API):
+
+- Verify the design specifies what happens on 401, 503, and timeout.
+- "The provider will be available" is not an acceptable assumption.
+- The design must state whether failure is **silent** (graceful degradation, empty tool list) or **noisy** (bubbled as an error). Both are valid — but the choice must be explicit.
+- Failure to document degradation paths for external dependencies is a **CRITICAL** gap.
+
+### 9. Adversarial Challenge Techniques (STRICT)
 
 You MUST apply at least 3 of the following techniques to actively try to break the design:
 
@@ -61,10 +90,12 @@ You MUST apply at least 3 of the following techniques to actively try to break t
 - **Edge Case Injection**: Propose 3 realistic edge cases (empty input, concurrent access, partial failure) and verify the design handles them.
 - **Cost Challenge**: Estimate the runtime cost (API calls, DB queries, memory) of the proposed flow and compare to alternatives.
 - **Reuse Audit**: Search the codebase for existing implementations that overlap >50% with any proposed new component.
+- **Auth Flow Trace**: For any OAuth / MCP auth reference, manually trace the token acquisition and lookup path end-to-end. Verify the storage key matches the retrieval key. Verify the discovery endpoint is correct for the named provider.
+- **Runtime Failure Trace**: Pick the most critical external dependency and trace what happens when it returns a hard error. Confirm the design handles it without crashing the session.
 
 If fewer than 3 techniques are applied, the review is incomplete.
 
-### 7. Mandatory Codebase Verification (STRICT)
+### 10. Mandatory Codebase Verification (STRICT)
 
 Before issuing any verdict, you MUST:
 - Use search/read tools to explore the actual source code -- do NOT review only the design document in isolation.
@@ -109,8 +140,17 @@ Concrete suggestions to improve the design.
 ### Safer / Cleaner Alternative Approach
 If a fundamentally better design exists, describe it here. You MUST always consider whether a simpler or more aligned approach exists, even if the current design is acceptable. If no better alternative exists, state so explicitly with reasoning.
 
+### Layer Completeness Findings
+Which layers were missing or incomplete, and what was required.
+
+### Auth / Protocol Realism Findings
+Whether the OAuth/auth discovery chain was verified end-to-end or left as an unverified label.
+
+### External Dependency Failure Modes
+Which failure paths were unspecified, and how they should be handled.
+
 ### Adversarial Challenges Applied
-List which adversarial techniques (from section 6) you applied and what they revealed.
+List which adversarial techniques (from section 9) you applied and what they revealed.
 
 ### Codebase Verification Evidence
 List the specific source files you read and what claims they verified or contradicted.
