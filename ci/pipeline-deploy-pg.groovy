@@ -39,7 +39,7 @@ def buildParams = [
 
 def secret_lists = [
     redis: ['redis_username', 'redis_password', 'ri_username', 'ri_password'],
-    identity: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url'],
+    identity_stage: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url'],
     rabbitmq: ['rmq_username', 'rmq_password'],
     umami: ['umami_username', 'umami_password'],
     global_config: ['secret_key'],
