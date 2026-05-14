@@ -32,6 +32,7 @@ env:
   RI_APP_HOST: "0.0.0.0"
   #REDISINSIGHT_DB_0_NAME: "workflows"
   RI_REDIS_HOST: "redis"
+  RI_AUTHENTICATION_ENABLED: "true"
 
 redisConfigMapName: redis-config
 RedisSecretName: redis-secret
