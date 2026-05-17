@@ -6,7 +6,7 @@ properties([
         
         // 🚀 Deployment Parameters
         choice(name: 'deploy_namespace', choices: ['tag-ai--playground', 'tag-ai--playground2'], description: 'Target OpenShift namespace'),
-        choice(name: 'deploy_type', choices: ['FRESH_INSTALL', 'APPLICATION_UPGRADE'], description: 'Deployment type'),
+        choice(name: 'deploy_type', choices: ['FRESH_INSTALL', 'APPLICATION_UPGRADE'], description: 'Deployment type fresh install - delete everything including shared resources, application upgrade - update only the specified modules'),
         string(name: "VERSION", defaultValue: "", description: "DONT SET THIS VALUE!"),
         string(name: "BACKEND_VERSION", defaultValue: "", description: "Image tag for backend"),
         string(name: "RAG_VERSION", defaultValue: "", description: "Image tag for rag"),
