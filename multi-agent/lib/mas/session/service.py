@@ -1,9 +1,11 @@
+import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from mas.session.management.user_session_manager import UserSessionManager
 from mas.session.execution.foreground_runner import ForegroundSessionRunner
 from mas.session.execution.input_projector import SessionInputProjector
-from mas.session.execution.ports import BackgroundSessionSubmitter, SubmitSessionRequest
+from mas.session.execution.ports import BackgroundSessionEngine, SubmitSessionRequest
+from mas.session.domain.status import SessionStatus
 from mas.session.domain.workflow_session import WorkflowSession
 from mas.session.domain.session_record import SessionRecord
 from mas.session.domain.dto import SessionListItem
@@ -11,6 +13,8 @@ from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint,
 from mas.session.domain.exceptions import BlueprintNotFoundError
 from mas.core.identity import Identity
 from mas.core.dto import GroupedCount
+
+logger = logging.getLogger(__name__)
 
 class SessionService:
     """
@@ -26,12 +30,12 @@ class SessionService:
         manager: UserSessionManager,
         foreground_runner: ForegroundSessionRunner,
         input_projector: SessionInputProjector,
-        background_submitter: Optional[BackgroundSessionSubmitter] = None,
+        background_engine: Optional[BackgroundSessionEngine] = None,
     ):
         self._manager = manager
         self._foreground = foreground_runner
         self._projector = input_projector
-        self._submitter = background_submitter
+        self._engine = background_engine
 
     def create(
         self,
@@ -82,17 +86,59 @@ class SessionService:
         """
         Non-blocking submit: stage inputs, then start a background workflow
         and return its handle/ID immediately (HTTP 202 pattern).
+
+        The engine handle is persisted atomically with input staging
+        (before the workflow starts), eliminating the race window where
+        a cancel request could arrive before the handle is in Mongo.
         """
-        if self._submitter is None:
+        if self._engine is None:
             raise TypeError(
-                "No BackgroundSessionSubmitter configured — "
+                "No BackgroundSessionEngine configured — "
                 "submit() is not available for this engine."
             )
-        self._stage(session_id, inputs, logged_in_user=logged_in_user)
+        record = self._manager.get_record(session_id)
+        handle = self._engine.generate_handle(session_id)
+        record.update_context(engine_handle=handle)
+        self._projector.apply(record, inputs or {}, logged_in_user=logged_in_user)
+
         session = self._manager.get_session(session_id)
         execution_ctx = session.run_context.with_scope(scope)
         request = SubmitSessionRequest(execution_context=execution_ctx)
-        return self._submitter.submit(session, request)
+        self._engine.submit(session, request)
+
+        return handle
+
+    def cancel(self, session_id: str) -> bool:
+        """Request cancellation of a running or queued background session.
+
+        Only checks eligibility and delegates to the adapter.  The actual
+        lifecycle transition (CANCELLED status, channel close) happens inside
+        the workflow's CancelledError handler via BackgroundLifecycleHandler,
+        keeping lifecycle ownership in a single place.
+
+        Returns True if cancellation was requested, False if the session
+        is not in a cancellable state or the engine call failed.
+        """
+        if self._engine is None:
+            raise TypeError(
+                "No BackgroundSessionEngine configured — "
+                "cancel() is not available for this engine."
+            )
+        record = self._manager.get_record(session_id)
+        if record.status not in (SessionStatus.QUEUED, SessionStatus.RUNNING):
+            return False
+        handle = record.engine_handle
+        if handle is None:
+            return False
+        try:
+            self._engine.cancel(handle)
+        except Exception:
+            logger.warning(
+                "Failed to cancel background workflow %s for session %s",
+                handle, session_id, exc_info=True,
+            )
+            return False
+        return True
 
     # ---- Private staging ----
 
@@ -106,9 +152,14 @@ class SessionService:
     ) -> None:
         """Project raw inputs onto the record and persist (QUEUED).
 
+        Clears any stale engine_handle from a previous background run
+        so that cancel() won't target a dead workflow if this session
+        is now being executed via the foreground run() path.
+
         Raises ValueError if the session is already executing.
         """
         record = self._manager.get_record(session_id)
+        record.update_context(engine_handle=None)
         if record.status.name in self._BUSY_STATUSES:
             raise ValueError(
                 f"Session {session_id} is already {record.status.name} — "

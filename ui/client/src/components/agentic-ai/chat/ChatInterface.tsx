@@ -10,9 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Send, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw,
+  Send, Square, Trash2, Loader2, Sparkles, Info, Copy, RotateCcw,
   ThumbsUp, ThumbsDown, Check, Columns3, MessageSquare, Network,
-  Maximize2, Minimize2, Download, FileText, FileJson,
+  Maximize2, Minimize2, Download, FileText, FileJson, Ban, ChevronDown, ChevronUp,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,7 +20,7 @@ import axios from "../../../http/axiosAgentConfig";
 import { MarkdownComponents, preprocessText } from "./helpers/TextComponents";
 import { SessionPayload } from "../ExecutionTab";
 import { useStreamingData } from "../StreamingDataContext";
-import { Message, StreamLogEntry, WorkPlanSnapshot } from "./types";
+import { Message, StreamLogEntry, WorkPlanSnapshot, isSessionCancellation } from "./types";
 import { StreamLogDisplay } from "./StreamLogDisplay";
 import { useToast } from "@/hooks/use-toast";
 import { UmamiTrack } from '@/components/ui/umamitrack';
@@ -43,17 +43,25 @@ import {
 } from "./exportSession";
 import { sendTypingSignal as sendTypingSignalApi } from "@/api/collaboration";
 
+const TERMINAL_STATUSES = ['CANCELLED', 'FAILED', 'COMPLETED'] as const;
+const isTerminalStatus = (status?: string): boolean =>
+  !!status && TERMINAL_STATUSES.includes(status as typeof TERMINAL_STATUSES[number]);
+
 // Backend message format
 interface BackendMessage {
   content: string;
   role: "user" | "assistant";
   sender_id?: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface ChatInterfaceProps {
   runId?: string;
   triggerExecution: (sessionPayload: SessionPayload) => Promise<string>;
+  onCancelSession?: () => Promise<void>;
   initialMessages?: BackendMessage[];
+  sessionStatus?: string;
+  statusMessage?: string;
   blueprintExists?: boolean;
   isSharingDisabled?: boolean;
   blueprintValid?: boolean;
@@ -66,6 +74,7 @@ interface ChatInterfaceProps {
   queuedMessageToProcess?: string | null;
   onQueuedMessageProcessed?: () => void;
   isLiveRequest?: boolean;
+  isSubmitting?: boolean;
   collaborationMode?: boolean;
   teamMembers?: MemberDisplay[];
   typingUsers?: string[];
@@ -74,7 +83,10 @@ interface ChatInterfaceProps {
 export default function ChatInterface({
   runId,
   triggerExecution,
+  onCancelSession,
   initialMessages = [],
+  sessionStatus,
+  statusMessage,
   blueprintExists = true,
   isSharingDisabled = false,
   blueprintValid = true,
@@ -87,6 +99,7 @@ export default function ChatInterface({
   queuedMessageToProcess,
   onQueuedMessageProcessed,
   isLiveRequest = false,
+  isSubmitting = false,
   collaborationMode = false,
   teamMembers = [],
   typingUsers = [],
@@ -112,6 +125,38 @@ export default function ChatInterface({
   const [userPromptsMap, setUserPromptsMap] = useState<Record<string, string>>({});
   const userPromptsMapRef = useRef<Record<string, string>>({});
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelledExpanded, setCancelledExpanded] = useState<Record<string, boolean>>({});
+  const toggleCancelledExpansion = useCallback((messageId: string) => {
+    setCancelledExpanded(prev => ({ ...prev, [messageId]: !prev[messageId] }));
+  }, []);
+  const wasCancelledByUserRef = useRef(false);
+  const activeUserMessageIdRef = useRef<string | null>(null);
+
+  const updateMessageById = useCallback(
+    (messageId: string, updates: Partial<Message>) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? { ...msg, ...updates } : msg))
+      );
+    },
+    []
+  );
+
+  const markMessageAsCancelled = useCallback((aiMessageId: string) => {
+    const userMsgId = activeUserMessageIdRef.current;
+    setMessages((prev) => {
+      const filtered = prev.filter((m) => m.id !== aiMessageId);
+      const targetUserId = userMsgId
+        || filtered.findLast((m) => m.sender === "user")?.id;
+      if (targetUserId) {
+        return filtered.map((m) =>
+          m.id === targetUserId ? { ...m, isCancelled: true } : m
+        );
+      }
+      return filtered;
+    });
+    activeUserMessageIdRef.current = null;
+  }, []);
 
   // Typing indicator: debounced POST to collaboration endpoint
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -248,6 +293,12 @@ export default function ChatInterface({
   }, [blueprintExists, isSharingDisabled, isValidatingBlueprint, blueprintValid, isLiveRequest]);
 
   // Transform backend messages to frontend format with stable IDs
+  const isInputDisabled = useMemo(
+    () => !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest,
+    [blueprintExists, isSharingDisabled, blueprintValid, isValidatingBlueprint, isLiveRequest]
+  );
+
+  // Transform backend messages to frontend format (streamLogs/workPlans, managed separately)
   const transformBackendMessagesToFrontend = useCallback(
     (backendMessages: BackendMessage[]): Message[] => {
       return backendMessages.map((msg, index) => ({
@@ -258,6 +309,7 @@ export default function ChatInterface({
         ...(msg.role === "assistant" && {
           finalAnswer: msg.content,
         }),
+        ...(msg.metadata?.is_cancelled && { isCancelled: true }),
       }));
     },
     [],
@@ -317,6 +369,20 @@ export default function ChatInterface({
         setUserPromptsMap({ ...userPromptsMapRef.current });
       }
 
+      // Fallback for sessions cancelled before is_cancelled was deployed
+      const hasCancelledFromBackend = transformedMessages.some((m) => m.isCancelled);
+      if (sessionStatus === "CANCELLED" && !hasCancelledFromBackend) {
+        const lastUserIndex = transformedMessages.findLastIndex(
+          (m) => m.sender === "user"
+        );
+        if (lastUserIndex !== -1) {
+          transformedMessages[lastUserIndex] = {
+            ...transformedMessages[lastUserIndex],
+            isCancelled: true,
+          };
+        }
+      }
+
       setMessages(transformedMessages);
     } else if (lastSyncedCountRef.current !== 0 || messages.length === 0) {
       lastSyncedCountRef.current = 0;
@@ -329,7 +395,7 @@ export default function ChatInterface({
         },
       ]);
     }
-  }, [initialMessages, transformBackendMessagesToFrontend]);
+  }, [initialMessages, sessionStatus, statusMessage, transformBackendMessagesToFrontend]);
 
   // Auto-scroll when new messages are added
   const prevMessageCountRef = useRef(0);
@@ -481,22 +547,34 @@ export default function ChatInterface({
                 const existingPlan = updatedWorkPlans[existingPlanIndex];
                 updatedWorkPlans[existingPlanIndex] = {
                   ...workplanSnapshot,
-                  isExpanded: existingPlan.isExpanded // Preserve expansion state
+                  isExpanded: existingPlan.isExpanded
                 };
               } else {
-                // Add new workplan with default expansion state
+                // Evict stale plan from the same orchestrator before adding the new one
+                const staleIndex = updatedWorkPlans.findIndex(
+                  (wp) => wp.owner_uid === workplanSnapshot.owner_uid
+                );
+                const preserveExpanded = staleIndex !== -1
+                  ? updatedWorkPlans[staleIndex].isExpanded
+                  : false;
+                if (staleIndex !== -1) {
+                  updatedWorkPlans.splice(staleIndex, 1);
+                }
                 updatedWorkPlans.push({
                   ...workplanSnapshot,
-                  isExpanded: false // Default to collapsed
+                  isExpanded: preserveExpanded
                 });
               }
             });
           }
         });
 
-        // Also preserve existing workplans that weren't updated
+        // Preserve existing workplans whose orchestrator hasn't emitted a newer plan
         currentWorkPlans.forEach((existingPlan) => {
-          if (!updatedWorkPlans.find(wp => wp.plan_id === existingPlan.plan_id)) {
+          const alreadyCovered = updatedWorkPlans.find(
+            wp => wp.plan_id === existingPlan.plan_id || wp.owner_uid === existingPlan.owner_uid
+          );
+          if (!alreadyCovered) {
             updatedWorkPlans.push(existingPlan);
           }
         });
@@ -624,6 +702,8 @@ export default function ChatInterface({
     if (currentStreamingMessageId) return;
     // Skip if user is typing (middle of handleSendMessage)
     if (isTyping) return;
+    // Skip reconnection for sessions in terminal states
+    if (isTerminalStatus(sessionStatus)) return;
     
     // Start polling when session is live and messages are loaded
     if (isLiveRequest && messages.length > 0) {
@@ -662,28 +742,38 @@ export default function ChatInterface({
     if (!isLiveRequest && currentStreamingMessageId) {
       const messageId = currentStreamingMessageId;
       const wasReconnection = isReconnectionStreamRef.current;
+      const wasCancelled = wasCancelledByUserRef.current;
       
       // Stop polling
       stopStreamingLogs(messageId);
       setCurrentStreamingMessageId(null);
       isReconnectionStreamRef.current = false;
+      wasCancelledByUserRef.current = false;
       
+      if (wasCancelled) {
+        markMessageAsCancelled(messageId);
+        return;
+      }
+
       // For reconnection streams, fetch the final answer
       if (wasReconnection && runId) {
         (async () => {
           try {
             const response = await axios.get(`/sessions/session.chat.get?sessionId=${runId}`);
-            const finalAnswer = response.data?.output;
-            
+            const { output: finalAnswer, status, status_message } = response.data;
+
+            if (status === 'CANCELLED') {
+              markMessageAsCancelled(messageId);
+              return;
+            }
+
+            if (status === 'FAILED') {
+              updateMessageById(messageId, { finalAnswer: status_message || 'Workflow failed.' });
+              return;
+            }
+
             if (finalAnswer) {
-              setMessages((prev) =>
-                prev.map((msg) => {
-                  if (msg.id === messageId) {
-                    return { ...msg, finalAnswer };
-                  }
-                  return msg;
-                })
-              );
+              updateMessageById(messageId, { finalAnswer });
             }
           } catch (error) {
             console.error('Error fetching final state after reconnection:', error);
@@ -777,6 +867,8 @@ export default function ChatInterface({
     setInputMessage("");
     setIsTyping(true);
     clearTypingSignal();
+    wasCancelledByUserRef.current = false;
+    activeUserMessageIdRef.current = userMessage.id;
 
     // Reset textarea to compact state and focus
     setTimeout(() => {
@@ -818,45 +910,55 @@ export default function ChatInterface({
 
       const response = await triggerExecution(sessionPayload);
 
-      // Update the message with final answer
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id === streamingMessageId) {
-            return {
-              ...msg,
-              finalAnswer: response,
-            };
-          }
-          return msg;
-        }),
-      );
+      if (wasCancelledByUserRef.current) {
+        markMessageAsCancelled(streamingMessageId);
+      } else {
+        updateMessageById(streamingMessageId, { finalAnswer: response });
+      }
     } catch (error) {
       console.error("Error in chat interaction:", error);
 
-      // Update with error message
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id === streamingMessageId) {
-            return {
-              ...msg,
-              finalAnswer:
-                "I'm sorry, there was an error processing your request.",
-            };
-          }
-          return msg;
-        }),
-      );
+      if (wasCancelledByUserRef.current || isSessionCancellation(error)) {
+        markMessageAsCancelled(streamingMessageId);
+      } else {
+        const errorMessage = error instanceof Error ? error.message : '';
+        updateMessageById(streamingMessageId, {
+          finalAnswer: errorMessage || "I'm sorry, there was an error processing your request.",
+        });
+      }
     } finally {
       setIsTyping(false);
+      wasCancelledByUserRef.current = false;
+      activeUserMessageIdRef.current = null;
       stopStreamingLogs(streamingMessageId);
       setCurrentStreamingMessageId(null);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { // Allow Shift+Enter for new lines
-      e.preventDefault(); // Prevent default Enter behavior (new line)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleCancelClick = async () => {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    wasCancelledByUserRef.current = true;
+
+    try {
+      await onCancelSession?.();
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+      wasCancelledByUserRef.current = false; 
+      toast({
+        title: "Cancel Failed",
+        description: "Failed to cancel the session. It may have already completed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -1108,6 +1210,34 @@ export default function ChatInterface({
     }, [message, streamLogs, workPlans]);
 
     if (message.sender === "user") {
+      if (message.isCancelled) {
+        const isExpanded = cancelledExpanded[message.id];
+        return (
+          <div>
+            <div className="text-sm whitespace-pre-line text-gray-400">
+              <div className={!isExpanded ? "line-clamp-2" : ""}>
+                {message.content}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-700" role="status" aria-live="polite">
+              <Ban className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+              <span className="text-xs text-gray-400 font-medium">Workflow was stopped by user.</span>
+              {message.content.length > 120 && (
+                <button
+                  onClick={() => toggleCancelledExpansion(message.id)}
+                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-100 ml-auto transition-colors"
+                >
+                  {isExpanded ? (
+                    <><ChevronUp className="h-3 w-3" /> Show less</>
+                  ) : (
+                    <><ChevronDown className="h-3 w-3" /> Show more</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="text-sm whitespace-pre-line">{message.content}</div>
       );
@@ -1133,7 +1263,6 @@ export default function ChatInterface({
             <div
               className="mt-3 p-3 rounded-lg"
               style={{
-                // backgroundColor: `hsl(var(--primary) / 0.1)`,
                 border: `1px solid hsl(var(--primary) / 0.3)`,
               }}
             >
@@ -1280,7 +1409,9 @@ export default function ChatInterface({
                     <div
                       className={`max-w-[90%] rounded-2xl p-3 ${
                         message.sender === "user"
-                          ? "bg-primary text-white rounded-tr-none"
+                          ? message.isCancelled
+                            ? "bg-gray-800/50 text-gray-100 rounded-tr-none border border-gray-700"
+                            : "bg-primary text-white rounded-tr-none"
                           : "bg-background-dark border border-gray-800 rounded-tl-none"
                       }`}
                     >
@@ -1350,65 +1481,80 @@ export default function ChatInterface({
           )}
           
           {/* Input area */}
-          <div className="flex space-x-2 items-end">
-            {/* Textarea container with expand/collapse icon */}
-            <div className="relative flex-1">
-              <Textarea
-                ref={textareaRef}
-                value={inputMessage}
-                onChange={(e) => {
-                  setInputMessage(e.target.value);
-                  if (collaborationMode && e.target.value.trim()) sendTypingSignal();
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={getInputPlaceholder()}
-                className={`bg-background-dark resize-none transition-[height] duration-200 ease-out w-full ${
-                  (!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest) 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
-                } ${(isAtMaxHeight || isExpanded) ? 'pr-10' : ''}`}
-                style={{ height: `${TEXTAREA_MIN_HEIGHT}px` }}
-                rows={1}
-                disabled={!blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint || isLiveRequest}
-              />
-              {/* Expand/Collapse icon - shows when textarea is at max height or expanded */}
-              <AnimatePresence>
-                {(isAtMaxHeight || isExpanded) && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.15 }}
-                    onClick={toggleExpandedHeight}
-                    className={`absolute top-2 right-2 p-1.5 rounded-md transition-colors border ${
-                      isExpanded 
-                        ? 'bg-primary/20 text-primary border-primary/50 hover:bg-primary/30' 
-                        : 'bg-background-surface/90 hover:bg-primary/20 text-gray-400 hover:text-primary border-gray-700 hover:border-primary/50'
-                    }`}
-                    title={isExpanded ? "Collapse input area" : "Expand input area"}
-                    type="button"
+          <div className="relative">
+            <Textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                if (collaborationMode && e.target.value.trim()) sendTypingSignal();
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={getInputPlaceholder()}
+              className={`bg-background-dark resize-none transition-[height] duration-200 ease-out w-full pr-12 ${
+                isInputDisabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              style={{ height: `${TEXTAREA_MIN_HEIGHT}px` }}
+              rows={1}
+              disabled={isInputDisabled}
+            />
+            {/* Expand/Collapse icon - shows when textarea is at max height or expanded */}
+            <AnimatePresence>
+              {(isAtMaxHeight || isExpanded) && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={toggleExpandedHeight}
+                  className={`absolute top-2 right-2 p-1.5 rounded-md transition-colors border ${
+                    isExpanded 
+                      ? 'bg-primary/20 text-primary border-primary/50 hover:bg-primary/30' 
+                      : 'bg-background-surface/90 hover:bg-primary/20 text-gray-400 hover:text-primary border-gray-700 hover:border-primary/50'
+                  }`}
+                  title={isExpanded ? "Collapse input area" : "Expand input area"}
+                  type="button"
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </motion.button>
+              )}
+            </AnimatePresence>
+            {/* Send/Cancel button inside textarea */}
+            <div className="absolute bottom-2 right-2">
+              {(isTyping || isLiveRequest) ? (
+                <button
+                  onClick={handleCancelClick}
+                  disabled={isCancelling || !onCancelSession || isSubmitting}
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md text-white disabled:opacity-50 disabled:cursor-not-allowed animate-pulse"
+                  style={{ backgroundColor: 'hsl(var(--primary))' }}
+                  title="Stop generation"
+                  aria-label="Stop generation"
+                >
+                  {(isCancelling || isSubmitting) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <span className="h-3 w-3 bg-white" />
+                  )}
+                </button>
+              ) : (
+                <UmamiTrack 
+                  event={UmamiEvents.AGENT_CHAT_SEND_MESSAGE_BUTTON}
+                >
+                  <Button
+                    onClick={() => handleSendMessage()}
+                    disabled={inputMessage.trim() === "" || isInputDisabled}
+                    size="icon"
+                    className="bg-primary hover:bg-primary/80 h-7 w-7"
                   >
-                    {isExpanded ? (
-                      <Minimize2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    )}
-                  </motion.button>
-                )}
-              </AnimatePresence>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </UmamiTrack>
+              )}
             </div>
-            <UmamiTrack 
-              event={UmamiEvents.AGENT_CHAT_SEND_MESSAGE_BUTTON}
-            >
-              <Button
-                onClick={() => handleSendMessage()}
-                disabled={inputMessage.trim() === "" || ((isTyping || isLiveRequest) && !onQueueMessage) || !blueprintExists || isSharingDisabled || !blueprintValid || isValidatingBlueprint}
-                className="bg-primary hover:bg-[#7525c9] mb-0"
-                title="Send message"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </UmamiTrack>
           </div>
           <div className="flex items-start gap-2 mt-2 px-1">
             <Info className="h-3.5 w-3.5 text-gray-400 mt-0.5 flex-shrink-0" />

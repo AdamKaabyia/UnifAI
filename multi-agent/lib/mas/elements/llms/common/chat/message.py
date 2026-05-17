@@ -27,5 +27,6 @@ class ChatMessage(BaseModel):
     tool_call_id: Optional[str] = None
     additional_kwargs: Optional[Dict[str, Any]] = None
     sender_id: Optional[str] = None
+    metadata: Dict[str, Any] = {}
 
     model_config = ConfigDict(frozen=True)

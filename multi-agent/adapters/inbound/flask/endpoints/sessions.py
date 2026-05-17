@@ -128,6 +128,25 @@ def submit_user_session(session_id, inputs, scope, logged_in_user):
         return jsonify({"error": str(e)}), 500
 
 
+@sessions_bp.route("/session.cancel", methods=["POST"])
+@from_body({
+    "session_id": fields.Str(data_key="sessionId", required=True),
+    "logged_in_user": fields.Str(data_key="loggedInUser", required=False, load_default=lambda: ""),
+})
+def cancel_session(session_id, logged_in_user):
+    try:
+        svc = current_app.container.session_service
+        cancelled = svc.cancel(session_id=session_id)
+        if not cancelled:
+            return jsonify({
+                "error": "Session is not in a cancellable state",
+                "sessionId": session_id,
+            }), 409
+        return jsonify({"sessionId": session_id, "status": "CANCELLED"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @sessions_bp.route("/session.state.get", methods=["GET"])
 @from_query({
     "session_id": fields.Str(data_key="sessionId", required=True),

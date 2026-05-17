@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Users, Clock, Trash2, Plus, Columns3, Network } from "lucide-react";
 import ChatInterface from "./chat/ChatInterface";
+import { createSessionError } from "./chat/types";
 import ExecutionStream from "./ExecutionStream";
 import GraphDisplay from "./graphs/GraphDisplay";
 import axios from '../../http/axiosAgentConfig'
@@ -98,6 +99,7 @@ export default function ExecutionTab({
   const [showExecutionStream, setShowExecutionStream] = useState(false);
   const [isActiveChatSession, setIsActiveChatSession] = useState(true);
   const [isLiveRequest, setIsLiveRequest] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalScope, setGlobalScope] = useState<'public' | 'private'>('public');
@@ -339,6 +341,7 @@ export default function ExecutionTab({
     // This clears any existing node data from the previous session
     clearStream();
     setIsLiveRequest(false);
+    setIsCancelled(false);
 
     // Reset sharing-disabled state immediately so a previously disabled session
     // doesn't bleed into the newly selected (possibly valid) session.
@@ -441,18 +444,23 @@ export default function ExecutionTab({
     }
     setIsLoadingSessionMessages(false);
 
-    // Check if this session has an active Redis stream and reconnect if so
-    // This enables persistent streaming - when user navigates away and returns,
-    // they can reconnect to the live stream and continue seeing updates
-    // Note: This runs in the background - we don't block session selection on it
-    const reconnectSessionId = session.id;
-    sessionStream.checkAndReconnect(session.id).then((hasActiveStream) => {
-      if (sessionSelectRequestId.current !== requestId) return;
-      if (selectedSessionIdRef.current !== reconnectSessionId) return;
-      if (hasActiveStream) {
-        setIsLiveRequest(true);
-      }
-    });
+    // Check if this session has an active Redis stream and reconnect if so.
+    // Skip reconnection for sessions in terminal states (CANCELLED, FAILED, COMPLETED)
+    // to avoid showing typing indicators and cancel buttons for finished sessions.
+    // Note: Stale-request guards ensure we don't apply reconnect to a different session.
+    const sessionStatus = updatedSession?.status;
+    const isTerminal = sessionStatus === 'CANCELLED' || sessionStatus === 'FAILED' || sessionStatus === 'COMPLETED';
+
+    if (!isTerminal) {
+      const reconnectSessionId = session.id;
+      sessionStream.checkAndReconnect(session.id).then((hasActiveStream) => {
+        if (sessionSelectRequestId.current !== requestId) return;
+        if (selectedSessionIdRef.current !== reconnectSessionId) return;
+        if (hasActiveStream) {
+          setIsLiveRequest(true);
+        }
+      });
+    }
   };
 
   // Handle delete chat
@@ -651,16 +659,14 @@ export default function ExecutionTab({
             workplan: workplan
           };
 
-          // Find existing workplan or add new one
+          // Find existing workplan by plan_id (same plan) or owner_uid (re-planned)
           const existingPlanIndex = existing.workplans.findIndex(
-            (wp: any) => wp.plan_id === plan_id
+            (wp: any) => wp.plan_id === plan_id || wp.owner_uid === workplanSnapshot.owner_uid
           );
 
           if (existingPlanIndex !== -1) {
-            // Update existing workplan
             existing.workplans[existingPlanIndex] = workplanSnapshot;
           } else {
-            // Add new workplan
             existing.workplans.push(workplanSnapshot);
           }
         }
@@ -716,6 +722,30 @@ export default function ExecutionTab({
   }, [contextUserId, identityType]);
 
   /**
+   * Cancel the currently running session.
+   * Calls the backend cancel API, stops the client-side stream, and resets live state.
+   */
+  const handleCancelSession = useCallback(async () => {
+    if (!selectedSession?.id) return;
+
+    setIsCancelled(true);
+
+    try {
+      await sessionStream.cancelSessionExecution(selectedSession.id);
+    } catch (error) {
+      console.error('Error cancelling session execution:', error);
+    } finally {
+      sessionStream.cancelStream();
+      setIsLiveRequest(false);
+
+      if (streamCompleteResolverRef.current) {
+        streamCompleteResolverRef.current();
+        streamCompleteResolverRef.current = null;
+      }
+    }
+  }, [selectedSession, sessionStream]);
+
+  /**
    * Submit a session for execution and stream results.
    * 
    * Uses fire-and-forget pattern:
@@ -730,6 +760,7 @@ export default function ExecutionTab({
    */
   const triggerExecution = async (sessionPayload: SessionPayload): Promise<string> => {
     try {
+      setIsCancelled(false);
       setIsLiveRequest(true);
       
       // Create a promise that resolves when streaming completes
@@ -763,7 +794,16 @@ export default function ExecutionTab({
       const session_response = await axios.get(
         `/sessions/session.chat.get?sessionId=${sessionPayload.sessionId}`
       );
-      return session_response.data.output;
+      const { output, status, status_message } = session_response.data;
+
+      if (status === 'CANCELLED') {
+        throw createSessionError(status_message || 'Workflow was stopped.', 'CANCELLED');
+      }
+      if (status === 'FAILED') {
+        throw createSessionError(status_message || 'Workflow failed.', 'FAILED');
+      }
+
+      return output;
     } catch (error) {
       console.error('Error in session execution:', error);
       setIsLiveRequest(false);
@@ -967,7 +1007,10 @@ export default function ExecutionTab({
                 key={selectedSession?.id || 'no-session'}
                 runId={selectedSession?.id || ''}
                 triggerExecution={triggerExecution}
+                onCancelSession={handleCancelSession}
                 initialMessages={currentSessionMessages}
+                sessionStatus={selectedSession?.status}
+                statusMessage={selectedSession?.statusMessage}
                 blueprintExists={selectedSession?.blueprintExists ?? true}
                 isSharingDisabled={isSharingDisabled}
                 blueprintValid={isBlueprintValid}
@@ -977,6 +1020,7 @@ export default function ExecutionTab({
                 onSetCarouselMode={handleSetCarouselMode}
                 carouselMode={carouselMode}
                 isLiveRequest={isLiveRequest}
+                isSubmitting={sessionStream.isSubmitting}
               />
             )}
           </div>
@@ -1116,6 +1160,7 @@ export default function ExecutionTab({
                   validationResults={blueprintValidationResults}
                   isValidating={isValidatingBlueprint}
                   isLiveRequest={isLiveRequest}
+                  isCancelled={isCancelled}
                   isGraphVisible={carouselMode !== 'chat'}
                 />
               ) : (

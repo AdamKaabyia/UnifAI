@@ -23,6 +23,7 @@ class ExecutionContext(BaseModel):
     identity: Identity
     scope: str = "public"
     engine_name: str = ""
+    engine_handle: Optional[str] = None
 
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = None
