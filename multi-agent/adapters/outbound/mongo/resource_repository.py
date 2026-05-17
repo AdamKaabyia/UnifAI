@@ -4,6 +4,7 @@ from mas.resources.models import Resource, ResourceQuery
 from mas.resources.repository.base import ResourceRepository
 from mas.core.identity import Identity
 from mas.core.dto import GroupedCount
+from outbound.mongo.helpers import identity_q
 
 
 class MongoResourceRepository(ResourceRepository):
@@ -23,14 +24,6 @@ class MongoResourceRepository(ResourceRepository):
         self.col.create_index(
             [("identity.type", 1), ("identity.id", 1), ("created", -1)],
             background=True)
-
-    # ---------- helpers ----------
-    @staticmethod
-    def _identity_q(identity: Identity) -> Dict[str, Any]:
-        return {
-            "identity.type": identity.type.value,
-            "identity.id": identity.id,
-        }
 
     # ---------- CRUD ----------
     def save(self, doc: Resource) -> str:
@@ -62,12 +55,12 @@ class MongoResourceRepository(ResourceRepository):
 
     def delete_by_identity(self, identity: Identity) -> int:
         """Delete all resources owned by the given identity. Returns count."""
-        result = self.col.delete_many(self._identity_q(identity))
+        result = self.col.delete_many(identity_q(identity))
         return result.deleted_count
 
     def find_by_name(self, identity: Identity, category: str,
                      type: str, name: str):
-        q = {**self._identity_q(identity),
+        q = {**identity_q(identity),
              "category": category, "type": type, "name": name}
         raw = self.col.find_one(q)
         return Resource(**raw) if raw else None
@@ -75,7 +68,7 @@ class MongoResourceRepository(ResourceRepository):
     # ---------- queries ----------
     def find_resources(self, query: ResourceQuery) -> List[Resource]:
         """Find resources based on query criteria with pagination."""
-        filter_dict = self._identity_q(query.identity)
+        filter_dict = identity_q(query.identity)
 
         if query.category:
             filter_dict["category"] = query.category.value
@@ -99,7 +92,7 @@ class MongoResourceRepository(ResourceRepository):
 
     def count_resources(self, query: ResourceQuery) -> int:
         """Count resources matching query criteria."""
-        filter_dict = self._identity_q(query.identity)
+        filter_dict = identity_q(query.identity)
 
         if query.category:
             filter_dict["category"] = query.category.value
@@ -110,7 +103,7 @@ class MongoResourceRepository(ResourceRepository):
 
     def count(self, identity: Identity, filter: dict | None = None) -> int:
         # Identity keys must not be overridden by caller-supplied filter.
-        merged = {**(filter or {}), **self._identity_q(identity)}
+        merged = {**(filter or {}), **identity_q(identity)}
         return self.col.count_documents(merged)
 
     def meta(self, rid: str) -> tuple[str, str]:
@@ -137,7 +130,7 @@ class MongoResourceRepository(ResourceRepository):
         exclude_rid: str = "",
     ) -> int:
         filter_dict: Dict[str, Any] = {
-            **self._identity_q(identity),
+            **identity_q(identity),
             f"cfg_dict.{field}": value,
         }
         if exclude_rid:
@@ -157,7 +150,7 @@ class MongoResourceRepository(ResourceRepository):
         Transforms MongoDB's {"_id": {...}, "count": N} format to 
         database-agnostic GroupedCount DTOs.
         """
-        match = {**(filter or {}), **self._identity_q(identity)}
+        match = {**(filter or {}), **identity_q(identity)}
         group_id = {field: f"${field}" for field in group_by}
         
         pipeline = [

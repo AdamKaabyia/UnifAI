@@ -12,6 +12,7 @@ from mas.session.domain.status import SessionStatus
 from mas.core.identity import Identity
 from mas.core.dto import GroupedCount
 from global_utils.utils.time_utils import format_utc_iso
+from outbound.mongo.helpers import identity_q
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +82,6 @@ class MongoSessionRepository(SessionRepository):
             background=True,
         )
 
-    # ---------- Identity query helpers ----------
-
-    def _identity_match(self, identity: Identity) -> Dict[str, Any]:
-        """Build a MongoDB filter that scopes to a specific identity."""
-        return {
-            self._IDENTITY_TYPE_FIELD: identity.type.value,
-            self._IDENTITY_ID_FIELD: identity.id,
-        }
-
     # ---------- Core CRUD Operations ----------
 
     def save(self, record: SessionRecord) -> None:
@@ -125,14 +117,14 @@ class MongoSessionRepository(SessionRepository):
 
     def list_runs(self, identity: Identity) -> List[str]:
         cursor = self._col.find(
-            self._identity_match(identity),
+            identity_q(identity),
             {self._RUN_ID_FIELD: 1, "_id": 0},
         )
         return [d[self._RUN_ID_FIELD] for d in cursor]
 
     def list_docs(self, identity: Identity) -> List[Mapping[str, Any]]:
         """Return all session documents for a user in a single query."""
-        return list(self._col.find(self._identity_match(identity), {"_id": 0}))
+        return list(self._col.find(identity_q(identity), {"_id": 0}))
 
     def delete(self, run_id: str) -> bool:
         """Delete a session by run_id. Returns True if deleted, False if not found."""
@@ -141,14 +133,14 @@ class MongoSessionRepository(SessionRepository):
 
     def delete_by_identity(self, identity: Identity) -> int:
         """Delete all sessions owned by the given identity. Returns count."""
-        result = self._col.delete_many(self._identity_match(identity))
+        result = self._col.delete_many(identity_q(identity))
         return result.deleted_count
 
     # ---------- Owner-scoped Statistics ----------
 
     def count(self, identity: Identity, filter: Dict[str, Any]) -> int:
         # Identity keys must not be overridden by caller-supplied filter.
-        query = {**filter, **self._identity_match(identity)}
+        query = {**filter, **identity_q(identity)}
         return self._col.count_documents(query)
 
     def group_count(
@@ -169,7 +161,7 @@ class MongoSessionRepository(SessionRepository):
         Returns:
             List of GroupedCount DTOs with grouped field values and count.
         """
-        match = {**(filter or {}), **self._identity_match(identity)}
+        match = {**(filter or {}), **identity_q(identity)}
         return self._aggregate_group_count(match, group_by)
 
     # ---------- System-wide Statistics (for admin analytics) ----------

@@ -10,7 +10,6 @@ from typing import List, Optional
 
 from mas.templates.repository.repository import TemplateRepository
 from mas.templates.models.template import Template
-from global_utils.utils.util import get_mongo_url
 
 
 class MongoTemplateRepository(TemplateRepository):
@@ -22,10 +21,12 @@ class MongoTemplateRepository(TemplateRepository):
 
     def __init__(
         self,
+        mongodb_ip: str = "127.0.0.1",
+        mongodb_port: str = "27017",
         db_name: str = "UnifAI",
         coll_name: str = "templates",
     ):
-        mongo_uri = get_mongo_url()
+        mongo_uri = f"mongodb://{mongodb_ip}:{mongodb_port}/"
         client = pymongo.MongoClient(mongo_uri)
         self._col = client[db_name][coll_name]
         

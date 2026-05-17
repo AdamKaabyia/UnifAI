@@ -48,7 +48,7 @@ class AppConfig(SharedConfig):
     directory_timeout: int = 10
 
     # Identity HTTP base for directory + teams HTTP APIs (optional override).
-    # When empty, ``identity_host`` is used for ``SsoDirectoryClient`` and auth decorators.
+    # When empty, ``identity_host`` is used for ``IdentityDirectoryClient`` and auth decorators.
     directory_sso_url: str = ""
 
     # MCP Auth

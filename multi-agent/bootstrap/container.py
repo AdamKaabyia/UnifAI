@@ -98,8 +98,10 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.blueprint_repo = MongoBlueprintRepository(
+            mongodb_ip=cfg.mongodb_ip,
+            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.blueprint_coll
+            coll_name=cfg.blueprint_coll,
         )
 
         self.resource_repo = MongoResourceRepository(
@@ -251,8 +253,10 @@ class AppContainer(metaclass=SingletonMeta):
         self.directory_provider = self._build_directory_provider(cfg)
 
         self.share_repo = MongoShareRepository(
+            mongodb_ip=cfg.mongodb_ip,
+            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.shares_coll
+            coll_name=cfg.shares_coll,
         )
         self.share_cloner = ShareCloner(
             resources_registry=resource_registry,
@@ -271,8 +275,10 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.template_repo = MongoTemplateRepository(
+            mongodb_ip=cfg.mongodb_ip,
+            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.templates_coll
+            coll_name=cfg.templates_coll,
         )
         self.template_service = TemplateService(
             repository=self.template_repo,
@@ -329,15 +335,15 @@ class AppContainer(metaclass=SingletonMeta):
             return None
 
         if provider_name == "sso":
-            return AppContainer._build_sso_provider(cfg)
+            return AppContainer._build_identity_provider(cfg)
 
         raise ValueError(
             f"Unknown directory_provider: '{provider_name}'. Supported: sso"
         )
 
     @staticmethod
-    def _build_sso_provider(cfg: AppConfig):
-        from outbound.sso_directory import SsoDirectoryClient
+    def _build_identity_provider(cfg: AppConfig):
+        from outbound.sso_directory import IdentityDirectoryClient
         import logging
         logger = logging.getLogger(__name__)
 
@@ -346,8 +352,8 @@ class AppContainer(metaclass=SingletonMeta):
             raise ValueError(
                 "identity_host or directory_sso_url is required when directory_provider='sso'"
             )
-        logger.info("Directory provider: sso (%s)", base_url)
-        return SsoDirectoryClient(
+        logger.info("Directory provider: identity (%s)", base_url)
+        return IdentityDirectoryClient(
             base_url=base_url.rstrip("/"),
             timeout=cfg.directory_timeout,
         )

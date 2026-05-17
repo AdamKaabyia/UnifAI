@@ -50,16 +50,16 @@ class DirectoryProvider(ABC):
         return None
 
 
-# ── SSO HTTP client ───────────────────────────────────────────────────
+# ── Identity HTTP client ──────────────────────────────────────────────
 
-class SsoDirectoryClient(DirectoryProvider):
+class IdentityDirectoryClient(DirectoryProvider):
     """Talks to the Identity service ``/api/directory/*`` endpoints."""
 
     def __init__(self, base_url: str, timeout: int = 10):
         self._base = base_url.rstrip("/")
         self._timeout = timeout
         self._user_token: Optional[str] = None
-        logger.info("SSO directory client: %s", self._base)
+        logger.info("Identity directory client: %s", self._base)
 
     def set_user_token(self, token: str) -> None:
         self._user_token = token
