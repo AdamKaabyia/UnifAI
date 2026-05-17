@@ -21,7 +21,10 @@ from mas.elements.common.validator import (
     ValidationMessage,
     ValidationCode,
 )
-from mas.elements.providers.mcp_server_client.config import McpProviderConfig
+from mas.elements.providers.mcp_server_client.config import (
+    McpAuthMethod,
+    McpProviderConfig,
+)
 from mas.elements.providers.mcp_server_client.mcp_provider_factory import McpProviderFactory
 
 logger = logging.getLogger(__name__)
@@ -70,51 +73,35 @@ class McpProviderValidator(BaseElementValidator):
         context: ValidationContext,
         messages: List[ValidationMessage],
     ) -> None:
-        mcp_url = str(config.mcp_url).rstrip("/")
-        headers: Dict[str, Any] = {
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        }
-
-        server_id = getattr(config, "server_identifier", "")
-        scheme_type = getattr(config, "scheme_type", "")
-
-        auth_uid = context.oauth_lookup_user_id()
-        if server_id and auth_uid and context.auth_service:
-            try:
-                auth_headers = await context.auth_service.get_headers(
-                    auth_uid, server_id,
-                    scheme_type=scheme_type,
-                )
-                headers.update(auth_headers)
-            except TokenExpiredError:
-                messages.append(self._error(
-                    "AUTH_EXPIRED",
-                    "Authentication expired — sign in again or update your access token",
-                    field="mcp_url",
-                ))
-                return
-            except Exception as exc:
-                logger.debug("Failed to get auth headers for validation: %s", exc)
-                messages.append(self._error(
-                    "AUTH_EXPIRED",
-                    "Authentication failed — sign in again or update your access token",
-                    field="mcp_url",
-                ))
-                return
-
-        if config.additional_headers:
-            headers.update(config.additional_headers)
-
-        timeout = min(context.timeout_seconds, 10.0)
-        start = time.time()
+        lookup_id = getattr(config, "server_identifier", "") or str(config.mcp_url)
+        scheme_type = getattr(config, "scheme_type", "") or ""
 
         auth_cred = None
-        if context.user_id and context.auth_service:
-            lookup_id = getattr(config, "server_identifier", "") or str(config.mcp_url)
-            auth_cred = context.auth_service.bind(context.user_id, lookup_id)
+        owner_id = (context.user_id or "").strip()
+        if owner_id and context.auth_service:
+            auth_cred = context.auth_service.bind(
+                owner_id, lookup_id, scheme_type=scheme_type,
+            )
+
+        # OAuth MCP credentials are stored on the member, not the team id — mirror runtime AuthHandle.
+        cu = (context.credential_user_id or "").strip()
+        auth_method = getattr(config, "auth_method", None)
+        is_sign_in = auth_method == McpAuthMethod.SIGN_IN or getattr(
+            auth_method, "value", None,
+        ) == McpAuthMethod.SIGN_IN.value
+        if (
+            auth_cred is None
+            and cu
+            and cu != owner_id
+            and context.auth_service
+            and is_sign_in
+        ):
+            auth_cred = context.auth_service.bind(
+                cu, lookup_id, scheme_type=scheme_type,
+            )
 
         try:
+            start = time.time()
             with anyio.fail_after(context.timeout_seconds):
                 await self._factory.create_async(config, auth_credential=auth_cred)
 
