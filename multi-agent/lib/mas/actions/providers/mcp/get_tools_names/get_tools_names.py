@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Dict, Any
 from pydantic import HttpUrl, Field
 from mas.actions.common.base_action import BaseAction
 from mas.actions.common.action_models import BaseActionInput, BaseActionOutput, ActionType
@@ -9,9 +9,7 @@ from mas.elements.providers.mcp_server_client.config import McpProviderConfig
 from mas.elements.providers.mcp_server_client.identifiers import Identifier
 from mas.elements.providers.mcp_server_client.transport.enums import McpTransportType
 from mas.core.enums import ResourceCategory
-
-if TYPE_CHECKING:
-    from mas.core.auth.service import AuthService
+from mas.core.auth.service import AuthService
 
 # Input/Output models for this action
 class GetToolsNamesInput(BaseActionInput):

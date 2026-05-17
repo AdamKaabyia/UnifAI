@@ -32,7 +32,6 @@ from mas.elements.retrievers.types import RetrieversSpec
 from mas.elements.conditions.types import ConditionSpec
 from mas.elements.tools.types import ToolsSpec
 from mas.elements.providers.types import ProviderSpec
-from mas.elements.auths.types import AuthSpec
 from mas.core.ref.models import Ref, NodeRef, ConditionRef
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +112,6 @@ class BlueprintDraft(BaseModel):
     tools: List[BlueprintResource[ToolsSpec]] = []
     nodes: List[BlueprintResource[NodeSpec]] = []
     conditions: List[BlueprintResource[ConditionSpec]] = []
-    auths: List[BlueprintResource[AuthSpec]] = []
 
     plan: List[StepDef]
 
@@ -132,7 +130,6 @@ class BlueprintSpec(BaseModel):
     tools: List[ResourceSpec[ToolsSpec]]
     nodes: List[ResourceSpec[NodeSpec]]
     conditions: List[ResourceSpec[ConditionSpec]] = []
-    auths: List[ResourceSpec[AuthSpec]] = []
 
     plan: List[StepDef]
 

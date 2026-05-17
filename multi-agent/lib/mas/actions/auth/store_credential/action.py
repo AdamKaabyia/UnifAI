@@ -53,7 +53,6 @@ class StoreCredentialAction(BaseAction):
     version = "1.0.0"
     tags = {"auth", "credential"}
     elements = {
-        (ResourceCategory.AUTH.value, "api_key_auth"),
         (ResourceCategory.PROVIDER.value, "mcp_server_client"),
     }
 

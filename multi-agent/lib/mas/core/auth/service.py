@@ -12,7 +12,7 @@ at build time so they can call ``get_headers()`` with no args.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, Optional, Union
 
 from .errors import TokenExpiredError
 from .credentials.models import (
@@ -21,10 +21,8 @@ from .credentials.models import (
 from .credentials.ports import CredentialStore, ServerConfigStore
 from .credentials.credential import AuthCredential
 from .ports import AuthStrategy, AuthChallenge
-
-if TYPE_CHECKING:
-    from .discovery.detector import AuthDetector
-    from .discovery.models import DetectionResult
+from .discovery.detector import AuthDetector
+from .discovery.models import DetectionResult
 
 logger = logging.getLogger(__name__)
 

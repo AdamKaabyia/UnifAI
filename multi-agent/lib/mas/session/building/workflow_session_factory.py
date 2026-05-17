@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from mas.catalog.element_registry import ElementRegistry
 from mas.session.building.element_builder import SessionElementBuilder
@@ -14,9 +14,7 @@ from mas.graph.rt_graph_plan import RTGraphPlan
 from mas.core.execution_context import ExecutionContextHolder
 from mas.core.element_deps import ElementDeps
 from mas.blueprints.models.blueprint import BlueprintSpec
-
-if TYPE_CHECKING:
-    from mas.core.auth.service import AuthService
+from mas.core.auth.service import AuthService
 
 
 class WorkflowSessionFactory:
