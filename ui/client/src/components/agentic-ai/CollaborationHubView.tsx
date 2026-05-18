@@ -168,6 +168,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     const requestId = ++sessionSelectRequestId.current;
     let current = session;
     setSelectedSession(current);
+    setCurrentSessionMessages([]);
     setIsSharingDisabled(false);
 
     if (current.blueprintId) validateSelectedBlueprint(current.blueprintId);
@@ -505,6 +506,9 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           transformApiDataToSessions(listRes.data),
         );
         setChatSessions(sorted);
+        // Refresh participants for every visible session so the sidebar always
+        // shows accurate presence (not just the currently selected one).
+        await Promise.allSettled(sorted.map(s => fetchParticipants(s.id)));
       } catch { /* ignore */ }
     }
 
@@ -593,6 +597,14 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     const previousSession = joinedSessionRef.current;
     if (previousSession && previousSession !== selectedSession?.id) {
       leaveSession(previousSession);
+      // Immediately remove self from the old session's local participant list so
+      // the sidebar stops showing us in a session we've already left.
+      const username = user?.username || "default";
+      setSessionParticipants(prev => {
+        if (!prev[previousSession]) return prev;
+        const filtered = prev[previousSession].filter(u => u !== username);
+        return { ...prev, [previousSession]: filtered };
+      });
     }
 
     // Reset transient state for new session
