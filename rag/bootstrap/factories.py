@@ -37,6 +37,8 @@ class DocumentConverterFactory:
     def create_remote(
         base_url: str,
         timeout: int = 300,
+        poll_interval: int = 10,
+        http_timeout: int = 60,
         image_export_mode: str = "placeholder",
         pdf_backend: str = "dlparse_v4",
     ) -> DocumentConverterPort:
@@ -44,7 +46,12 @@ class DocumentConverterFactory:
         from global_utils.docling import DoclingClient, DoclingService
         from infrastructure.sources.document.converters import RemoteDoclingAdapter
         
-        client = DoclingClient(base_url=base_url, timeout=timeout)
+        client = DoclingClient(
+            base_url=base_url,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            http_timeout=http_timeout,
+        )
         service = DoclingService(
             client=client,
             image_export_mode=image_export_mode,
@@ -85,6 +92,8 @@ class DocumentConnectorFactory:
             converter = DocumentConverterFactory.create_remote(
                 base_url=service_url,
                 timeout=config.get("timeout", 300),
+                poll_interval=config.get("poll_interval", 10),
+                http_timeout=config.get("http_timeout", 60),
                 pdf_backend=config.get("pdf_backend", "dlparse_v4"),
             )
         else:
@@ -116,6 +125,8 @@ class DocumentConnectorFactory:
                 "type": "remote",
                 "service_url": config.docling_service_url,
                 "timeout": config.docling_service_timeout,
+                "poll_interval": config.docling_poll_interval,
+                "http_timeout": config.docling_http_timeout,
                 "pdf_backend": config.docling_pdf_backend,
             })
         return cls.create({"type": "local"})

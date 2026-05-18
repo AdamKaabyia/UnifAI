@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldValidation, ItemValidationResult } from "./FieldValidation";
 import { FieldPopulation } from "./FieldPopulation";
+import { AuthSelector } from "./AuthSelector";
+import { AuthFieldRenderer } from "./AuthFieldRenderer";
 import { AgentCardVisualization } from "./AgentCardVisualization";
 import { ElementType } from "../../../types/workspace";
 import { maskSecretValue } from "../../../utils/maskSecretFields";
@@ -490,6 +492,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -575,6 +578,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             isRequired={isRequired}
             configValues={formData}
             onValidationChange={onValidationChange}
+            onInputChange={onInputChange}
           />
         )}
 
@@ -593,6 +597,40 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           />
         )}
       </div>
+    );
+  }
+
+  // Handle fields with AuthHint — render as Sign In / auth status component
+  if (fieldSchema?.hints?.auth) {
+    return (
+      <AuthFieldRenderer
+        fieldName={fieldName}
+        fieldSchema={fieldSchema}
+        formData={formData}
+        elementActions={elementActions}
+        onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
+      />
+    );
+  }
+
+  // Handle auth category fields with dedicated AuthSelector component
+  if (fieldSchema.category === 'auths') {
+    const authOptions = (refOptions['auths'] || [])
+      .filter((option: any) => option.rid && option.rid.trim() !== "");
+
+    const authActionUid = validationHint?.action_uid || fieldSchema.action_uid || 'auth.authenticate';
+
+    return (
+      <AuthSelector
+        fieldName={fieldName}
+        value={value}
+        refOptions={authOptions}
+        actionUid={authActionUid}
+        onInputChange={onInputChange}
+        isRequired={isRequired}
+        description={fieldSchema.description}
+      />
     );
   }
 
@@ -636,31 +674,43 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
             <p className="text-xs text-gray-400">{fieldSchema.description}</p>
           )}
 
-          <Select
-            value={value && value !== "" ? value : undefined}
-            onValueChange={(newValue) => {
-              onInputChange(fieldName, newValue);
-            }}
-          >
-            <SelectTrigger className={`bg-background-dark ${hasFieldError ? 'border-red-500' : ''}`}>
-              <SelectValue placeholder={`Select ${fieldName}`} />
-            </SelectTrigger>
-            <SelectContent>
-              {validOptions.map((option: any) => (
-                <SelectItem 
-                  key={option.rid} 
-                  value={option.rid}
-                >
-                  {option.name} ({option.type})
-                </SelectItem>
-              ))}
-              {validOptions.length === 0 && (
-                <SelectItem value="__no_options_disabled__" disabled>
-                  No {category} resources available
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              key={value || 'empty'}
+              value={value || undefined}
+              onValueChange={(newValue) => onInputChange(fieldName, newValue)}
+            >
+              <SelectTrigger className={`bg-background-dark flex-1 ${hasFieldError ? 'border-red-500' : ''}`}>
+                <SelectValue placeholder={`Select ${fieldName}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {validOptions.map((option: any) => (
+                  <SelectItem 
+                    key={option.rid} 
+                    value={option.rid}
+                  >
+                    {option.name} ({option.type})
+                  </SelectItem>
+                ))}
+                {validOptions.length === 0 && (
+                  <SelectItem value="__no_options_disabled__" disabled>
+                    No {category} resources available
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {!isRequired && value && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                onClick={() => onInputChange(fieldName, null)}
+              >
+                <XCircle className="h-4 w-4 text-muted-foreground hover:text-red-400" />
+              </Button>
+            )}
+          </div>
 
           {/* Validation component for $ref fields */}
           {validationHint && (
@@ -673,6 +723,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
               isRequired={isRequired}
               configValues={formData}
               onValidationChange={onValidationChange}
+              onInputChange={onInputChange}
             />
           )}
 
@@ -853,6 +904,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
           isRequired={isRequired}
           configValues={formData}
           onValidationChange={onValidationChange}
+          onInputChange={onInputChange}
         />
       )}
       {populateHint && (
@@ -930,6 +982,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
         isRequired={isRequired}
         configValues={formData}
         onValidationChange={onValidationChange}
+        onInputChange={onInputChange}
       />
     )}
     {populateHint && (

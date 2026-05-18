@@ -9,3 +9,4 @@ class AppConfig(SharedConfig):
     version: str = "1.0.0"
     admin_allowed_users: list = []
     rag_url: str = "http://localhost:13457"
+    secret_key: str = ""

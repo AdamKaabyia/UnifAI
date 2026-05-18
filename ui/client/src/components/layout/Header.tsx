@@ -2,14 +2,13 @@ import React from "react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { FaSearch, FaBell, FaInfoCircle, FaPlus, FaBars, FaMoon, FaSun, FaSignOutAlt, FaShare, FaCodeBranch } from "react-icons/fa";
+import { FaSearch, FaBell, FaInfoCircle, FaPlus, FaBars, FaSignOutAlt } from "react-icons/fa";
 import { FaShareNodes } from "react-icons/fa6";
 import { motion } from "framer-motion";
 import SimpleTooltip from "@/components/shared/SimpleTooltip";
 import NotificationPanel from "@/components/shared/NotificationPanel";
 import SharedPanel from "@/components/shared/SharedPanel";
-import HelpPanel from "@/components/shared/HelpPanel";
+import AboutDialog from "@/components/shared/AboutDialog";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -24,18 +23,11 @@ interface HeaderProps {
 
 export default function Header({ title, onToggleSidebar }: HeaderProps) {
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-  const [isHelpPanelOpen, setIsHelpPanelOpen] = useState(false);
-  const { theme, toggleTheme, primaryHex, setPrimaryHex } = useTheme();
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const { primaryHex } = useTheme();
   const { user, logout } = useAuth();
   const { hasUnreadNotifications, pendingNotificationsCount } = useNotifications();
   const { isSharedPanelOpen, openSharedPanel, closeSharedPanel } = useShared();
-
-  const colorOptions = [
-    { hex: "#A60000", name: "Red" },
-    { hex: "#147878", name: "Teal" },
-    { hex: "#707070", name: "Gray" },
-    { hex: "#8A2BE2", name: "Purple" },
-  ];
 
   const getInitials = (name: string): string => {
     return name
@@ -69,26 +61,6 @@ export default function Header({ title, onToggleSidebar }: HeaderProps) {
             <FaSearch />
           </button>
         </SimpleTooltip>
-
-        {/* Color picker (dropdown) */}
-        <div className="mr-2 w-19">
-          <Select value={primaryHex} onValueChange={(value) => setPrimaryHex(value)}>
-            <SelectTrigger>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: primaryHex }} />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-[var(--radix-select-trigger-width)]">
-              {colorOptions.map(({ hex }) => (
-                <SelectItem key={hex} value={hex}>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: hex }} />
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
         <div className="relative">
           <SimpleTooltip content={<p>Shared System</p>}>
@@ -136,37 +108,15 @@ export default function Header({ title, onToggleSidebar }: HeaderProps) {
           />
         </div>
 
-        {/* Versions Button */}
-        <div className="relative">
-          <SimpleTooltip content={<p>Versions</p>}>
-            <button
-              onClick={() => setIsHelpPanelOpen(!isHelpPanelOpen)}
-              className="p-2 rounded-full hover:bg-background-card text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors"
-            >
-              <FaCodeBranch />
-            </button>
-          </SimpleTooltip>
-          <HelpPanel
-            isOpen={isHelpPanelOpen}
-            onClose={() => setIsHelpPanelOpen(false)}
-          />
-        </div>
-
-        {/* Theme Switch */}
-        <SimpleTooltip
-          content={
-            <p>
-              {theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            </p>
-          }
-        >
+        <SimpleTooltip content={<p>About</p>}>
           <button
-            onClick={toggleTheme}
+            onClick={() => setIsAboutOpen(true)}
             className="p-2 rounded-full hover:bg-background-card text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors"
           >
-            {theme === 'dark' ? <FaSun /> : <FaMoon />}
+            <FaInfoCircle />
           </button>
         </SimpleTooltip>
+        <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
 
         {/* User Profile */}
         <div className="px-4 py-3 border-l border-gray-800">
@@ -193,7 +143,12 @@ export default function Header({ title, onToggleSidebar }: HeaderProps) {
               transition={{ duration: 0.2 }}
             >
               <SimpleTooltip content={<p>Sign out</p>}>
-                <button className="mt-2 text-gray-400 hover:text-white">
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  aria-label="Sign out"
+                  className="mt-2 text-gray-400 hover:text-white transition-colors"
+                >
                   <FaSignOutAlt />
                 </button>
               </SimpleTooltip>

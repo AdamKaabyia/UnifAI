@@ -6,7 +6,7 @@ properties([
         string(name: "VERSION", defaultValue: new Date().format('yyyy.MM.dd'), description: "Image version tag"),
         
         // 🛠️ Image Build Parameters
-        booleanParam(name: 'build_sso_image', defaultValue: false, description: 'Create image for sso-backend and sso-nginx'),
+        booleanParam(name: 'build_identity_image', defaultValue: false, description: 'Create image for identity'),
         booleanParam(name: 'build_gui', defaultValue: false, description: 'Create image for UI'),
         booleanParam(name: 'build_rag_backend', defaultValue: false, description: 'Create image for rag backend'),
         booleanParam(name: 'build_multiagent_backend', defaultValue: false, description: 'Create image for multiagent backend'),
@@ -33,10 +33,10 @@ def buildParams = [
     ImageRegistryPath  : "unifai",
     ImageRegistryCreds : "images.paas.registry-unifai",
 
-    CredMainRepoURL    : "gitlab.cee.redhat.com",
-    CredMainRepoProject: "ai_tools/genie-cred-data", 
+    CredMainRepoURL    : "github.com",
+    CredMainRepoProject: "redhat-community-ai-tools/UnifAI-secrets", 
     CredMainRepoBranch : "main",
-    CredCredentialsId  : "gitlab-genie",
+    CredCredentialsId  : "jenkins_agent_deploy_key",
 ]
 
 
@@ -124,7 +124,7 @@ pipeline {
                     submoduleCfg: [],
                     userRemoteConfigs: [[
                         credentialsId: "${buildParams.CredentialsId}",
-                        url: "https://${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
+                        url: "git@${buildParams.MainRepoURL}:${buildParams.MainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -133,11 +133,11 @@ pipeline {
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
                         //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "genie-cred-data"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "UnifAI-secrets"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
                             credentialsId: "${buildParams.CredCredentialsId}",
-                            url: "https://${buildParams.CredMainRepoURL}/${buildParams.CredMainRepoProject}.git"
+                            url: "git@${buildParams.CredMainRepoURL}:${buildParams.CredMainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -147,11 +147,11 @@ pipeline {
 
         stage('Build and Push Images') {
             parallel {
-                stage('build_sso_image') {
-                    when { expression { params.build_sso_image } }
+                stage('build_identity_image') {
+                    when { expression { params.build_identity_image } }
                     steps {
                         script {
-                            def component = "shared-resources/sso-backend"
+                            def component = "shared-resources/identity"
                             def module = ""
                             dir("${buildParams.DevRoot}/${params.BRANCH}/") {
                                 cleanWorkspace(component)
@@ -245,7 +245,7 @@ pipeline {
             steps {
                 script {
                     def modules = []
-                    if (params.build_sso_image) modules << 'sso'
+                    if (params.build_identity_image) modules << 'identity'
                     if (params.build_rag_backend) modules << 'rag'
                     if (params.build_multiagent_backend) modules << 'multiagent'
                     if (params.build_backend) modules << 'backend'

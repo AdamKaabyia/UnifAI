@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Users, Clock, Trash2, Plus, Columns3, Network } from "lucide-react";
 import ChatInterface from "./chat/ChatInterface";
+import { createSessionError } from "./chat/types";
 import ExecutionStream from "./ExecutionStream";
 import GraphDisplay from "./graphs/GraphDisplay";
 import axios from '../../http/axiosAgentConfig'
@@ -97,6 +98,7 @@ export default function ExecutionTab({
   const [showExecutionStream, setShowExecutionStream] = useState(false);
   const [isActiveChatSession, setIsActiveChatSession] = useState(true);
   const [isLiveRequest, setIsLiveRequest] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalScope, setGlobalScope] = useState<'public' | 'private'>('public');
@@ -328,6 +330,7 @@ export default function ExecutionTab({
     // This clears any existing node data from the previous session
     clearStream();
     setIsLiveRequest(false);
+    setIsCancelled(false);
 
     // Reset sharing-disabled state immediately so a previously disabled session
     // doesn't bleed into the newly selected (possibly valid) session.
@@ -426,15 +429,19 @@ export default function ExecutionTab({
     }
     setIsLoadingSessionMessages(false);
 
-    // Check if this session has an active Redis stream and reconnect if so
-    // This enables persistent streaming - when user navigates away and returns,
-    // they can reconnect to the live stream and continue seeing updates
-    // Note: This runs in the background - we don't block session selection on it
-    sessionStream.checkAndReconnect(session.id).then(hasActiveStream => {
-      if (hasActiveStream) {
-        setIsLiveRequest(true);
-      }
-    });
+    // Check if this session has an active Redis stream and reconnect if so.
+    // Skip reconnection for sessions in terminal states (CANCELLED, FAILED, COMPLETED)
+    // to avoid showing typing indicators and cancel buttons for finished sessions.
+    const sessionStatus = updatedSession?.status;
+    const isTerminal = sessionStatus === 'CANCELLED' || sessionStatus === 'FAILED' || sessionStatus === 'COMPLETED';
+
+    if (!isTerminal) {
+      sessionStream.checkAndReconnect(session.id).then(hasActiveStream => {
+        if (hasActiveStream) {
+          setIsLiveRequest(true);
+        }
+      });
+    }
   };
 
   // Handle delete chat
@@ -639,16 +646,14 @@ export default function ExecutionTab({
             workplan: workplan
           };
 
-          // Find existing workplan or add new one
+          // Find existing workplan by plan_id (same plan) or owner_uid (re-planned)
           const existingPlanIndex = existing.workplans.findIndex(
-            (wp: any) => wp.plan_id === plan_id
+            (wp: any) => wp.plan_id === plan_id || wp.owner_uid === workplanSnapshot.owner_uid
           );
 
           if (existingPlanIndex !== -1) {
-            // Update existing workplan
             existing.workplans[existingPlanIndex] = workplanSnapshot;
           } else {
-            // Add new workplan
             existing.workplans.push(workplanSnapshot);
           }
         }
@@ -693,6 +698,30 @@ export default function ExecutionTab({
   });
 
   /**
+   * Cancel the currently running session.
+   * Calls the backend cancel API, stops the client-side stream, and resets live state.
+   */
+  const handleCancelSession = useCallback(async () => {
+    if (!selectedSession?.id) return;
+
+    setIsCancelled(true);
+
+    try {
+      await sessionStream.cancelSessionExecution(selectedSession.id);
+    } catch (error) {
+      console.error('Error cancelling session execution:', error);
+    } finally {
+      sessionStream.cancelStream();
+      setIsLiveRequest(false);
+
+      if (streamCompleteResolverRef.current) {
+        streamCompleteResolverRef.current();
+        streamCompleteResolverRef.current = null;
+      }
+    }
+  }, [selectedSession, sessionStream]);
+
+  /**
    * Submit a session for execution and stream results.
    * 
    * Uses fire-and-forget pattern:
@@ -707,6 +736,7 @@ export default function ExecutionTab({
    */
   const triggerExecution = async (sessionPayload: SessionPayload): Promise<string> => {
     try {
+      setIsCancelled(false);
       setIsLiveRequest(true);
       
       // Create a promise that resolves when streaming completes
@@ -732,7 +762,16 @@ export default function ExecutionTab({
       const session_response = await axios.get(
         `/sessions/session.chat.get?sessionId=${sessionPayload.sessionId}`
       );
-      return session_response.data.output;
+      const { output, status, status_message } = session_response.data;
+
+      if (status === 'CANCELLED') {
+        throw createSessionError(status_message || 'Workflow was stopped.', 'CANCELLED');
+      }
+      if (status === 'FAILED') {
+        throw createSessionError(status_message || 'Workflow failed.', 'FAILED');
+      }
+
+      return output;
     } catch (error) {
       console.error('Error in session execution:', error);
       setIsLiveRequest(false);
@@ -789,7 +828,7 @@ export default function ExecutionTab({
         {/* Available Chats Sidebar - Dynamic width */}
         <div className="flex-shrink-0" style={{ width: `${chatSidebarWidth}%` }}>
           <Card className="bg-background-card shadow-card border-gray-800 h-full flex flex-col mr-0">
-            <CardHeader className="py-3 px-4 border-b border-gray-800 overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b border-gray-800 overflow-hidden flex-shrink-0">
               <div className="flex justify-between items-center min-w-0 w-full max-w-full">
                 <CardTitle className="text-sm font-medium truncate flex-1 min-w-0 mr-2">
                   Available Chats ({chatSessions.length})
@@ -834,13 +873,13 @@ export default function ExecutionTab({
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0 flex-grow">
+            <CardContent className="p-0 flex-grow min-h-0 overflow-hidden">
               {chatSessions.length === 0 ? (
                 <div className="p-4 text-center text-gray-400 text-sm">
                   No chat sessions available
                 </div>
               ) : (
-                <div className="h-full max-h-[75vh] overflow-y-auto py-2">
+                <div className="h-full overflow-y-auto py-2">
                   {chatSessions.map((session) => (
                     <motion.div
                       key={session.id}
@@ -936,7 +975,10 @@ export default function ExecutionTab({
                 key={selectedSession?.id || 'no-session'}
                 runId={selectedSession?.id || ''}
                 triggerExecution={triggerExecution}
+                onCancelSession={handleCancelSession}
                 initialMessages={currentSessionMessages}
+                sessionStatus={selectedSession?.status}
+                statusMessage={selectedSession?.statusMessage}
                 blueprintExists={selectedSession?.blueprintExists ?? true}
                 isSharingDisabled={isSharingDisabled}
                 blueprintValid={isBlueprintValid}
@@ -946,6 +988,7 @@ export default function ExecutionTab({
                 onSetCarouselMode={handleSetCarouselMode}
                 carouselMode={carouselMode}
                 isLiveRequest={isLiveRequest}
+                isSubmitting={sessionStream.isSubmitting}
               />
             )}
           </div>
@@ -1085,6 +1128,7 @@ export default function ExecutionTab({
                   validationResults={blueprintValidationResults}
                   isValidating={isValidatingBlueprint}
                   isLiveRequest={isLiveRequest}
+                  isCancelled={isCancelled}
                   isGraphVisible={carouselMode !== 'chat'}
                 />
               ) : (
@@ -1106,7 +1150,7 @@ export default function ExecutionTab({
             <DialogTitle className="text-lg">Add New Chat from Flow</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
-            <div key={`new-chat-graph-${showAddFlowModal}`}>
+            <div key={`new-chat-graph-${showAddFlowModal}`} className="h-full">
               <WorkflowsPanel
                 selectedFlow={selectedFlowForModal}
                 onFlowSelect={handleFlowSelect}

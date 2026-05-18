@@ -65,6 +65,12 @@ class ResourcesRegistry:
     def exists(self, rid: str) -> bool:
         return self._repo.exists(rid)
 
+    def count_by_config_field(
+        self, user_id: str, field: str, value: str, exclude_rid: str = "",
+    ) -> int:
+        """Count resources where cfg_dict.<field> == value for a user."""
+        return self._repo.count_by_config_field(user_id, field, value, exclude_rid)
+
     # ---------- statistics ----------
     def count(self, user_id: str, filter: Dict[str, Any] = None) -> int:
         """Count resources matching filter criteria for a user."""

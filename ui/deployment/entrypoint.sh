@@ -1,13 +1,15 @@
 #!/bin/sh
 set -e
 
-# Default VERSION if not provided
 : "${VERSION:=N/A}"
+: "${TEAM_MEMBERS:=Lina Abu Yousef,Maya Carmi,Nir Rashti,Odai Odeh,Omri Sabach,Saar Fireshtein,Shani Tzvi,Yosi Habushi}"
+: "${SUPPORT_LINK:=https://redhat-internal.slack.com/app_redirect?channel=forum-unifai}"
 
-# Write runtime config.json
 cat <<EOF > /usr/share/nginx/html/config.json
 {
-  "version": "${VERSION}"
+  "version": "${VERSION}",
+  "teamMembers": "${TEAM_MEMBERS}",
+  "supportLink": "${SUPPORT_LINK}"
 }
 EOF
 
