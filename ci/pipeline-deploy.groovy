@@ -38,6 +38,7 @@ def buildParams = [
 ]
 
 def secret_lists = [
+    cluster: ['cluster_address', 'cluster_access_token', 'tenant_name', 'namespace', 'jenkins_credentials_id'],
     redis: ['redis_username', 'redis_password', 'ri_username', 'ri_password'],
     identity: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url'],
     rabbitmq: ['rmq_username', 'rmq_password'],
@@ -313,55 +314,35 @@ pipeline {
             steps {
                 dir("${buildParams.DevRoot}/${params.BRANCH}/helm/") {
                     script {
-                        // Declare variables outside the switch statement
-                        // def ClusterAddress = ''
-                        // def NameSpace = ''
-                        // def ClusterAccessToken = ''
-                        
-                        def configEnvFile = "./UnifAI-secrets/${params.deploy_location.toLowerCase()}/.env"
-                        def configMap = [:]
-                        readFile(configEnvFile).trim().split('\n').each { line ->
-                            if (line && !line.startsWith('#')) {
-                                def parts = line.split('=', 2)
-                                configMap[parts[0].trim()] = parts[1].trim()
-                            }
-                        }
-                        def ClusterAddress = configMap.cluster_address
-                        def NameSpace = configMap.namespace
-                        def ClusterAccessToken = configMap.cluster_access_token
-
-                        // switch(params.deploy_location) {
-                        //     case 'STAGING':
-                        //         ClusterAddress = 'https://api.stc-ai-e1-pp.imap.p1.openshiftapps.com:6443'
-                        //         NameSpace = "tag-ai--pipeline"
-                        //         ClusterAccessToken = 'tenantaccess-unifai-sa-pp'
-                        //         break
-                        //     case 'PRODUCTION':
-                        //         ClusterAddress = 'https://api.stc-ai-e1-prod.rtc9.p1.openshiftapps.com:6443'
-                        //         NameSpace = "tag-ai--pipeline"
-                        //         ClusterAccessToken = 'tenantaccess-unifai-sa-prod'
-                        //         updateGlobalConfigYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/global-config.yaml")
-                        //         break
-                        //     default:
-                        //         error("Invalid deployment location: ${params.deploy_location}")
-                        // }
                         if (params.deploy_location == 'PRODUCTION') {
                             updateGlobalConfigYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/global-config.yaml")
                         }
-                        
-                        // def module = "helmfile"
-                        
+
+                        // Fetch ALL secrets from Vault (including cluster)
+                        def vaultEnvFile = generateVaultSecretsEnvFile(buildParams.VaultBasePath, secret_lists)
+
+                        // Parse cluster connection details from the generated vault env file
+                        def vaultEnvMap = [:]
+                        readFile(vaultEnvFile).trim().split('\n').each { line ->
+                            if (line && !line.startsWith('#')) {
+                                def parts = line.split('=', 2)
+                                vaultEnvMap[parts[0].trim()] = parts[1].trim()
+                            }
+                        }
+                        def ClusterAddress = vaultEnvMap.cluster_address
+                        def NameSpace = vaultEnvMap.namespace
+                        def ClusterCredsId = vaultEnvMap.jenkins_credentials_id
+
+                        // Non-secret config still passed from UnifAI-secrets for now (umami_url, admin_allowed_users, etc.)
+                        def configEnvFile = "./UnifAI-secrets/${params.deploy_location.toLowerCase()}/.env"
+
                         withCredentials([
-                            string(credentialsId: "${ClusterAccessToken}", variable: 'token'),
+                            string(credentialsId: "${ClusterCredsId}", variable: 'token'),
                         ]){
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            def vaultEnvFile = generateVaultSecretsEnvFile(buildParams.VaultBasePath, secret_lists)
-                            // def (identity_env_file, redis_env_file, multiagent_env_file) = updateDeployerEnv()
-                            // def configEnvFile = "./UnifAI-secrets/${params.deploy_location.toLowerCase()}/.env"
                             echo("Deploy Helm container")
-                            // sh("podman run --replace -dt --env-file=${identity_env_file} --env-file=${redis_env_file} --env-file=${multiagent_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             sh("podman run --replace -dt --env-file=${vaultEnvFile} --env-file=${configEnvFile} --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {
