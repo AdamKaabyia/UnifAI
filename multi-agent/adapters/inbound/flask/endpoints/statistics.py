@@ -2,9 +2,8 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_query
 from webargs import fields, validate
 import logging
-from ..decorators import require_admin_access
+from inbound.flask.decorators import require_admin_access, with_require_identity_authorization
 from mas.statistics.models import TimeRangePreset
-from inbound.flask.decorators import require_identity_authorization, with_identity
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +11,7 @@ statistics_bp = Blueprint("statistics", __name__)
 
 
 @statistics_bp.route("/stats.get", methods=["GET"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 def get_all(identity):
     """
     Get aggregated statistics for all features (identity-scoped).

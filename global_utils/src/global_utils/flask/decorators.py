@@ -3,16 +3,193 @@ Flask decorators for access control.
 
 Pluggable so each app can supply its own way to get the current user
 and to check admin status (e.g. from config, DB, or admin config service).
+
+Also provides identity-pod-backed decorators that validate callers against
+the Identity service and inject resolved Identity objects into endpoint
+handlers. These are designed to be consumed by any Flask-based service
+(MAS, RAG, etc.) without duplication.
 """
+import logging
+import time
 from functools import wraps
-from flask import session, jsonify, request, current_app, g
+from threading import Lock
 from typing import Any, Callable
 
+import requests as http_requests
+from flask import current_app, g, jsonify, request, session
+
+from global_utils.identity import Identity, IdentityType
 from global_utils.redis import get_identity_session, get_identity_username
+
+logger = logging.getLogger(__name__)
 
 # g attribute names (single place for both helpers as all modules will use the same functions)
 G_IDENTITY_SESSION = "identity_session"
 G_IDENTITY_USERNAME = "identity_username"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Team-membership cache – short TTL so revocations take effect quickly
+# ──────────────────────────────────────────────────────────────────────────────
+
+_TEAM_IDS_CACHE_TTL_SEC = 45.0
+_team_ids_cache: dict[str, tuple[float, frozenset[str]]] = {}
+_team_ids_cache_lock = Lock()
+
+
+def _get_cached_team_ids(username: str) -> frozenset[str] | None:
+    now = time.monotonic()
+    with _team_ids_cache_lock:
+        entry = _team_ids_cache.get(username)
+        if entry is not None and (now - entry[0]) < _TEAM_IDS_CACHE_TTL_SEC:
+            return entry[1]
+    return None
+
+
+def _set_cached_team_ids(username: str, team_ids: frozenset[str]) -> None:
+    with _team_ids_cache_lock:
+        _team_ids_cache[username] = (time.monotonic(), team_ids)
+
+
+def _fetch_teams_payload_from_identity(username: str, base: str) -> list:
+    """Raw ``teams`` array from Identity ``teams.list`` for *username*."""
+    resp = http_requests.get(
+        f"{base}/api/teams/teams.list",
+        params={"userId": username},
+        timeout=5,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"teams.list HTTP {resp.status_code}")
+    return resp.json().get("teams", []) or []
+
+
+def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
+    teams = _fetch_teams_payload_from_identity(username, base)
+    return frozenset(
+        str(t.get("team_id"))
+        for t in teams
+        if t.get("team_id") is not None
+    )
+
+
+def _resolve_team_id_for_member(username: str, team_name_or_id: str) -> str | None:
+    """Map a team display name or ``team_id`` to the canonical id for teams the user may access.
+
+    Used by APIs that accept a human-readable ``teamName`` while membership checks
+    and workspace ownership use ``team_id``.
+
+    When no Identity base URL is configured, returns *team_name_or_id* stripped
+    (legacy / local dev — no server-side validation).
+
+    Returns ``None`` when Identity is configured but the user has no matching team
+    or ``teams.list`` fails.
+    """
+    raw = str(team_name_or_id).strip()
+    if not raw:
+        return None
+
+    base = _identity_service_base()
+    if not base:
+        return raw
+
+    try:
+        teams = _fetch_teams_payload_from_identity(username, base)
+    except Exception:
+        logger.exception("teams.list failed during team id resolution")
+        return None
+
+    for t in teams:
+        tid = str(t.get("team_id") or "").strip()
+        if not tid:
+            continue
+        if raw.casefold() == tid.casefold():
+            return tid
+        nm = str(t.get("name") or "").strip()
+        if nm and raw.casefold() == nm.casefold():
+            return tid
+    return None
+
+
+def _identity_service_base() -> str:
+    """Base URL for the Identity pod (teams + directory HTTP APIs).
+
+    ``directory_sso_url`` is the legacy name; ``identity_host`` from main is
+    preferred when the former is unset.
+    """
+    return (
+        (current_app.config.get("directory_sso_url") or "")
+        or (current_app.config.get("identity_host") or "")
+    ).rstrip("/")
+
+
+def _require_auth_header_enforced() -> bool:
+    """Whether ``X-Authenticated-User`` must be present for guarded decorators."""
+    if current_app.config.get("require_auth_header"):
+        return True
+    return bool(_identity_service_base())
+
+
+def _is_team_member(username: str, team_id: str) -> bool:
+    """Check team membership via the Identity pod ``teams.list`` endpoint.
+
+    Fails **closed** (denies access) when the Identity base URL is configured but
+    the service is unreachable or returns an error. Skips the check when no
+    base URL is set (e.g. local dev without Identity).
+
+    Successful ``teams.list`` responses are cached briefly per username to
+    reduce load on Identity (see ``_TEAM_IDS_CACHE_TTL_SEC``).
+    """
+    base = _identity_service_base()
+    if not base:
+        return True
+
+    cached = _get_cached_team_ids(username)
+    if cached is not None:
+        return team_id in cached
+
+    try:
+        team_ids = _fetch_team_ids_from_identity(username, base)
+        _set_cached_team_ids(username, team_ids)
+        return team_id in team_ids
+    except Exception:
+        logger.exception("Team membership check failed — denying access")
+        return False
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Identity resolution from request parameters
+# ──────────────────────────────────────────────────────────────────────────────
+
+_IDENTITY_TYPE_MAP = {
+    "user": IdentityType.USER,
+    "team": IdentityType.TEAM,
+}
+_VALID_IDENTITY_TYPES = frozenset(_IDENTITY_TYPE_MAP.keys())
+
+
+def resolve_identity(
+    user_id: str,
+    identity_type: str = "user",
+    display_name: str = "",
+) -> Identity:
+    """Build an ``Identity`` from raw request parameters.
+
+    Raises ``ValueError`` if *identity_type* is not a recognized value.
+    """
+    if identity_type not in _VALID_IDENTITY_TYPES:
+        raise ValueError(
+            f"Invalid identityType '{identity_type}'; "
+            f"must be one of {sorted(_VALID_IDENTITY_TYPES)}"
+        )
+    id_type = _IDENTITY_TYPE_MAP[identity_type]
+    if id_type == IdentityType.TEAM:
+        return Identity.team(team_id=user_id, display_name=display_name)
+    return Identity.user(user_id=user_id, display_name=display_name)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Pluggable decorators (each app supplies its own user/admin resolvers)
+# ──────────────────────────────────────────────────────────────────────────────
 
 def require_admin_access(get_current_user, is_admin):
     """
@@ -52,6 +229,7 @@ def require_admin_access(get_current_user, is_admin):
                 }), 500
         return decorated_function
     return decorator
+
 
 def require_identity_session(
     get_redis_store: Callable[[], Any],
@@ -99,6 +277,7 @@ def require_identity_session(
         return wrapped
     return decorator
 
+
 def require_identity_username(
     get_redis_store: Callable[[], Any],
     get_session_id: Callable[[], str | None] | None = None,
@@ -139,3 +318,174 @@ def require_identity_username(
                 )
         return wrapped
     return decorator
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Identity-pod-backed request decorators
+# ──────────────────────────────────────────────────────────────────────────────
+
+def with_authenticated_user(f):
+    """Decorator that extracts and validates the ``X-Authenticated-User`` header.
+
+    Reads ``X-Authenticated-User`` from the request header and injects it as
+    the ``authenticated_user`` keyword argument.
+
+    When ``_require_auth_header_enforced()`` is true (Identity URL configured
+    or ``REQUIRE_AUTH_HEADER`` set), requests without the header receive **401**.
+    In permissive mode (local dev / no Identity URL) the header is optional and
+    an empty string is injected when absent.
+
+    Usage::
+
+        @bp.route("/things.create", methods=["POST"])
+        @with_authenticated_user
+        @from_body({...})
+        def create_thing(authenticated_user, ...):
+            ...
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
+        if not authenticated_user and _require_auth_header_enforced():
+            return jsonify({
+                "error": "Missing authenticated user",
+                "error_type": "AUTHENTICATION_REQUIRED",
+            }), 401
+        kwargs["authenticated_user"] = authenticated_user
+        return f(*args, **kwargs)
+    return decorated
+
+
+def with_identity(f):
+    """Decorator that resolves ``Identity`` from the incoming request.
+
+    Reads ``userId``, ``identityType`` (default ``"user"``), and
+    ``displayName`` from query parameters **or** JSON body and passes the
+    resulting ``Identity`` as the ``identity`` keyword argument.
+
+    Returns **400** when ``userId`` is absent or ``identityType`` is
+    unrecognised, so the endpoint never has to handle those error cases.
+
+    Usage::
+
+        @bp.route("/things.list", methods=["GET"])
+        @with_identity
+        def list_things(identity):
+            ...
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        body = request.get_json(silent=True) or {}
+
+        user_id = request.args.get("userId") or body.get("userId")
+        identity_type = (
+            request.args.get("identityType")
+            or body.get("identityType")
+            or "user"
+        )
+        display_name = (
+            request.args.get("displayName")
+            or body.get("displayName")
+            or ""
+        )
+
+        if not user_id:
+            return jsonify({"error": "userId is required"}), 400
+
+        try:
+            kwargs["identity"] = resolve_identity(user_id, identity_type, display_name)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+        return f(*args, **kwargs)
+    return decorated
+
+
+def with_require_identity_authorization(f):
+    """Validate caller authorization **and** resolve ``Identity`` in one step.
+
+    Combines an authorization check (via the Identity pod ``teams.list``) with
+    identity resolution so endpoints only need a single decorator.
+
+    Execution order:
+
+    1. Reads ``X-Authenticated-User`` from the request header.
+       - If the header is required (Identity URL configured or
+         ``REQUIRE_AUTH_HEADER`` set) and missing → **401**.
+       - If present, validates the claimed identity:
+         - **user** identity: ``userId`` must match the header value → **403**
+           on mismatch.
+         - **team** identity: the authenticated user must be a member of the
+           claimed team (via Identity ``teams.list``) → **403** if not.
+    2. Resolves ``Identity`` from ``userId`` / ``identityType`` /
+       ``displayName`` (query params or JSON body) and injects it as the
+       ``identity`` keyword argument → **400** when ``userId`` is absent or
+       ``identityType`` is unrecognised.
+
+    Usage::
+
+        @bp.route("/things.list", methods=["GET"])
+        @with_require_identity_authorization
+        def list_things(identity):
+            ...
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        body = request.get_json(silent=True) or {}
+
+        # ── Authorization check ───────────────────────────────────────
+        authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
+        if not authenticated_user:
+            if _require_auth_header_enforced():
+                return jsonify({
+                    "error": "Missing authenticated user",
+                    "error_type": "AUTHENTICATION_REQUIRED",
+                }), 401
+        else:
+            identity_type_raw = str(
+                kwargs.get("identity_type")
+                or request.args.get("identityType")
+                or body.get("identityType")
+                or "user"
+            ).strip().lower() or "user"
+
+            claimed_id = str(
+                kwargs.get("user_id")
+                or kwargs.get("userId")
+                or request.args.get("userId")
+                or body.get("userId")
+                or ""
+            ).strip()
+
+            if identity_type_raw == "team":
+                if claimed_id and not _is_team_member(authenticated_user, claimed_id):
+                    return jsonify({
+                        "error": "Access denied: you are not a member of this team",
+                        "error_type": "TEAM_ACCESS_DENIED",
+                    }), 403
+            elif claimed_id and claimed_id.casefold() != authenticated_user.casefold():
+                return jsonify({
+                    "error": "Access denied: userId does not match authenticated user",
+                    "error_type": "USER_ACCESS_DENIED",
+                }), 403
+
+        # ── Identity resolution ───────────────────────────────────────
+        user_id = request.args.get("userId") or body.get("userId")
+        identity_type = (
+            request.args.get("identityType")
+            or body.get("identityType")
+            or "user"
+        )
+        display_name = request.args.get("displayName") or body.get("displayName") or ""
+
+        if not user_id:
+            return jsonify({"error": "userId is required"}), 400
+
+        try:
+            kwargs["identity"] = resolve_identity(user_id, identity_type, display_name)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+        return f(*args, **kwargs)
+
+    return decorated

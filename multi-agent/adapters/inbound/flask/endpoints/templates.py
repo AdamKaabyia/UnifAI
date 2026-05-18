@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, current_app
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 import logging
-from inbound.flask.decorators import require_identity_authorization, with_identity
+from inbound.flask.decorators import with_require_identity_authorization
 
 from mas.templates.errors import (
     TemplateNotFoundError,
@@ -296,8 +296,7 @@ def instantiate_template(template_id, input):
 
 
 @templates_bp.route("/template.materialize", methods=["POST"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 @from_body({
     "template_id": fields.Str(data_key="templateId", required=True),
     "input": fields.Dict(required=True),

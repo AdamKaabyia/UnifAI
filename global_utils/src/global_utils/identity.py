@@ -4,6 +4,8 @@ Platform-wide Identity model.
 An Identity is the minimal, portable reference to "who owns this thing".
 It can represent either a single user or a team.  All services should use
 this model instead of raw ``user_id`` strings.
+
+This file is under this pod and not under the Identity pod as global_utils is a package we can use.
 """
 from enum import Enum
 

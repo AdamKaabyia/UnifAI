@@ -47,15 +47,25 @@ class CloneContext:
     receives this as an opaque bundle and never needs to reason about users.
 
     Attributes:
-        sender_id:            Original owner's identity id; used for ownership validation and logging.
-        recipient_id:         The user/team id who will own all cloned resources/blueprints.
-        is_team_contribution: When True the share targets a team workspace and
-                              sender_id is recorded as the contributor.
+        sender_id:             Primary sender identity id used for display / logging.
+        recipient_id:          The user/team id who will own all cloned resources/blueprints.
+        authorized_owner_ids:  Full set of identity ids authorised to be the resource owner.
+                               When empty the cloner falls back to ``{sender_id}``.
+                               For team shares this should include both the team id and the
+                               individual user, so resources owned by either are accepted.
+        is_team_contribution:  When True the share targets a team workspace and
+                               sender_id is recorded as the contributor.
     """
     sender_id: str
     recipient_id: str
     sender_display_name: Optional[str] = None
+    authorized_owner_ids: frozenset = field(default_factory=frozenset)
     is_team_contribution: bool = False
+
+    def is_authorized_owner(self, identity_id: str) -> bool:
+        """Return True when *identity_id* is allowed to be the resource owner."""
+        pool = self.authorized_owner_ids or frozenset({self.sender_id})
+        return identity_id in pool
 
     @property
     def contributed_by(self) -> Optional[str]:
@@ -116,7 +126,7 @@ class ShareCloner:
         try:
             # Load and validate blueprint
             bp_doc = self.blueprints.get_blueprint_draft_doc(blueprint_id)
-            if bp_doc.identity.id != ctx.sender_id:
+            if not ctx.is_authorized_owner(bp_doc.identity.id):
                 raise ValueError(f"Blueprint {blueprint_id} not owned by sender")
 
             draft = BlueprintDraft(**bp_doc.spec_dict)
@@ -234,9 +244,10 @@ class ShareCloner:
                 # Load and validate resource
                 doc = self.resources.get(rid)
 
-                if doc.identity.id != ctx.sender_id:
+                if not ctx.is_authorized_owner(doc.identity.id):
                     logger.warning(
-                        f"Resource {rid} not owned by {ctx.sender_id}, owned by {doc.identity.id}"
+                        f"Resource {rid} not owned by an authorized sender "
+                        f"(owner={doc.identity.id}, authorized={ctx.authorized_owner_ids or {ctx.sender_id}})"
                     )
                     continue
 

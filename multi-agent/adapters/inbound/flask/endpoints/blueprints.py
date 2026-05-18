@@ -10,7 +10,7 @@ from mas.blueprints.exceptions import (
     BlueprintSaveError,
     BlueprintMetadataError,
 )
-from inbound.flask.decorators import require_identity_authorization, with_identity
+from inbound.flask.decorators import with_require_identity_authorization
 from inbound.flask.identity_helpers import authenticated_username
 
 logger = logging.getLogger(__name__)
@@ -87,8 +87,7 @@ def _extract_blueprint_data(
 
 
 @blueprints_bp.route("/available.blueprints.get", methods=["GET"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 def available_doc_list(identity):
     try:
         svc = current_app.container.blueprint_service
@@ -99,8 +98,7 @@ def available_doc_list(identity):
 
 
 @blueprints_bp.route("/available.blueprints.summary.get", methods=["GET"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 def available_blueprint_summaries(identity):
     """
     Return lightweight blueprint summaries (id, name, description,
@@ -115,8 +113,7 @@ def available_blueprint_summaries(identity):
 
 
 @blueprints_bp.route("/available.blueprints.resolved.get", methods=["GET"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 @from_query({
     "blueprint_id": fields.Str(data_key="blueprintId", required=False, load_default=None),
     "skip": fields.Int(data_key="skip", required=False, load_default=0),
@@ -151,8 +148,7 @@ def available_resolved_doc_list(identity, blueprint_id=None, skip=0, limit=100, 
 
 
 @blueprints_bp.route("/blueprint.save", methods=["POST"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 @from_body({
     "blueprint_raw": fields.Str(data_key="blueprintRaw", required=False),
     "metadata": fields.Dict(data_key="metadata", required=False, load_default=lambda: {})
@@ -169,7 +165,7 @@ def save_blueprint(identity, blueprint_raw=None, metadata=None):
     try:
         if metadata is None:
             metadata = {}
-            
+
         parsed = _extract_blueprint_data(
             json_field_value=blueprint_raw,
             field_name="blueprint_raw"

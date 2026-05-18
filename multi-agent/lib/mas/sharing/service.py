@@ -32,17 +32,19 @@ class ShareService:
                      item_kind: ShareItemKind, item_id: str,
                      message: Optional[str] = None, ttl_days: int = 10,
                      sender_type: str = "user",
-                     sender_display_name: Optional[str] = None) -> str:
+                     sender_display_name: Optional[str] = None,
+                     authorized_owner_ids: Optional[set] = None) -> str:
         """Create share invitation."""
-        # Validate item exists and is owned by sender
-        item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
+        # Validate item exists and is owned by an authorized sender.
+        item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id,
+                                                authorized_owner_ids=authorized_owner_ids)
         sender_type_normalized = (sender_type or "user").strip().lower()
         sender_label = sender_display_name or sender_user_id
         if sender_type_normalized == "team":
             sender_identity = Identity.team(sender_user_id, display_name=sender_label)
         else:
             sender_identity = Identity.user(sender_user_id, display_name=sender_label)
-        
+
         invite = ShareInvite(
             sender_identity=sender_identity,
             recipient_identity=Identity.user(recipient_user_id),
@@ -51,6 +53,7 @@ class ShareService:
             item_name=item_name,
             message=message,
             ttl_days=ttl_days,
+            authorized_owner_ids=sorted(authorized_owner_ids or {sender_user_id}),
         )
         
         return self._repo.save(invite)
@@ -77,12 +80,17 @@ class ShareService:
         # Clone into the workspace id stored on the invite (canonical owner namespace).
         recipient_owner_id = invite.recipient_identity.id
 
+        # Reconstruct the authorized ownership pool stored at invite-creation time.
+        # Falls back to sender_identity.id alone for legacy invites that predate the field.
+        owner_pool = frozenset(invite.authorized_owner_ids) or frozenset({invite.sender_identity.id})
+
         # Perform cloning
         try:
             ctx = CloneContext(
                 sender_id=invite.sender_identity.id,
                 sender_display_name=invite.sender_identity.display_name or invite.sender_identity.id,
                 recipient_id=recipient_owner_id,
+                authorized_owner_ids=owner_pool,
             )
 
             if invite.item_kind == ShareItemKind.RESOURCE:
@@ -116,17 +124,25 @@ class ShareService:
             raise ValueError(f"Failed to accept share: {str(e)}")
 
     def share_to_team(self, *, sender_user_id: str, team_name: str,
-                      item_kind: ShareItemKind, item_id: str) -> ShareResult:
+                      item_kind: ShareItemKind, item_id: str,
+                      authorized_owner_ids: Optional[set] = None) -> ShareResult:
         """
         Share an item directly to a team workspace (no invite/accept flow).
         Clones the item immediately into the team's namespace.
+
+        ``authorized_owner_ids`` widens the ownership check beyond ``sender_user_id``
+        alone — pass the set of all identity ids whose resources the caller is
+        allowed to share (e.g. ``{authenticated_user, sender_team_id}``).
         """
-        item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id)
+        item_name = self._validate_and_get_name(item_kind, item_id, sender_user_id,
+                                                authorized_owner_ids=authorized_owner_ids)
+        owner_pool = frozenset(authorized_owner_ids or {sender_user_id})
 
         try:
             ctx = CloneContext(
                 sender_id=sender_user_id,
                 recipient_id=team_name,
+                authorized_owner_ids=owner_pool,
                 is_team_contribution=True,
             )
 
@@ -192,21 +208,29 @@ class ShareService:
         """Get invitation details."""
         return self._repo.get(share_id)
 
-    def _validate_and_get_name(self, item_kind: ShareItemKind, 
-                              item_id: str, sender_user_id: str) -> str:
-        """Validate item ownership and get name."""
+    def _validate_and_get_name(self, item_kind: ShareItemKind,
+                              item_id: str, sender_user_id: str,
+                              authorized_owner_ids: Optional[set] = None) -> str:
+        """Validate item ownership and return the item's display name.
+
+        ``authorized_owner_ids`` widens the allowed set of owner identity ids beyond
+        ``sender_user_id`` alone.  When omitted only ``sender_user_id`` is accepted,
+        preserving the existing behaviour for personal (non-team) shares.
+        """
+        authorized = authorized_owner_ids or {sender_user_id}
+
         if item_kind == ShareItemKind.RESOURCE:
             resource = self._cloner.resources.get(item_id)
-            if resource.identity.id != sender_user_id:
+            if resource.identity.id not in authorized:
                 raise ValueError(f"Resource {item_id} not owned by sender")
             return resource.name
-            
+
         elif item_kind == ShareItemKind.BLUEPRINT:
             bp_doc = self._cloner.blueprints.get_blueprint_draft_doc(item_id)
-            if bp_doc.identity.id != sender_user_id:
+            if bp_doc.identity.id not in authorized:
                 raise ValueError(f"Blueprint {item_id} not owned by sender")
             return bp_doc.spec_dict["name"]
-        
+
         raise ValueError(f"Unknown item kind: {item_kind}")
 
     def _build_result_from_mapping(self, invite: ShareInvite) -> ShareResult:

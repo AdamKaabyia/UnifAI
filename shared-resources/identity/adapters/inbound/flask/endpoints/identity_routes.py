@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, current_app, request
-from global_utils.identity import Identity
+from models.identity import Identity
 
 from utils.auth_manager import directory_request_user_token
 

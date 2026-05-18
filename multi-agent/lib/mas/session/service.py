@@ -199,6 +199,23 @@ class SessionService:
         record = self._manager.get_record(run_id)
         return record.graph_state.model_dump(mode="json")
 
+    def get_meta(self, run_id: str) -> SessionMeta:
+        """Return the persisted metadata for a session."""
+        record = self._manager.get_record(run_id)
+        return record.metadata
+
+    def update_meta(self, run_id: str, meta: SessionMeta) -> SessionMeta:
+        """Whole-replace the session metadata and persist.
+
+        The caller is expected to send the *complete* desired state so that
+        whatever the GUI considers canonical is reflected atomically — no
+        partial-update merge is performed.
+        """
+        record = self._manager.get_record(run_id)
+        record.metadata = meta
+        self._manager.save_record(record)
+        return record.metadata
+
     def get_chat(self, run_id: str) -> SessionChat:
         """
         Get only messages and output for a session (lightweight, projected from DB).

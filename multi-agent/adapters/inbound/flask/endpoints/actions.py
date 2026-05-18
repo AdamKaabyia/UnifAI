@@ -86,16 +86,13 @@ def list_actions(category=None, type=None, action_type=None, tags=None):
     "uid": fields.Str(required=True),
     "input_data": fields.Dict(data_key="inputData", required=False, load_default={}),
     "context": fields.Dict(required=False, load_default={}),
-    "user_id": fields.Str(data_key="userId", required=False, load_default=""),
 })
-def execute_action(uid, input_data, context, user_id):
+def execute_action(uid, input_data, context):
     """Execute a specific action by UID (synchronously)."""
     try:
         auth_user = authenticated_username()
         if auth_user:
             input_data["user_id"] = auth_user
-        elif user_id and "user_id" not in input_data:
-            input_data["user_id"] = user_id
 
         svc = current_app.container.actions_service
         result = svc.execute_action_sync(uid, input_data, context)

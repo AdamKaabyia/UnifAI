@@ -4,14 +4,13 @@ from inbound.flask.identity_helpers import authenticated_username
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.resources.errors import ResourceInUseError
-from inbound.flask.decorators import require_identity_authorization, with_identity
+from inbound.flask.decorators import with_require_identity_authorization
 
 resources_bp = Blueprint("resources", __name__)
 
 
 @resources_bp.route("/resource.save", methods=["POST"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 @from_body({
     "category": fields.Str(required=True),
     "type": fields.Str(required=True),
@@ -50,8 +49,7 @@ def get_resource(resource_id):
 
 
 @resources_bp.route("/resources.list", methods=["GET"])
-@require_identity_authorization
-@with_identity
+@with_require_identity_authorization
 @from_query({
     "category": fields.Str(required=False),
     "type": fields.Str(required=False),
@@ -176,7 +174,7 @@ def validate_resource(resource_id, user_id, timeout_seconds):
 def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
     """
     Validate multiple resources in parallel.
-    
+
     Request:
         {
             "resourceIds": ["rid1", "rid2", "rid3"],
@@ -184,25 +182,25 @@ def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
             "timeoutSeconds": 10.0,
             "maxWorkers": 10
         }
-        
+
     Response:
         [
             { "element_rid": "rid1", "is_valid": true, ... },
             { "element_rid": "rid2", "is_valid": false, ... },
             { "element_rid": "rid3", "is_valid": true, ... }
         ]
-        
+
     Results are returned in the same order as the input resourceIds.
     """
     svc = current_app.container.resources_service
-    
+
     # Validate input
     if not resource_ids:
         return jsonify([]), 200
-    
+
     # Cap max_workers and ensure a positive value
     max_workers = max(1, min(max_workers, 20))
-    
+
     try:
         results = svc.validate_resources(
             rids=resource_ids,
@@ -282,7 +280,7 @@ def get_resource_cards(resource_ids):
 def validate_config(category, type, config, name=None, timeout_seconds=10.0):
     """
     Validate a resource config before saving.
-    
+
     Same fields as resource.save but validates without saving to database.
     Useful for pre-save validation in the UI.
     """

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, UTC
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field, computed_field
 from enum import Enum
@@ -37,6 +37,13 @@ class ShareInvite(BaseModel):
     ttl_days: int = Field(default=10, description="Time to live in days")
     expires_at: datetime = Field(default_factory=lambda: datetime.now(UTC) + timedelta(days=10))
     
+    # Full set of identity ids authorised to own the shared item.
+    # Populated by the endpoint when the caller shares on behalf of a team so
+    # that both the individual user id and the team id are accepted during
+    # cloning (dependency traversal also uses this list).  Empty means only
+    # sender_identity.id is trusted — preserving legacy behaviour.
+    authorized_owner_ids: List[str] = Field(default_factory=list)
+
     # Result tracking for idempotency
     result_mapping: Dict[str, str] = Field(default_factory=dict)
 
