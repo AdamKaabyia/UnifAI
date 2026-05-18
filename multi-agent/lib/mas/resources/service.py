@@ -37,10 +37,6 @@ class ResourcesService:
         self._validation_service = validation_service
         self._auth_service = auth_service
 
-    def set_auth_service(self, auth_service) -> None:
-        """Late-bind the auth service (created after ResourcesService in the container)."""
-        self._auth_service = auth_service
-
     # ---------- CRUD ----------
     def create(self, *, user_id, category, type, name, config) -> Resource:
         model_cls = self.element_registry.get_schema(ResourceCategory(category), type)

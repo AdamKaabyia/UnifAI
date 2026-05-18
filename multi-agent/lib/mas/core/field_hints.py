@@ -223,8 +223,8 @@ class AuthHint(BaseModel):
 
         json_schema_extra=combine_hints(
             ConditionalHint(visible_when={"auth_method": "sign_in"}),
-            AuthHint(action_uid="auth.authenticate",
-                     dependencies={"server_identifier": "server_identifier"}),
+            AuthHint(action_uid="auth.discovery",
+                     dependencies={"mcp_url": "mcp_url"}),
         )
     """
     action_uid: str = Field(

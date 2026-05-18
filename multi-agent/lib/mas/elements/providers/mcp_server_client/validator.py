@@ -75,7 +75,6 @@ class McpProviderValidator(BaseElementValidator):
         
         Uses anyio.fail_after INSIDE the async function for timeout control.
         """
-        start = time.time()
 
         auth_cred = None
         if context.user_id and context.auth_service:
@@ -86,10 +85,9 @@ class McpProviderValidator(BaseElementValidator):
             with anyio.fail_after(context.timeout_seconds):
                 await self._factory.create_async(config, auth_credential=auth_cred)
 
-            elapsed = (time.time() - start) * 1000
             messages.append(self._info(
                 "CONNECTION_OK",
-                f"Connected to MCP server at {config.mcp_url} ({elapsed:.0f}ms)",
+                f"Connected to MCP server",
                 field="mcp_url",
             ))
 
