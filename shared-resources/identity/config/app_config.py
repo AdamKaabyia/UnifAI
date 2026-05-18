@@ -44,7 +44,18 @@ class AppConfig(SharedConfig):
     mongo_db: str = "UnifAI"
     teams_coll: str = "teams"
 
-    # Directory provider (e.g. "ldap" or "" to disable)
+    # ── LDAP / Directory settings ──────────────────────────────────────────
+    # Stable LDAP structural params (base DNs, object classes, search attrs)
+    # are intentional defaults here — not injected from env. Only override via
+    # env var if the target directory schema changes.
+    #
+    # Environment-specific connection settings (directory_provider, directory_url,
+    # directory_verify_ssl) are injected at deploy time via the identity-config
+    # ConfigMap (see helm/scripts/identity-presync.sh).
+    #
+    # Bind credentials (directory_ldap_bind_dn, directory_ldap_bind_password)
+    # default to empty (anonymous bind). A future story will move these to a
+    # Kubernetes Secret.
     directory_provider: str = ""
     directory_url: str = ""
     directory_timeout: int = 10
