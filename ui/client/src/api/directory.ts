@@ -1,4 +1,4 @@
-import identityApi from '@/http/identityClient';
+import { api as identityApi } from '@/http/authClient';
 
 export interface DirectoryUser {
   user_id: string;

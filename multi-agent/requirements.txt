@@ -25,4 +25,3 @@ authlib
 anyio
 typing-inspection
 a2a-sdk[all]<1.0
-ldap3

@@ -14,7 +14,7 @@ from global_utils.redis.redis_kv_store import RedisKVStore
 logger = logging.getLogger(__name__)
 
 KEY_PREFIX = "unifai:directory:"
-DEFAULT_TTL_SECONDS = 120
+DEFAULT_TTL_SECONDS = 300
 
 
 class DirectoryCache:

@@ -343,7 +343,7 @@ class AppContainer(metaclass=SingletonMeta):
 
     @staticmethod
     def _build_identity_provider(cfg: AppConfig):
-        from outbound.sso_directory import IdentityDirectoryClient
+        from outbound.identity_directory_client import IdentityDirectoryClient
         import logging
         logger = logging.getLogger(__name__)
 
