@@ -39,6 +39,7 @@ class McpProviderConfig(ProviderBaseConfig):
             dependencies={
                 "mcp_url": "mcp_url",
                 "credential_token": "credential_token",
+                "server_identifier": "server_identifier",
                 "auth_method": "auth_method",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",

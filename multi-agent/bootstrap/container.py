@@ -31,8 +31,6 @@ from mas.sharing.service import ShareService
 from mas.statistics.service import StatisticsService
 from mas.validation.service import ElementValidationService
 from mas.templates.service import TemplateService
-
-# Auth layer
 from mas.core.auth.service import AuthService, AuthStrategyRegistry
 from mas.core.auth.discovery import AuthDetector
 from outbound.auth.oauth2_strategy import OAuth2Strategy
@@ -210,7 +208,9 @@ class AppContainer(metaclass=SingletonMeta):
         self.actions_service.register_instance(SignOutAction(
             auth_service=self.auth_service,
         ))
-        self.actions_service.register_instance(ValidateConnectionAction())
+        self.actions_service.register_instance(ValidateConnectionAction(
+            auth_service=self.auth_service,
+        ))
         self.actions_service.register_instance(GetToolsNamesAction(
             auth_service=self.auth_service,
         ))

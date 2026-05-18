@@ -1,3 +1,4 @@
+import secrets
 from global_utils.config.config import SharedConfig
 
 
@@ -9,6 +10,7 @@ class AppConfig(SharedConfig):
     shares_coll: str = "shares"
     templates_coll: str = "templates"
     credentials_coll: str = "credentials"
+    server_configs_coll: str = "server_configs"
     hostname: str = "0.0.0.0"
     port: str = "8002"
     version: str = "1.0.0"
@@ -21,8 +23,9 @@ class AppConfig(SharedConfig):
     redis_stream_ttl: int = 3600
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
-    # MCP Auth
-    mcp_auth_state_secret: str = ""
+    # Auth
+    oauth_state_secret: str = secrets.token_urlsafe(32)
     identity_host: str = "http://localhost:13456"
+    oauth_callback_path: str = "/api/credentials/callback"
     credential_encryption_key: str = ""
 
