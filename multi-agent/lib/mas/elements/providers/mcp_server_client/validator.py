@@ -76,29 +76,20 @@ class McpProviderValidator(BaseElementValidator):
         lookup_id = getattr(config, "server_identifier", "") or str(config.mcp_url)
         scheme_type = getattr(config, "scheme_type", "") or ""
 
-        auth_cred = None
-        owner_id = (context.user_id or "").strip()
-        if owner_id and context.auth_service:
-            auth_cred = context.auth_service.bind(
-                owner_id, lookup_id, scheme_type=scheme_type,
-            )
-
-        # OAuth MCP credentials are stored on the member, not the team id — mirror runtime AuthHandle.
-        cu = (context.credential_user_id or "").strip()
         auth_method = getattr(config, "auth_method", None)
         is_sign_in = auth_method == McpAuthMethod.SIGN_IN or getattr(
             auth_method, "value", None,
         ) == McpAuthMethod.SIGN_IN.value
-        if (
-            auth_cred is None
-            and cu
-            and cu != owner_id
-            and context.auth_service
-            and is_sign_in
-        ):
-            auth_cred = context.auth_service.bind(
-                cu, lookup_id, scheme_type=scheme_type,
-            )
+
+        auth_cred = None
+        if context.auth_service:
+            # For SIGN_IN (OAuth), credentials are stored per human member, never on a team.
+            # oauth_lookup_user_id() handles the owner-vs-credential-user resolution.
+            lookup_user = context.oauth_lookup_user_id() if is_sign_in else (context.user_id or "").strip()
+            if lookup_user:
+                auth_cred = context.auth_service.bind(
+                    lookup_user, lookup_id, scheme_type=scheme_type,
+                )
 
         try:
             start = time.time()

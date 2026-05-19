@@ -22,14 +22,6 @@ from mas.session.management.utils import derive_title
 from mas.session.repository.repository import SessionRepository
 
 
-def _credential_user_for_record(record: SessionRecord, logged_in_user: str) -> str:
-    """Never persist a team id as ``credential_user_id`` (OAuth is always per member)."""
-    cu = (logged_in_user or "").strip()
-    if record.identity.is_team and cu == record.identity.id:
-        return ""
-    return cu
-
-
 class SessionInputProjector:
     """
     Stages raw user inputs into a SessionRecord and persists it.
@@ -68,11 +60,9 @@ class SessionInputProjector:
                 )
             )
 
-        # Persist acting user for OAuth (team sessions, etc.) on the durable record so
-        # Temporal / workers always see tags after reload — not only on the submit payload.
-        cred_user = _credential_user_for_record(record, logged_in_user)
-        if cred_user:
-            record.run_context = record.run_context.with_credential_user(cred_user)
+        # Persist acting user for OAuth on the durable record so Temporal / workers always
+        # see tags after reload. with_credential_user() rejects team ids automatically.
+        record.run_context = record.run_context.with_credential_user(logged_in_user)
 
         record.metadata.status_message = None
         record.metadata.tags.pop(CANCELLED_TAG, None)

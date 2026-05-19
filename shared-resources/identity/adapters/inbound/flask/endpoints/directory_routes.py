@@ -1,4 +1,5 @@
 import logging
+from typing import Callable
 
 from flask import Blueprint, jsonify, current_app, request
 
@@ -21,6 +22,29 @@ def _user_token():
     return directory_request_user_token()
 
 
+def _cached_fetch(cache, cache_key: str, fetch: Callable, response_key: str, log_action: str):
+    """Run fetch(), cache the result, and fall back to cache on error.
+
+    Returns a Flask (response, status_code) tuple.
+    """
+    if cache:
+        cached = cache.get_json(cache_key)
+        if cached is not None:
+            return jsonify({response_key: cached}), 200
+    try:
+        payload = fetch()
+        if cache:
+            cache.set_json(cache_key, payload)
+        return jsonify({response_key: payload}), 200
+    except Exception:
+        logger.exception("%s failed", log_action)
+        if cache:
+            cached = cache.get_json(cache_key)
+            if cached is not None:
+                return jsonify({response_key: cached, "cached": True}), 200
+        return jsonify({"error": "Internal server error"}), 500
+
+
 @directory_bp.route("/directory.status", methods=["GET"])
 def directory_status():
     svc = current_app.extensions["team_service"]
@@ -41,23 +65,12 @@ def search_users():
     token = _user_token()
     cache = current_app.extensions.get("directory_cache")
     cache_key = DirectoryCache.key_for_search("users", q, limit, token)
-    if cache:
-        cached = cache.get_json(cache_key)
-        if cached is not None:
-            return jsonify({"users": cached}), 200
-    try:
-        users = svc.search_directory_users(q, limit=limit, user_token=token)
-        payload = [u.model_dump(mode="json") for u in users]
-        if cache:
-            cache.set_json(cache_key, payload)
-        return jsonify({"users": payload}), 200
-    except Exception:
-        logger.exception("search_users failed")
-        if cache:
-            cached = cache.get_json(cache_key)
-            if cached is not None:
-                return jsonify({"users": cached, "cached": True}), 200
-        return jsonify({"error": "Internal server error"}), 500
+    return _cached_fetch(
+        cache, cache_key,
+        fetch=lambda: [u.model_dump(mode="json") for u in svc.search_directory_users(q, limit=limit, user_token=token)],
+        response_key="users",
+        log_action="search_users",
+    )
 
 
 @directory_bp.route("/directory.search_groups", methods=["GET"])
@@ -74,23 +87,12 @@ def search_groups():
     token = _user_token()
     cache = current_app.extensions.get("directory_cache")
     cache_key = DirectoryCache.key_for_search("groups", q, limit, token)
-    if cache:
-        cached = cache.get_json(cache_key)
-        if cached is not None:
-            return jsonify({"groups": cached}), 200
-    try:
-        groups = svc.search_directory_groups(q, limit=limit, user_token=token)
-        payload = [g.model_dump(mode="json") for g in groups]
-        if cache:
-            cache.set_json(cache_key, payload)
-        return jsonify({"groups": payload}), 200
-    except Exception:
-        logger.exception("search_groups failed")
-        if cache:
-            cached = cache.get_json(cache_key)
-            if cached is not None:
-                return jsonify({"groups": cached, "cached": True}), 200
-        return jsonify({"error": "Internal server error"}), 500
+    return _cached_fetch(
+        cache, cache_key,
+        fetch=lambda: [g.model_dump(mode="json") for g in svc.search_directory_groups(q, limit=limit, user_token=token)],
+        response_key="groups",
+        log_action="search_groups",
+    )
 
 
 @directory_bp.route("/directory.search", methods=["GET"])
@@ -184,19 +186,24 @@ def get_group():
     token = _user_token()
     cache = current_app.extensions.get("directory_cache")
     cache_key = DirectoryCache.key_for_group(group_id, token)
+
+    def _fetch_group():
+        group = svc.get_directory_group(group_id, user_token=token)
+        if not group:
+            raise KeyError(f"Group {group_id} not found")
+        return group.model_dump(mode="json")
+
     if cache:
         cached = cache.get_json(cache_key)
         if cached is not None:
             return jsonify(cached), 200
-
     try:
-        group = svc.get_directory_group(group_id, user_token=token)
-        if not group:
-            return jsonify({"error": "Group not found"}), 404
-        payload = group.model_dump(mode="json")
+        payload = _fetch_group()
         if cache:
             cache.set_json(cache_key, payload)
         return jsonify(payload), 200
+    except KeyError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception:
         logger.exception("get_group failed")
         if cache:

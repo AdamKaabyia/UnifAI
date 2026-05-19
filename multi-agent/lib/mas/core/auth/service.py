@@ -21,10 +21,7 @@ from .credentials.models import (
 from .credentials.ports import CredentialStore, ServerConfigStore
 from .credentials.credential import AuthCredential
 from .ports import AuthStrategy, AuthChallenge
-from mas.core.execution_context import (
-    ExecutionContextHolder,
-    CREDENTIAL_USER_ID_TAG,
-)
+from mas.core.execution_context import ExecutionContextHolder
 
 if TYPE_CHECKING:
     from .discovery.detector import AuthDetector
@@ -86,19 +83,8 @@ class AuthHandle:
                 ctx = uid.context
             except RuntimeError:
                 return ""
-            from_tag = (ctx.tags or {}).get(CREDENTIAL_USER_ID_TAG)
-            if from_tag:
-                cu = str(from_tag).strip()
-                # Never use team id as OAuth key (legacy bad payloads / client bugs).
-                if ctx.identity.is_team and cu == ctx.identity.id:
-                    cu = ""
-                if cu:
-                    return cu
-            # Per-user OAuth (Google MCP, etc.) is never stored under a team id.
-            if ctx.identity.is_team:
-                return ""
-            return uid.identity_id
-        return uid.user_id
+            return ctx.credential_user_id()
+        return getattr(uid, "user_id", "")
 
     async def get_headers(self) -> Dict[str, str]:
         return await self._svc.get_headers(

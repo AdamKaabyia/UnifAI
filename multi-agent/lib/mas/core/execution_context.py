@@ -51,13 +51,32 @@ class ExecutionContext(BaseModel):
         return self.model_copy(update={"scope": scope})
 
     def with_credential_user(self, credential_user_id: str = "") -> ExecutionContext:
-        """Copy with per-user OAuth key in ``tags`` (used when ``identity`` is a team)."""
+        """Copy with per-user OAuth key in ``tags`` (used when ``identity`` is a team).
+
+        A team id is never a valid OAuth credential user, so passing the team's
+        own id is silently ignored — callers do not need to pre-filter.
+        """
         cu = (credential_user_id or "").strip()
-        if not cu:
+        if not cu or (self.identity.is_team and cu == self.identity.id):
             return self
         tags = dict(self.tags or {})
         tags[CREDENTIAL_USER_ID_TAG] = cu
         return self.model_copy(update={"tags": tags})
+
+    def credential_user_id(self) -> str:
+        """Return the credential user id for OAuth lookups.
+
+        For individual sessions this is the identity id.  For team sessions
+        the per-member credential user is stored in ``tags``; if absent (e.g.
+        the session was not submitted via the HTTP layer) the caller will
+        receive an empty string and must handle the missing-credential case.
+        """
+        cu = (self.tags or {}).get(CREDENTIAL_USER_ID_TAG, "")
+        if cu:
+            return str(cu).strip()
+        if self.identity.is_team:
+            return ""
+        return self.identity.id
 
     def mark_finished(self) -> ExecutionContext:
         return self.model_copy(update={"finished_at": datetime.now(timezone.utc)})

@@ -33,6 +33,46 @@ logger = logging.getLogger(__name__)
 
 _PREFIX = "mas:collab:"
 
+# Atomically acquires or renews a lock. Returns:
+#   b'ok'        – acquired / renewed
+#   b'retry'     – lost a race (corrupted key deleted), caller should loop
+#   b'held:...'  – another user holds it; suffix is the holder's JSON
+_ACQUIRE_LOCK_SCRIPT = """
+local cur = redis.call('GET', KEYS[1])
+if not cur then
+    if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2]) then
+        return 'ok'
+    end
+    return 'retry'
+end
+local ok, data = pcall(cjson.decode, cur)
+if not ok then
+    redis.call('DEL', KEYS[1])
+    return 'retry'
+end
+if data['user_id'] == ARGV[3] then
+    redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+    return 'ok'
+end
+return 'held:' .. cur
+"""
+
+# Atomically releases a lock only if the caller is the current holder.
+_RELEASE_LOCK_SCRIPT = """
+local cur = redis.call('GET', KEYS[1])
+if not cur then return 0 end
+local ok, data = pcall(cjson.decode, cur)
+if not ok then
+    redis.call('DEL', KEYS[1])
+    return 1
+end
+if data['user_id'] == ARGV[1] then
+    redis.call('DEL', KEYS[1])
+    return 1
+end
+return 0
+"""
+
 
 def _participants_key(session_id: str) -> str:
     return f"{_PREFIX}session:{session_id}:participants"
@@ -210,23 +250,24 @@ class RedisCollaborationStore(CollaborationStore):
         key = _team_edit_lock_key(team_id, entity_kind, entity_id)
         payload = self._lock_payload(user_id, display_name)
         r = self._client()
+        acquire = r.register_script(_ACQUIRE_LOCK_SCRIPT)
 
         while True:
-            cur = r.get(key)
-            if cur is None:
-                if r.set(key, payload, nx=True, ex=ttl):
-                    return True, None
-                continue
-            try:
-                data = json.loads(cur)
-                holder = TeamEditLockHolder.model_validate(data)
-            except (json.JSONDecodeError, ValueError):
-                r.delete(key)
-                continue
-            if holder.user_id == user_id:
-                r.set(key, payload, ex=ttl)
+            result = acquire(keys=[key], args=[payload, ttl, user_id])
+            if isinstance(result, bytes):
+                result = result.decode()
+            if result == "ok":
                 return True, None
-            return False, holder
+            if result == "retry":
+                continue
+            if result.startswith("held:"):
+                holder_json = result[len("held:"):]
+                try:
+                    holder = TeamEditLockHolder.model_validate(json.loads(holder_json))
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                return False, holder
+            continue
 
     def release_team_edit_lock(
         self,
@@ -237,17 +278,8 @@ class RedisCollaborationStore(CollaborationStore):
     ) -> None:
         key = _team_edit_lock_key(team_id, entity_kind, entity_id)
         r = self._client()
-        cur = r.get(key)
-        if not cur:
-            return
-        try:
-            data = json.loads(cur)
-            holder = TeamEditLockHolder.model_validate(data)
-        except (json.JSONDecodeError, ValueError):
-            r.delete(key)
-            return
-        if holder.user_id == user_id:
-            r.delete(key)
+        release = r.register_script(_RELEASE_LOCK_SCRIPT)
+        release(keys=[key], args=[user_id])
 
     def renew_team_edit_lock(
         self,
