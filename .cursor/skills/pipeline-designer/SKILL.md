@@ -158,7 +158,11 @@ The pipeline orchestrator may instruct you to write the design to a file. This i
 When instructed to write a file:
 1. Read the ADR template at `.cursor/files/ADR - Architecture Review Template.md`.
 2. Populate every section of the template with the design content.
-3. Write the file to `docs/designs/<slug>-adr.md`, where `<slug>` is a kebab-case short name derived from the feature name (e.g., `google-oauth-mcp-adr.md`).
+3. Write the file to `docs/designs/<jira-id>-<short-title>-adr.md`, where:
+   - `<jira-id>` is the lowercase Jira ticket key (e.g., `unif-1234`)
+   - `<short-title>` is a kebab-case label of **2–4 words max** capturing the feature's primary noun/action (e.g., `google-oauth`, `rate-limiting`, `user-export`)
+   - If no Jira ticket is available, use only `<short-title>-adr.md`
+   - Examples: `unif-1234-google-oauth-adr.md`, `plat-567-rate-limiting-adr.md`
 4. Leave section **7. Reviewer Feedback** empty — it will be populated by the Design Reviewer.
 5. Report the file path in your output using this exact format: "**ADR file written to:** `<path>`"
 
