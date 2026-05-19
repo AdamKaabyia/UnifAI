@@ -280,7 +280,26 @@ class TemplateService:
             save_resources: bool = True,
             skip_validation: bool = False,
     ) -> MaterializeResult:
-        """Instantiate template and save blueprint + resources to a workspace."""
+        """
+        Instantiate template and save blueprint + resources to user's account.
+        
+        This is the main entry point for template usage.
+        
+        Args:
+            template_id: Template to instantiate
+            identity: Identity who owns the result
+            user_input: User-provided values
+            blueprint_name: Optional name override
+            save_resources: If True, save resources and create $refs (default)
+            skip_validation: If True, skip blueprint validation (default False)
+            
+        Returns:
+            MaterializeResult with blueprint_id, resource_ids, and metadata
+            
+        Raises:
+            InstantiationError: If instantiation or validation fails
+            RuntimeError: If required services not configured
+        """
         if self._blueprint_service is None:
             raise RuntimeError("BlueprintService not configured")
 
