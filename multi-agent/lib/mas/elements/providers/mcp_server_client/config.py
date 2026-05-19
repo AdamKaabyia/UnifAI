@@ -92,7 +92,7 @@ class McpProviderConfig(ProviderBaseConfig):
     )
     bearer_token: Optional[str] = Field(
         default=None,
-        description="API key or bearer token",
+        description="API key or bearer token (leave empty if already configured)",
         json_schema_extra=combine_hints(
             SecretHint(allow_reveal=True),
             ConditionalHint(visible_when={"auth_method": "access_token"}),
@@ -114,7 +114,7 @@ class McpProviderConfig(ProviderBaseConfig):
             multi_select=True,
             dependencies={
                 "mcp_url": "mcp_url",
-                "credential_token": "credential_token",
+                "server_identifier": "server_identifier",
                 "transport_type": "transport_type",
                 "additional_headers": "additional_headers",
             }
