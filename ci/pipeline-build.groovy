@@ -112,7 +112,9 @@ def cleanPodmanSystem() {
 
 pipeline {
     agent { node { label "${buildParams.NodeToRun}" } }
-
+    options {
+        timestamps()
+    }
     stages {
         stage('Checkout') {
             steps {
