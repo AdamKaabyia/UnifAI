@@ -6,6 +6,16 @@ echo "Starting identity-presync hook..."
 # Source common functions
 source "$(dirname "$0")/postsync-lib.sh"
 
+# Helmfile hooks inherit the caller's environment; these must exist under `set -u`.
+: "${admin_allowed_users:=}"
+: "${keycloak_base_url:=}"
+: "${client_id:=}"
+: "${client_secret:=}"
+: "${keycloak_realm:=}"
+: "${secret_key:=}"
+: "${directory_provider:=}"
+: "${directory_url:=}"
+: "${directory_verify_ssl:=}"
 
 # Create configmap
 create_or_update_configmap identity-config \
