@@ -58,7 +58,9 @@ def buildDockerImage(String component) {
 
     def componentLower = component.toLowerCase().replace("-", "")
 
+    sh "echo '>>> Build START: ${componentLower}' && date"
     def status = sh(script: """podman build -t ${componentLower}:${VERSION} -t ${componentLower}:latest -f ${component}/${dockerfile} ${context} 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0; fflush() }' > ${logFile}""", returnStatus: true)
+    sh "echo '>>> Build END: ${componentLower}' && date"
 
     if (status != 0) {
         echo("Build failed for module: ${componentLower}. Check ${logFile} for details.")
@@ -72,6 +74,7 @@ def buildDockerImage(String component) {
 
 def tagAndPushImageToRegistry( buildParams,component) {
     echo("Tagging and pushing image for ${component}.")
+    sh "echo '>>> Push START: ${component}' && date"
     component = component.replace("-", "")
     def componentLower = component.toLowerCase()
 
@@ -91,6 +94,7 @@ def tagAndPushImageToRegistry( buildParams,component) {
         }
         echo("Image for ${componentLower} has been tagged and pushed to ${buildParams.ImageRegistry}/${buildParams.ImageRegistryPath}/${componentLower}:${VERSION}")
     }
+    sh "echo '>>> Push END: ${component}' && date"
 }
 
 def cleanWorkspace(component) {
@@ -112,12 +116,11 @@ def cleanPodmanSystem() {
 
 pipeline {
     agent { node { label "${buildParams.NodeToRun}" } }
-    options {
-        timestamps()
-    }
+
     stages {
         stage('Checkout') {
             steps {
+                sh "echo '>>> Checkout START' && date"
                 echo("CheckOut ${buildParams.MainRepoProject}/${params.BRANCH}")
                 dir("${buildParams.DevRoot}/${params.BRANCH}/") {
                     checkout([$class: 'GitSCM',
@@ -143,7 +146,7 @@ pipeline {
                         ]]
                     ])
                 }
-                
+                sh "echo '>>> Checkout END' && date"
             }
         }
 
