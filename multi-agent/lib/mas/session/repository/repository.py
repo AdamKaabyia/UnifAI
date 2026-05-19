@@ -60,6 +60,7 @@ class SessionRepository(ABC):
     ) -> List[GroupedCount]:
         """
         Group documents by specified fields and return counts.
+        Implementation should perform efficient server-side grouping.
 
         Args:
             identity: The owning identity (user or team) to filter by
@@ -68,6 +69,7 @@ class SessionRepository(ABC):
 
         Returns:
             List of GroupedCount DTOs with grouped field values and count.
+            Example: [GroupedCount(fields={"blueprint_id": "bp-123"}, count=10), ...]
         """
         ...
 
@@ -75,7 +77,15 @@ class SessionRepository(ABC):
 
     @abstractmethod
     def count_system(self, since: Optional[datetime] = None) -> int:
-        """Count all sessions system-wide (no identity constraint)."""
+        """
+        Count all sessions system-wide (no user_id constraint).
+        
+        Args:
+            since: Optional cutoff datetime - only count sessions started after this time
+            
+        Returns:
+            Total count of matching sessions
+        """
         ...
 
     @abstractmethod
@@ -93,7 +103,17 @@ class SessionRepository(ABC):
         group_by: List[str],
         since: Optional[datetime] = None
     ) -> List[GroupedCount]:
-        """Group all sessions by specified fields and return counts (system-wide)."""
+        """
+        Group all sessions by specified fields and return counts (system-wide).
+        No user_id constraint - for admin analytics.
+        
+        Args:
+            group_by: List of field names to group by
+            since: Optional cutoff datetime - only include sessions started after this time
+            
+        Returns:
+            List of GroupedCount DTOs with grouped field values and count.
+        """
         ...
 
     @abstractmethod
@@ -106,6 +126,14 @@ class SessionRepository(ABC):
 
         The implementation determines the appropriate time granularity
         (hourly, daily, monthly) based on the time range.
+
+        Args:
+            since: Optional cutoff datetime - only include sessions started after this time.
+                   None means all-time data.
+            
+        Returns:
+            List of TimeSeriesPoint with period labels and session counts,
+            sorted chronologically.
         """
         ...
 
@@ -118,7 +146,14 @@ class SessionRepository(ABC):
         Get aggregated system analytics data for admin dashboards.
 
         Returns grouped session data for building user activity and
-        top blueprints views.
+        top blueprints views. Implementations should optimize for
+        efficiency (e.g., batching multiple aggregations).
+        
+        Args:
+            since: Optional cutoff datetime - only include sessions started after this time
+            
+        Returns:
+            SystemAnalyticsData containing user and blueprint groupings.
         """
         ...
 

@@ -18,7 +18,7 @@ from typing import Any, Callable
 import requests as http_requests
 from flask import current_app, g, jsonify, request, session
 
-from global_utils.identity import Identity, IdentityType
+from global_utils.identity import Identity, IdentityType, resolve_identity
 from global_utils.redis import get_identity_session, get_identity_username
 
 logger = logging.getLogger(__name__)
@@ -154,37 +154,6 @@ def _is_team_member(username: str, team_id: str) -> bool:
     except Exception:
         logger.exception("Team membership check failed — denying access")
         return False
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Identity resolution from request parameters
-# ──────────────────────────────────────────────────────────────────────────────
-
-_IDENTITY_TYPE_MAP = {
-    "user": IdentityType.USER,
-    "team": IdentityType.TEAM,
-}
-_VALID_IDENTITY_TYPES = frozenset(_IDENTITY_TYPE_MAP.keys())
-
-
-def resolve_identity(
-    user_id: str,
-    identity_type: str = "user",
-    display_name: str = "",
-) -> Identity:
-    """Build an ``Identity`` from raw request parameters.
-
-    Raises ``ValueError`` if *identity_type* is not a recognized value.
-    """
-    if identity_type not in _VALID_IDENTITY_TYPES:
-        raise ValueError(
-            f"Invalid identityType '{identity_type}'; "
-            f"must be one of {sorted(_VALID_IDENTITY_TYPES)}"
-        )
-    id_type = _IDENTITY_TYPE_MAP[identity_type]
-    if id_type == IdentityType.TEAM:
-        return Identity.team(team_id=user_id, display_name=display_name)
-    return Identity.user(user_id=user_id, display_name=display_name)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -5,7 +5,8 @@ An Identity is the minimal, portable reference to "who owns this thing".
 It can represent either a single user or a team.  All services should use
 this model instead of raw ``user_id`` strings.
 
-This file is under this pod and not under the Identity pod as global_utils is a package we can use.
+This file is under global_utils and not under Identity as global_utils is a package we can use
+In the future we would want to have identity as a package as well.
 """
 from enum import Enum
 
@@ -46,3 +47,35 @@ class Identity(BaseModel):
     def team(cls, team_id: str, display_name: str = "") -> "Identity":
         return cls(type=IdentityType.TEAM, id=team_id,
                    display_name=display_name or team_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Identity resolution from raw string parameters
+# ──────────────────────────────────────────────────────────────────────────────
+
+_IDENTITY_TYPE_MAP: dict[str, IdentityType] = {
+    "user": IdentityType.USER,
+    "team": IdentityType.TEAM,
+}
+_VALID_IDENTITY_TYPES: frozenset[str] = frozenset(_IDENTITY_TYPE_MAP.keys())
+
+
+def resolve_identity(
+    user_id: str,
+    identity_type: str = "user",
+    display_name: str = "",
+) -> Identity:
+    """Build an ``Identity`` from raw string parameters.
+
+    Raises ``ValueError`` if *identity_type* is not a recognised value.
+    Has no Flask dependency — safe to call from any service layer.
+    """
+    if identity_type not in _VALID_IDENTITY_TYPES:
+        raise ValueError(
+            f"Invalid identityType '{identity_type}'; "
+            f"must be one of {sorted(_VALID_IDENTITY_TYPES)}"
+        )
+    id_type = _IDENTITY_TYPE_MAP[identity_type]
+    if id_type == IdentityType.TEAM:
+        return Identity.team(team_id=user_id, display_name=display_name)
+    return Identity.user(user_id=user_id, display_name=display_name)
