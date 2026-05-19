@@ -4,17 +4,12 @@ from typing import List, Optional
 from mas.sharing.repository.base import ShareRepository
 from mas.sharing.models import ShareInvite, ShareStatus, ShareCleanupConfig, ShareCleanupResult
 from mas.core.identity import Identity
+from global_utils.utils.util import get_mongo_url
 
 
 class MongoShareRepository(ShareRepository):
-    def __init__(
-        self,
-        mongodb_ip: str = "127.0.0.1",
-        mongodb_port: str = "27017",
-        db_name: str = "UnifAI",
-        coll_name: str = "shares",
-    ):
-        mongo_uri = f"mongodb://{mongodb_ip}:{mongodb_port}/"
+    def __init__(self, db_name="UnifAI", coll_name="shares"):
+        mongo_uri = get_mongo_url()
         client = pymongo.MongoClient(mongo_uri)
         self._col = client[db_name][coll_name]
         

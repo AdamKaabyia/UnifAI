@@ -3,6 +3,11 @@ Self-contained Identity directory HTTP client.
 
 Delegates user/group lookups to the Identity service (``/api/directory/*``).
 Uses lightweight local models so multi-agent does not import Identity packages.
+
+TODO: Long-term, this logic should live in the Identity pod, which would expose
+internal proxy endpoints (e.g. ``/internal/directory/*``) that MAS calls.
+MAS would then hold only a thin HTTP client with no knowledge of RBAC internals.
+Kept here for now until a unified backend layer is in place.
 """
 import logging
 from abc import ABC, abstractmethod

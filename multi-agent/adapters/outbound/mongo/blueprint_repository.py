@@ -7,17 +7,14 @@ from mas.blueprints.repository.repository import BlueprintRepository
 from mas.core.enums import ResourceCategory
 from mas.core.identity import Identity
 from outbound.mongo.helpers import identity_q
+from global_utils.utils.util import get_mongo_url
 
 
 class MongoBlueprintRepository(BlueprintRepository):
-    def __init__(
-        self,
-        mongodb_ip: str = "127.0.0.1",
-        mongodb_port: str = "27017",
-        db_name: str = "UnifAI",
-        coll_name: str = "blueprints",
-    ):
-        mongo_uri = f"mongodb://{mongodb_ip}:{mongodb_port}/"
+    def __init__(self,
+                 db_name="UnifAI",
+                 coll_name="blueprints"):
+        mongo_uri = get_mongo_url()
         client = pymongo.MongoClient(mongo_uri)
         self._col = client[db_name][coll_name]
         self._col.create_index([("blueprint_id", pymongo.ASCENDING)], unique=True)
