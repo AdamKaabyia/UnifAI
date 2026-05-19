@@ -773,7 +773,7 @@ export default function ExecutionTab({
         sessionId: sessionPayload.sessionId,
         inputs: sessionPayload.inputs,
         scope: sessionPayload.scope || globalScope,
-        loggedInUser: (() => {
+        userId: (() => {
           const raw = (sessionPayload.loggedInUser || "").trim();
           // Team workspace: never send team id as acting user (OAuth is per member).
           if (isTeam && raw && raw === contextUserId) {

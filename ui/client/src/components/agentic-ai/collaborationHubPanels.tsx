@@ -144,6 +144,7 @@ export interface CollaborationHubMainColumnProps {
   selectedSession: ChatSession | null;
   isLiveRequest: boolean;
   isSessionBusy: boolean;
+  isSubmitting: boolean;
   currentSessionMessages: ChatMessage[];
   isSharingDisabled: boolean;
   isBlueprintValid: boolean;
@@ -151,6 +152,7 @@ export interface CollaborationHubMainColumnProps {
   typingUsers: string[];
   teamMembers: MemberDisplay[];
   triggerExecution: (payload: SessionPayload) => Promise<unknown>;
+  onCancelSession: () => Promise<void>;
   getSessionParticipantMembers: (sessionId: string) => MemberDisplay[];
 }
 
@@ -158,6 +160,7 @@ export function CollaborationHubMainColumn({
   selectedSession,
   isLiveRequest,
   isSessionBusy,
+  isSubmitting,
   currentSessionMessages,
   isSharingDisabled,
   isBlueprintValid,
@@ -165,6 +168,7 @@ export function CollaborationHubMainColumn({
   typingUsers,
   teamMembers,
   triggerExecution,
+  onCancelSession,
   getSessionParticipantMembers,
 }: CollaborationHubMainColumnProps) {
   return (
@@ -212,12 +216,14 @@ export function CollaborationHubMainColumn({
             key={selectedSession.id}
             runId={selectedSession.id}
             triggerExecution={triggerExecution}
+            onCancelSession={onCancelSession}
             initialMessages={currentSessionMessages}
             blueprintExists={selectedSession.blueprintExists}
             isSharingDisabled={isSharingDisabled}
             blueprintValid={isBlueprintValid}
             isValidatingBlueprint={isValidatingBlueprint}
             isLiveRequest={isLiveRequest || isSessionBusy}
+            isSubmitting={isSubmitting}
             collaborationMode={true}
             teamMembers={teamMembers}
             typingUsers={typingUsers}

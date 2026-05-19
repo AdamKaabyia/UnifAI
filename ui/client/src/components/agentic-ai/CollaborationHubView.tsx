@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "@/http/axiosAgentConfig";
 import { fetchResolvedBlueprint } from "@/api/blueprints";
+import { cancelSession } from "@/api/sessions";
 import { useStreamingData } from "./StreamingDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
@@ -39,6 +40,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiveRequest, setIsLiveRequest] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalScope] = useState<"public" | "private">("public");
   const [isSharingDisabled, setIsSharingDisabled] = useState(false);
   const [blueprintSpecCache, setBlueprintSpecCache] = useState<Map<string, any>>(new Map());
@@ -370,14 +372,16 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     async (sessionPayload: SessionPayload) => {
       try {
         setIsLiveRequest(true);
+        setIsSubmitting(true);
 
         await axios.post("/sessions/user.session.submit", {
           sessionId: sessionPayload.sessionId,
           inputs: sessionPayload.inputs,
           scope: globalScope,
-          loggedInUser: user?.username || "default",
+          userId: user?.username || "default",
         });
 
+        setIsSubmitting(false);
         subscribeRemoteStream(sessionPayload.sessionId);
 
         await new Promise<void>((resolve) => {
@@ -405,6 +409,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
         });
       } catch (err) {
         console.error("Error communicating with chat API", err);
+        setIsSubmitting(false);
       } finally {
         setIsLiveRequest(false);
         streamCompleteResolverRef.current = null;
@@ -423,6 +428,23 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     },
     [globalScope, user?.username, subscribeRemoteStream],
   );
+
+  const handleCancelSession = useCallback(async () => {
+    if (!selectedSession?.id) return;
+    try {
+      await cancelSession(selectedSession.id);
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+    } finally {
+      cancelRemoteStream();
+      setIsLiveRequest(false);
+      setIsSubmitting(false);
+      if (streamCompleteResolverRef.current) {
+        streamCompleteResolverRef.current();
+        streamCompleteResolverRef.current = null;
+      }
+    }
+  }, [selectedSession?.id, cancelRemoteStream]);
 
   // ─── Collaboration: join / leave / heartbeat / poll ──────────────────────
 
@@ -687,6 +709,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           selectedSession={selectedSession}
           isLiveRequest={isLiveRequest}
           isSessionBusy={isSessionBusy}
+          isSubmitting={isSubmitting}
           currentSessionMessages={currentSessionMessages}
           isSharingDisabled={isSharingDisabled}
           isBlueprintValid={isBlueprintValid}
@@ -694,6 +717,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           typingUsers={typingUsers}
           teamMembers={teamMembers}
           triggerExecution={triggerExecution}
+          onCancelSession={handleCancelSession}
           getSessionParticipantMembers={getSessionParticipantMembers}
         />
         <CollaborationHubRightPanel
