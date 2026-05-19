@@ -58,7 +58,7 @@ def buildDockerImage(String component) {
 
     def componentLower = component.toLowerCase().replace("-", "")
 
-    def status = sh(script: "podman build -t ${componentLower}:${VERSION} -t ${componentLower}:latest -f ${component}/${dockerfile} ${context} > ${logFile} 2>&1", returnStatus: true)
+    def status = sh(script: """podman build -t ${componentLower}:${VERSION} -t ${componentLower}:latest -f ${component}/${dockerfile} ${context} 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0; fflush() }' > ${logFile}""", returnStatus: true)
 
     if (status != 0) {
         echo("Build failed for module: ${componentLower}. Check ${logFile} for details.")
