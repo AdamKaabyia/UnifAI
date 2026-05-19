@@ -93,7 +93,7 @@ export async function updateTeam(
 }
 
 /**
- * Clean up all multi-agent data (resources, blueprints, sessions) owned by a
+ * Clean up all multi-agent data (resources, blueprints, sessions) owned by the
  * team identity, then delete the team record in Identity (Mongo).
  */
 export async function deleteTeam(teamId: string, requestedBy: string): Promise<void> {
