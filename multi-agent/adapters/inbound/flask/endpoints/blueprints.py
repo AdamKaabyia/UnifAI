@@ -10,8 +10,7 @@ from mas.blueprints.exceptions import (
     BlueprintSaveError,
     BlueprintMetadataError,
 )
-from inbound.flask.decorators import with_require_identity_authorization
-from inbound.flask.identity_helpers import authenticated_username
+from inbound.flask.decorators import with_require_identity_authorization, with_authenticated_user
 
 logger = logging.getLogger(__name__)
 
@@ -324,12 +323,13 @@ def set_metadata(blueprint_id, metadata):
         return jsonify({"error": str(e)}), 500
 
 @blueprints_bp.route("/blueprint.validate", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "blueprint_id": fields.Str(data_key="blueprintId", required=True),
     "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
 })
-def validate_blueprint(blueprint_id, user_id, timeout_seconds):
+def validate_blueprint(authenticated_user, blueprint_id, user_id, timeout_seconds):
     """Validate all elements in a saved blueprint."""
     svc = current_app.container.blueprint_service
     try:
@@ -337,7 +337,7 @@ def validate_blueprint(blueprint_id, user_id, timeout_seconds):
             blueprint_id=blueprint_id,
             user_id=user_id,
             timeout_seconds=timeout_seconds,
-            credential_user_id=authenticated_username(),
+            credential_user_id=authenticated_user,
         )
         return jsonify(result.model_dump()), 200
     except BlueprintNotFoundError as e:

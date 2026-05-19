@@ -9,10 +9,6 @@ from mas.sharing.service import ShareService
 from inbound.flask.decorators import (
     with_identity,
     with_authenticated_user,
-    _is_team_member,
-    _resolve_team_id_for_member,
-    _fetch_team_ids_from_identity,
-    _identity_service_base,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +41,7 @@ def create_share(
 ):
     """Create share invitation."""
     try:
+        teams_client = current_app.container.identity_teams_client
         sender_type_norm = str(sender_type or "user").strip().lower()
         claimed_owner = str(sender_identity_id or "").strip()
         if sender_type_norm == "team":
@@ -52,7 +49,7 @@ def create_share(
                 return jsonify(
                     {"error": "senderIdentityId (team id) is required when senderType is team"},
                 ), 400
-            if not _is_team_member(authenticated_user, claimed_owner):
+            if not teams_client.is_member(authenticated_user, claimed_owner):
                 return jsonify({"error": "Not authorized to share as this team"}), 403
             effective_sender_id = claimed_owner
         else:
@@ -182,15 +179,17 @@ def share_to_team(authenticated_user, team_name, item_kind, item_id, sender_team
     validation against the resource passes correctly.
     """
     try:
+        teams_client = current_app.container.identity_teams_client
+
         # Resolve the destination team and verify the caller is a member.
-        dest_team_id = _resolve_team_id_for_member(authenticated_user, team_name)
+        dest_team_id = teams_client.resolve_team_id(authenticated_user, team_name)
         if dest_team_id is None:
             return jsonify({"error": "Not authorized to share to this team"}), 403
 
         # Determine effective sender: team-owned resource or personal resource.
         if sender_team_id:
             sender_team_id = str(sender_team_id).strip()
-            if not _is_team_member(authenticated_user, sender_team_id):
+            if not teams_client.is_member(authenticated_user, sender_team_id):
                 return jsonify({"error": "Not authorized to share as this team"}), 403
             effective_sender_id = sender_team_id
         else:
@@ -210,19 +209,16 @@ def share_to_team(authenticated_user, team_name, item_kind, item_id, sender_team
         authorized_owner_ids = {authenticated_user}
         if sender_team_id:
             authorized_owner_ids.add(sender_team_id)
-        else:
-            base = _identity_service_base()
-            if base:
-                try:
-                    authorized_owner_ids.update(
-                        _fetch_team_ids_from_identity(authenticated_user, base)
-                    )
-                except Exception:
-                    logger.warning(
-                        "Could not fetch teams for %s during share_to_team; "
-                        "ownership pool limited to the authenticated user",
-                        authenticated_user,
-                    )
+        elif teams_client.configured:
+            team_ids = teams_client.get_team_ids(authenticated_user)
+            if team_ids:
+                authorized_owner_ids.update(team_ids)
+            else:
+                logger.warning(
+                    "Could not fetch teams for %s during share_to_team; "
+                    "ownership pool limited to the authenticated user",
+                    authenticated_user,
+                )
 
         svc = current_app.container.share_service
         result = svc.share_to_team(
@@ -321,9 +317,10 @@ def get_share(authenticated_user, share_id):
         invite = svc.get_invite(share_id)
 
         # Check authorization: sender (user or team member), or recipient
+        teams_client = current_app.container.identity_teams_client
         sender_ok = (
             invite.sender_identity.type == IdentityType.TEAM
-            and _is_team_member(authenticated_user, invite.sender_identity.id)
+            and teams_client.is_member(authenticated_user, invite.sender_identity.id)
         ) or ShareService._principal_matches_identity(invite.sender_identity, authenticated_user)
         recipient_ok = ShareService._principal_matches_identity(
             invite.recipient_identity, authenticated_user

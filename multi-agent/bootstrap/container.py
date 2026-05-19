@@ -98,10 +98,8 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.blueprint_repo = MongoBlueprintRepository(
-            mongodb_ip=cfg.mongodb_ip,
-            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.blueprint_coll,
+            coll_name=cfg.blueprint_coll
         )
 
         self.resource_repo = MongoResourceRepository(
@@ -252,11 +250,17 @@ class AppContainer(metaclass=SingletonMeta):
 
         self.directory_provider = self._build_directory_provider(cfg)
 
+        # Outbound client for Identity pod team APIs (membership checks, team-id
+        # resolution).  Centralises all ``teams.*`` HTTP calls so inbound adapters
+        # (Flask endpoints, decorators) never need to compute or store the identity
+        # base URL themselves — they resolve it through this client.
+        from outbound.identity_teams_client import IdentityTeamsClient
+        identity_base = (cfg.directory_sso_url or cfg.identity_host or "").rstrip("/")
+        self.identity_teams_client = IdentityTeamsClient(base_url=identity_base)
+
         self.share_repo = MongoShareRepository(
-            mongodb_ip=cfg.mongodb_ip,
-            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.shares_coll,
+            coll_name=cfg.shares_coll
         )
         self.share_cloner = ShareCloner(
             resources_registry=resource_registry,
@@ -275,10 +279,8 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.template_repo = MongoTemplateRepository(
-            mongodb_ip=cfg.mongodb_ip,
-            mongodb_port=cfg.mongodb_port,
             db_name=cfg.mongo_db,
-            coll_name=cfg.templates_coll,
+            coll_name=cfg.templates_coll
         )
         self.template_service = TemplateService(
             repository=self.template_repo,

@@ -40,6 +40,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiveRequest, setIsLiveRequest] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalScope] = useState<"public" | "private">("public");
   const [isSharingDisabled, setIsSharingDisabled] = useState(false);
@@ -371,6 +372,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const triggerExecution = useCallback(
     async (sessionPayload: SessionPayload) => {
       try {
+        setIsCancelled(false);
         setIsLiveRequest(true);
         setIsSubmitting(true);
 
@@ -431,6 +433,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
 
   const handleCancelSession = useCallback(async () => {
     if (!selectedSession?.id) return;
+    setIsCancelled(true);
     try {
       await cancelSession(selectedSession.id);
     } catch (error) {
@@ -723,6 +726,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
         <CollaborationHubRightPanel
           selectedSession={selectedSession}
           isLiveRequest={isLiveRequest}
+          isCancelled={isCancelled}
           isSessionBusy={isSessionBusy}
           teamName={teamName}
           chatSessionsLength={chatSessions.length}

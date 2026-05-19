@@ -9,13 +9,9 @@ re-exports them for backward-compatible imports and adds the MAS-specific
 """
 from functools import wraps
 
-from flask import current_app, jsonify, request
+from flask import current_app, jsonify, request  # noqa: F401 (current_app/request used by require_admin_access)
 
 from global_utils.flask.decorators import (  # noqa: F401  (re-exports)
-    _fetch_team_ids_from_identity,
-    _identity_service_base,
-    _is_team_member,
-    _resolve_team_id_for_member,
     with_authenticated_user,
     with_identity,
     with_require_identity_authorization,

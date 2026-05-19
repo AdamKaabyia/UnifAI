@@ -27,6 +27,29 @@ logger = logging.getLogger(__name__)
 G_IDENTITY_SESSION = "identity_session"
 G_IDENTITY_USERNAME = "identity_username"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Pluggable identity base URL provider
+#
+# Services that own an outbound IdentityTeamsClient should call
+# ``configure_identity_base(url)`` at startup instead of populating Flask's
+# ``app.config["identity_host"]`` / ``app.config["directory_sso_url"]``.
+# When configured this way, the decorators never read identity-related values
+# from Flask's app config, keeping the inbound adapter free of identity logic.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_configured_identity_base: str = ""
+
+
+def configure_identity_base(base_url: str) -> None:
+    """Register the Identity pod base URL for use by auth decorators.
+
+    Call this once at app startup (e.g. from the Flask app factory) with the
+    resolved identity host URL.  When set, ``_identity_service_base()`` uses
+    this value instead of reading from Flask's ``app.config``.
+    """
+    global _configured_identity_base
+    _configured_identity_base = (base_url or "").rstrip("/")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Team-membership cache – short TTL so revocations take effect quickly
@@ -113,9 +136,12 @@ def _resolve_team_id_for_member(username: str, team_name_or_id: str) -> str | No
 def _identity_service_base() -> str:
     """Base URL for the Identity pod (teams + directory HTTP APIs).
 
-    ``directory_sso_url`` is the legacy name; ``identity_host`` from main is
-    preferred when the former is unset.
+    Prefers the value registered via :func:`configure_identity_base`.
+    Falls back to Flask ``app.config`` (legacy — for services that have not
+    yet migrated to the outbound IdentityTeamsClient pattern).
     """
+    if _configured_identity_base:
+        return _configured_identity_base
     return (
         (current_app.config.get("directory_sso_url") or "")
         or (current_app.config.get("identity_host") or "")

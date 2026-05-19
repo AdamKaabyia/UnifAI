@@ -1,10 +1,9 @@
 from flask import Blueprint, jsonify, current_app
 
-from inbound.flask.identity_helpers import authenticated_username
 from global_utils.helpers.apiargs import from_body, from_query
 from webargs import fields
 from mas.resources.errors import ResourceInUseError
-from inbound.flask.decorators import with_require_identity_authorization
+from inbound.flask.decorators import with_require_identity_authorization, with_authenticated_user
 
 resources_bp = Blueprint("resources", __name__)
 
@@ -140,12 +139,13 @@ def get_resource_schema():
 
 
 @resources_bp.route("/resource.validate", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "resource_id": fields.Str(data_key="resourceId", required=True),
     "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
 })
-def validate_resource(resource_id, user_id, timeout_seconds):
+def validate_resource(authenticated_user, resource_id, user_id, timeout_seconds):
     """Validate a saved resource and its dependencies."""
     svc = current_app.container.resources_service
     try:
@@ -153,7 +153,7 @@ def validate_resource(resource_id, user_id, timeout_seconds):
             rid=resource_id,
             user_id=user_id,
             timeout_seconds=timeout_seconds,
-            credential_user_id=authenticated_username(),
+            credential_user_id=authenticated_user,
         )
         return jsonify(result.model_dump()), 200
     except KeyError as e:
@@ -165,13 +165,14 @@ def validate_resource(resource_id, user_id, timeout_seconds):
 
 
 @resources_bp.route("/resources.validate", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "resource_ids": fields.List(fields.Str(), data_key="resourceIds", required=True),
     "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
     "max_workers": fields.Int(data_key="maxWorkers", load_default=10),
 })
-def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
+def validate_resources(authenticated_user, resource_ids, user_id, timeout_seconds, max_workers):
     """
     Validate multiple resources in parallel.
 
@@ -207,7 +208,7 @@ def validate_resources(resource_ids, user_id, timeout_seconds, max_workers):
             user_id=user_id,
             timeout_seconds=timeout_seconds,
             max_workers=max_workers,
-            credential_user_id=authenticated_username(),
+            credential_user_id=authenticated_user,
         )
         return jsonify([r.model_dump() for r in results]), 200
     except RuntimeError as e:

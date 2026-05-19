@@ -245,6 +245,7 @@ export function CollaborationHubMainColumn({
 export interface CollaborationHubRightPanelProps {
   selectedSession: ChatSession | null;
   isLiveRequest: boolean;
+  isCancelled: boolean;
   isSessionBusy: boolean;
   teamName: string;
   chatSessionsLength: number;
@@ -257,6 +258,7 @@ export interface CollaborationHubRightPanelProps {
 export function CollaborationHubRightPanel({
   selectedSession,
   isLiveRequest,
+  isCancelled,
   isSessionBusy,
   teamName,
   chatSessionsLength,
@@ -300,6 +302,7 @@ export function CollaborationHubRightPanel({
               validationResults={blueprintValidationResults}
               isValidating={isValidatingBlueprint}
               isLiveRequest={isLiveRequest}
+              isCancelled={isCancelled}
               isGraphVisible={true}
             />
           ) : (
