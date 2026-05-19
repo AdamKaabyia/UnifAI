@@ -119,6 +119,8 @@ Execute the phases applicable to the selected mode, IN ORDER. Do not skip phases
 3. Analyze the task, explore the codebase, and produce the technical design following the skill's output format.
 4. Present the design under a `## PHASE 1: DESIGN` header.
 5. **ADR file output (optional):** Check whether the user included the `--adr` flag in their pipeline command or explicitly requested a design file. If yes, instruct the Designer to write the design to `docs/designs/<slug>-adr.md` following the ADR template at `.cursor/files/ADR - Architecture Review Template.md`. Record the file path in the pipeline state as `ADR File: <path>`. If no flag was provided, set `ADR File: NONE`.
+ - The Designer must report the generated file path in the format: "**ADR file written to:** `<path>`" so you can extract and record it.
+ - Parse the Designer's output for this marker and update the pipeline state accordingly.
 6. Update and display the pipeline state tracker.
 7. Proceed to Phase 2.
 

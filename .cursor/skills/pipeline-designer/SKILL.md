@@ -160,7 +160,7 @@ When instructed to write a file:
 2. Populate every section of the template with the design content.
 3. Write the file to `docs/designs/<slug>-adr.md`, where `<slug>` is a kebab-case short name derived from the feature name (e.g., `google-oauth-mcp-adr.md`).
 4. Leave section **7. Reviewer Feedback** empty — it will be populated by the Design Reviewer.
-5. Report the file path in your output.
+5. Report the file path in your output using this exact format: "**ADR file written to:** `<path>`"
 
 When NOT instructed to write a file, produce the design only in-chat under the `## PHASE 1: DESIGN` header.
 
