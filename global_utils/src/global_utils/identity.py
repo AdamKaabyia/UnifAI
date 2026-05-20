@@ -6,7 +6,8 @@ It can represent either a single user or a team.  All services should use
 this model instead of raw ``user_id`` strings.
 
 This file is under global_utils and not under Identity as global_utils is a package we can use
-In the future we would want to have identity as a package as well.
+In the future we would want to have the identity module as a package as well
+NOTE this file is for the identity model, and not the identity service.
 """
 from enum import Enum
 
