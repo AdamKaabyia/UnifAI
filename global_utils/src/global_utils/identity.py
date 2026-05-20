@@ -27,7 +27,6 @@ class Identity(BaseModel):
     type: IdentityType
     id: str
     display_name: str = ""
-    email: str = ""
 
     @property
     def is_user(self) -> bool:
@@ -38,10 +37,9 @@ class Identity(BaseModel):
         return self.type == IdentityType.TEAM
 
     @classmethod
-    def user(cls, user_id: str, display_name: str = "",
-             email: str = "") -> "Identity":
+    def user(cls, user_id: str, display_name: str = "") -> "Identity":
         return cls(type=IdentityType.USER, id=user_id,
-                   display_name=display_name or user_id, email=email)
+                   display_name=display_name or user_id)
 
     @classmethod
     def team(cls, team_id: str, display_name: str = "") -> "Identity":

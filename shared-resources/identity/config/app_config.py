@@ -40,8 +40,8 @@ class AppConfig(SharedConfig):
     session_cookie_samesite: str = "None"
     permanent_session_lifetime: int = 10
 
-    # MongoDB — teams collection
-    mongo_db: str = "UnifAI"
+    # MongoDB — teams collection (lives in the "users" DB alongside user approval terms)
+    mongo_db: str = "users"
     teams_coll: str = "teams"
 
     # ── LDAP / Directory settings ──────────────────────────────────────────

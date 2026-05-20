@@ -39,7 +39,7 @@ class ExecutionContext(BaseModel):
         if isinstance(values, dict) and values.get("identity") is None:
             values["identity"] = {
                 "type": "user", "id": "unknown",
-                "display_name": "unknown", "email": "",
+                "display_name": "unknown",
             }
         return values
 

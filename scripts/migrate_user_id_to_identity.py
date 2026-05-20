@@ -14,11 +14,11 @@ Forward (default):
   Wraps each ``user_id`` string into an identity subdocument. If the string matches
   a document in ``teams`` (by ``_id`` or by ``name``), the identity is team-shaped::
 
-      {"type": "team", "id": "<teams._id>", "display_name": "<teams.name>", "email": ""}
+      {"type": "team", "id": "<teams._id>", "display_name": "<teams.name>"}
 
   Otherwise it is a user identity::
 
-      {"type": "user", "id": "<user_id>", "display_name": "<user_id>", "email": ""}
+      {"type": "user", "id": "<user_id>", "display_name": "<user_id>"}
 
   Drops old ``user_id``-based indexes so new ``identity.*`` indexes don't conflict.
 
@@ -165,11 +165,11 @@ def _identity_from_user_id(
     uid = str(user_id)
     if uid in team_by_id:
         tid, tname = team_by_id[uid]
-        return {"type": "team", "id": tid, "display_name": tname, "email": ""}
+        return {"type": "team", "id": tid, "display_name": tname}
     if uid in team_by_name:
         tid, tname = team_by_name[uid]
-        return {"type": "team", "id": tid, "display_name": tname, "email": ""}
-    return {"type": "user", "id": uid, "display_name": uid, "email": ""}
+        return {"type": "team", "id": tid, "display_name": tname}
+    return {"type": "user", "id": uid, "display_name": uid}
 
 
 def _canonical_user_id_string_for_reverse(

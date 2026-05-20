@@ -33,7 +33,6 @@ def resolve_identity():
                     identity = Identity.user(
                         user.user_id,
                         display_name=user.display_name,
-                        email=user.email,
                     )
                     return jsonify(identity.model_dump(mode="json")), 200
 
