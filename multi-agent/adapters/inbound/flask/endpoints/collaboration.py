@@ -8,13 +8,12 @@ from global_utils.helpers.apiargs import from_body, from_query
 from mas.collaboration.models import ParticipantRole
 from webargs import fields
 
+from inbound.flask.decorators import with_authenticated_user
 from inbound.flask.collaboration_helpers import (
-    _acting_user_id,
     internal_error,
-    service_for_team,
-    service_for_user,
     service_or_unavailable,
     validate_session_access,
+    validate_team_membership,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,21 +24,21 @@ collaboration_bp = Blueprint("collaboration", __name__)
 # ── Join / Leave / Heartbeat ────────────────────────────────────────
 
 @collaboration_bp.route("/session.join", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
     "display_name": fields.Str(data_key="displayName", load_default=""),
     "role": fields.Str(data_key="role", load_default="collaborator"),
 })
-def join_session(session_id, display_name, role):
-    acting = _acting_user_id()
-    svc, err = service_for_user(acting)
+def join_session(authenticated_user, session_id, display_name, role):
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
         participant_role = ParticipantRole(role)
         participants = svc.join_session(
             session_id=session_id,
-            user_id=acting,
+            user_id=authenticated_user,
             display_name=display_name,
             role=participant_role,
         )
@@ -53,32 +52,32 @@ def join_session(session_id, display_name, role):
 
 
 @collaboration_bp.route("/session.leave", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
 })
-def leave_session(session_id):
-    acting = _acting_user_id()
-    svc, err = service_for_user(acting)
+def leave_session(authenticated_user, session_id):
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
-        svc.leave_session(session_id=session_id, user_id=acting)
+        svc.leave_session(session_id=session_id, user_id=authenticated_user)
         return jsonify({"success": True}), 200
     except Exception:
         return internal_error(logger, "leave_session")
 
 
 @collaboration_bp.route("/session.heartbeat", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
 })
-def heartbeat(session_id):
-    acting = _acting_user_id()
-    svc, err = service_for_user(acting)
+def heartbeat(authenticated_user, session_id):
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
-        svc.heartbeat(session_id=session_id, user_id=acting)
+        svc.heartbeat(session_id=session_id, user_id=authenticated_user)
         return jsonify({"success": True}), 200
     except Exception:
         return internal_error(logger, "heartbeat")
@@ -87,11 +86,12 @@ def heartbeat(session_id):
 # ── Queries ─────────────────────────────────────────────────────────
 
 @collaboration_bp.route("/session.participants", methods=["GET"])
+@with_authenticated_user
 @from_query({
     "session_id": fields.Str(data_key="sessionId", required=True),
 })
-def get_participants(session_id):
-    _, sess_err = validate_session_access(session_id)
+def get_participants(authenticated_user, session_id):
+    _, sess_err = validate_session_access(authenticated_user, session_id)
     if sess_err:
         return sess_err
     svc, err = service_or_unavailable()
@@ -105,11 +105,15 @@ def get_participants(session_id):
 
 
 @collaboration_bp.route("/team.sessions", methods=["GET"])
+@with_authenticated_user
 @from_query({
     "team_id": fields.Str(data_key="teamId", required=True),
 })
-def get_team_sessions(team_id):
-    svc, err = service_for_team(team_id)
+def get_team_sessions(authenticated_user, team_id):
+    team_err = validate_team_membership(authenticated_user, team_id)
+    if team_err:
+        return team_err
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
@@ -120,14 +124,14 @@ def get_team_sessions(team_id):
 
 
 @collaboration_bp.route("/user.active_sessions", methods=["GET"])
-def get_user_active_sessions():
-    acting = _acting_user_id()
-    svc, err = service_for_user(acting)
+@with_authenticated_user
+def get_user_active_sessions(authenticated_user):
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
-        session_ids = svc.get_user_active_sessions(acting)
-        return jsonify({"userId": acting, "activeSessions": session_ids}), 200
+        session_ids = svc.get_user_active_sessions(authenticated_user)
+        return jsonify({"userId": authenticated_user, "activeSessions": session_ids}), 200
     except Exception:
         return internal_error(logger, "get_user_active_sessions")
 
@@ -135,31 +139,32 @@ def get_user_active_sessions():
 # ── Typing indicators ────────────────────────────────────────────
 
 @collaboration_bp.route("/session.typing", methods=["POST"])
+@with_authenticated_user
 @from_body({
     "session_id": fields.Str(data_key="sessionId", required=True),
     "is_typing": fields.Bool(data_key="isTyping", load_default=True),
 })
-def set_typing(session_id, is_typing):
-    acting = _acting_user_id()
-    svc, err = service_for_user(acting)
+def set_typing(authenticated_user, session_id, is_typing):
+    svc, err = service_or_unavailable()
     if err:
         return err
     try:
         if is_typing:
-            svc.set_typing(session_id=session_id, user_id=acting)
+            svc.set_typing(session_id=session_id, user_id=authenticated_user)
         else:
-            svc.clear_typing(session_id=session_id, user_id=acting)
+            svc.clear_typing(session_id=session_id, user_id=authenticated_user)
         return jsonify({"success": True}), 200
     except Exception:
         return internal_error(logger, "set_typing")
 
 
 @collaboration_bp.route("/session.typing", methods=["GET"])
+@with_authenticated_user
 @from_query({
     "session_id": fields.Str(data_key="sessionId", required=True),
 })
-def get_typing(session_id):
-    _, sess_err = validate_session_access(session_id)
+def get_typing(authenticated_user, session_id):
+    _, sess_err = validate_session_access(authenticated_user, session_id)
     if sess_err:
         return sess_err
     svc, err = service_or_unavailable()
