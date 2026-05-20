@@ -9,6 +9,7 @@ from inbound.flask.endpoints.health import health_bp
 from inbound.flask.endpoints.shares import shares_bp
 from inbound.flask.endpoints.statistics import statistics_bp
 from inbound.flask.endpoints.templates import templates_bp
+from inbound.flask.endpoints.credentials import credentials_bp
 
 
 def register_all_endpoints(app):
@@ -24,6 +25,7 @@ def register_all_endpoints(app):
         {"bp": shares_bp, "parent": 'shares', "route": ''},
         {"bp": statistics_bp, "parent": 'statistics', "route": ''},
         {"bp": templates_bp, "parent": 'templates', "route": ''},
+        {"bp": credentials_bp, "parent": 'credentials', "route": ''},
     ]
 
     # register all other blueprints in the app

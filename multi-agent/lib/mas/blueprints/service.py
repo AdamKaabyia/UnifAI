@@ -24,12 +24,18 @@ class BlueprintService:
         resolver: BlueprintResolver,
         validation_service: ElementValidationService = None,
         card_service: ElementCardService = None,
+        auth_service=None,
     ):
         self._repo = repo
         self._resolver = resolver
         self._validation_service = validation_service
         self._card_service = card_service
+        self._auth_service = auth_service
         self._config_collector = BlueprintConfigCollector()
+
+    def set_auth_service(self, auth_service) -> None:
+        """Late-bind the auth service (created after BlueprintService in the container)."""
+        self._auth_service = auth_service
 
     # ────────── Write ──────────
     def save_draft(self, *, user_id: str, draft_dict: dict, metadata: Optional[Dict[str, Any]] = None) -> str:
@@ -172,6 +178,7 @@ class BlueprintService:
     def validate_blueprint(
         self,
         blueprint_id: str,
+        user_id: str = "",
         timeout_seconds: float = 10.0,
     ) -> BlueprintValidationResult:
         """
@@ -179,6 +186,7 @@ class BlueprintService:
         
         Args:
             blueprint_id: Blueprint ID to validate
+            user_id: Logged-in user (for auth-aware validators)
             timeout_seconds: Timeout for network checks
             
         Returns:
@@ -190,11 +198,12 @@ class BlueprintService:
         """
         self._ensure_validation_service()
         spec = self.load_resolved(blueprint_id)
-        return self._validate_spec(spec, blueprint_id, timeout_seconds)
+        return self._validate_spec(spec, blueprint_id, timeout_seconds, user_id=user_id)
 
     def validate_draft(
         self,
         draft_dict: dict,
+        user_id: str = "",
         timeout_seconds: float = 10.0,
     ) -> BlueprintValidationResult:
         """
@@ -205,7 +214,7 @@ class BlueprintService:
         """
         self._ensure_validation_service()
         spec = self.resolve_draft_dict(draft_dict)
-        return self._validate_spec(spec, "draft", timeout_seconds)
+        return self._validate_spec(spec, "draft", timeout_seconds, user_id=user_id)
 
     # ────────── Card Building ──────────
     def get_blueprint_cards(
@@ -246,10 +255,15 @@ class BlueprintService:
         spec: BlueprintSpec,
         blueprint_id: str,
         timeout_seconds: float,
+        user_id: str = "",
     ) -> BlueprintValidationResult:
         """Collect configs from spec, validate, and build result."""
         configs = self._config_collector.collect(spec)
-        context = ValidationContext(timeout_seconds=timeout_seconds)
+        context = ValidationContext(
+            timeout_seconds=timeout_seconds,
+            user_id=user_id,
+            auth_service=self._auth_service,
+        )
         results = self._validation_service.validate_ordered(configs, context)
         return BlueprintValidationResult(
             blueprint_id=blueprint_id,

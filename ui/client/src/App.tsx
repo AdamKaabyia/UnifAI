@@ -1,4 +1,5 @@
-import { Route, Switch, useLocation, useRoute } from "wouter";
+import React, { useEffect } from "react";
+import { Route, Switch, useRoute } from "wouter";
 import RagOverview from "@/pages/RagOverview";
 import AgenticOverview from "@/pages/AgenticOverview";
 import Configuration from "@/pages/Configuration";
@@ -10,13 +11,13 @@ import AgenticTemplates from "@/pages/AgenticTemplates";
 import GetToKnow from "@/pages/GetToKnow";
 import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import Login from "@/pages/Login";
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SharedProvider } from '@/contexts/SharedContext';
 import DocumentsPage from "./features/docs/DocumentsPage";
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AgenticAIProvider } from '@/contexts/AgenticAIContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import TermsApproval from '@/components/auth/TermsApproval';
@@ -69,6 +70,48 @@ function AppRoutes() {
   );
 }
 
+/** /login outside ProtectedRoute; use full navigation (no wouter setLocation) to match app routing convention. */
+function LoginRouteContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      window.location.replace('/');
+    }
+  }, [isAuthenticated, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0D1117]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
+
+  return <Login />;
+}
+
+function AppContent() {
+  return (
+    <Switch>
+      <Route path="/login">
+        <LoginRouteContent />
+      </Route>
+      <Route>
+        <ProtectedRoute>
+          <TermsApproval>
+            <AppRoutes />
+          </TermsApproval>
+        </ProtectedRoute>
+      </Route>
+    </Switch>
+  );
+}
+
 function App() {
   // Set document title
   useEffect(() => {
@@ -81,11 +124,7 @@ function App() {
         <SharedProvider>
           <ProjectProvider>
             <NotificationProvider>
-              <ProtectedRoute>
-                <TermsApproval>
-                  <AppRoutes />
-                </TermsApproval>
-              </ProtectedRoute>
+              <AppContent />
             </NotificationProvider>
           </ProjectProvider>
         </SharedProvider>
@@ -95,4 +134,4 @@ function App() {
 }
 
 export default App;
-              
+

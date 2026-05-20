@@ -3,6 +3,7 @@ CLI bootstrap — build the API client and resolve the user identity.
 
 Configuration lives in ``unifai_cli.config.app_config``.
 API methods live in ``unifai_cli.api``.
+Auth session lives in ``unifai_cli.auth``.
 """
 from __future__ import annotations
 
@@ -29,9 +30,13 @@ def build_client(mas_url: Optional[str] = None) -> MASClient:
 
 def resolve_user_id(user_option: Optional[str] = None) -> str:
     """
-    Resolve user ID from CLI flag, env var, or interactive prompt.
+    Resolve the authenticated user ID.
 
-    Priority: explicit flag > UNIFAI_USER env var > interactive prompt.
+    Priority:
+      1. Explicit --user flag (CI / scripting override)
+      2. UNIFAI_USER env var (CI / scripting override)
+      3. Local SSO session (~/.unifai/session.json, 10-hour TTL)
+      4. Browser-based SSO login (triggers automatically when no session exists)
     """
     if user_option:
         return user_option
@@ -40,13 +45,6 @@ def resolve_user_id(user_option: Optional[str] = None) -> str:
     if env_user:
         return env_user
 
-    import questionary
-    user_id = questionary.text(
-        "Enter your user ID:",
-        validate=lambda val: len(val.strip()) > 0 or "User ID cannot be empty",
-    ).ask()
-
-    if user_id is None:
-        raise SystemExit(0)
-
-    return user_id.strip()
+    from unifai_cli.auth.flow import ensure_authenticated
+    user_info = ensure_authenticated()
+    return user_info["username"]

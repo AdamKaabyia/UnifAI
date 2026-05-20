@@ -6,7 +6,7 @@ properties([
         string(name: "VERSION", defaultValue: new Date().format('yyyy.MM.dd'), description: "Image version tag"),
         
         // 🛠️ Image Build Parameters
-        booleanParam(name: 'build_sso_image', defaultValue: false, description: 'Create image for sso-backend and sso-nginx'),
+        booleanParam(name: 'build_identity_image', defaultValue: false, description: 'Create image for identity'),
         booleanParam(name: 'build_gui', defaultValue: false, description: 'Create image for UI'),
         booleanParam(name: 'build_rag_backend', defaultValue: false, description: 'Create image for rag backend'),
         booleanParam(name: 'build_multiagent_backend', defaultValue: false, description: 'Create image for multiagent backend'),
@@ -124,7 +124,7 @@ pipeline {
                     submoduleCfg: [],
                     userRemoteConfigs: [[
                         credentialsId: "${buildParams.CredentialsId}",
-                        url: "https://${buildParams.MainRepoURL}/${buildParams.MainRepoProject}.git"
+                        url: "git@${buildParams.MainRepoURL}:${buildParams.MainRepoProject}.git"
                         ]]
                     ])
                 }
@@ -147,11 +147,11 @@ pipeline {
 
         stage('Build and Push Images') {
             parallel {
-                stage('build_sso_image') {
-                    when { expression { params.build_sso_image } }
+                stage('build_identity_image') {
+                    when { expression { params.build_identity_image } }
                     steps {
                         script {
-                            def component = "shared-resources/sso-backend"
+                            def component = "shared-resources/identity"
                             def module = ""
                             dir("${buildParams.DevRoot}/${params.BRANCH}/") {
                                 cleanWorkspace(component)
@@ -245,7 +245,7 @@ pipeline {
             steps {
                 script {
                     def modules = []
-                    if (params.build_sso_image) modules << 'sso'
+                    if (params.build_identity_image) modules << 'identity'
                     if (params.build_rag_backend) modules << 'rag'
                     if (params.build_multiagent_backend) modules << 'multiagent'
                     if (params.build_backend) modules << 'backend'

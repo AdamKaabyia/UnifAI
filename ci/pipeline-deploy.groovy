@@ -12,8 +12,8 @@ properties([
         string(name: "RAG_VERSION", defaultValue: "", description: "Image tag for rag"),
         string(name: "MA_VERSION", defaultValue: "", description: "Image tag for multi-agent"),
         string(name: "GUI_VERSION", defaultValue: "", description: "Image tag for UI"),
-        string(name: "SSO_VERSION", defaultValue: "", description: "Image tag for SSO"),
-        string(name: "MODULES_TO_DEPLOY", defaultValue: "", description: "Comma-separated list of modules to update (e.g. rag,multiagent,backend,ui,sso)"),
+        string(name: "IDENTITY_VERSION", defaultValue: "", description: "Image tag for Identity"),
+        string(name: "MODULES_TO_DEPLOY", defaultValue: "", description: "Comma-separated list of modules to update (e.g. rag,multiagent,backend,ui,identity)"),
         booleanParam(name: 'debug_mode', defaultValue: false, description: 'debug the pods'),
     ])
 ])
@@ -60,7 +60,9 @@ def updateGlobalConfigYaml(String filePath) {
 
     if (values?.env) {
         values.env.FRONTEND_URL = "https://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
-        values.env.SSO_BACKEND_HOST = "https://unifai-sso-backend-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
+        // will be used once SSO team adds the new routes to the configuration
+        values.env.IDENTITY_HOST = "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
+        // values.env.IDENTITY_HOST = "https://unifai-sso-backend-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
     }
     writeYaml file: filePath, data: values, overwrite: true
     echo "📄 successfully Updated routes values in ${filePath}:\n" + writeYaml(returnText: true, data: values)
@@ -119,17 +121,22 @@ def updateValuesYaml(String filePath , String version) {
 
 def updateDeployerEnv() {
     echo "🔄 updating deployer env with new values"
-    def sso_env_file = null
+    def identity_env_file = null
+    def redis_env_file = null
+    def multiagent_env_file = null
     if (params.deploy_location == 'PRODUCTION') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
-        sso_env_file = "./UnifAI-secrets/production/.env_sso"
+        identity_env_file = "./UnifAI-secrets/production/.env_identity"
+        redis_env_file = "./UnifAI-secrets/production/.env_redis"
+        multiagent_env_file = "./UnifAI-secrets/production/.env_multi_agent"
     } else if (params.deploy_location == 'STAGING') {
         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
-        sso_env_file = "./UnifAI-secrets/staging/.env_sso"
+        identity_env_file = "./UnifAI-secrets/staging/.env_identity"
+        redis_env_file = "./UnifAI-secrets/staging/.env_redis"
+        multiagent_env_file = "./UnifAI-secrets/staging/.env_multi_agent"
     }
-    echo("sso env file: ${sso_env_file}")
     echo("✅ Deployer env updated successfully")
-    return sso_env_file
+    return [identity_env_file, redis_env_file, multiagent_env_file]
 }
 
 
@@ -155,7 +162,7 @@ def deployModules(module){
 def deleteRunningApplication(){
     echo("Removing running UnifAI application")
     cleanOldDataflow()
-    def charts = ["backend", "rag", "multiagent", "ui", "sso", "shared-resources"]
+    def charts = ["backend", "rag", "multiagent", "ui", "identity", "shared-resources"]
 
     charts.each { chart ->
         sh("podman exec -t helmfile bash -c 'helmfile destroy -f ${chart}.yaml.gotmpl --deleteWait'")
@@ -293,9 +300,9 @@ pipeline {
                             echo("Creating helm deployment pod")
                             sh("oc login --token=${token} --server=${ClusterAddress}")
                             sh("oc project ${NameSpace}")
-                            def sso_env_file = updateDeployerEnv()
+                            def (identity_env_file, redis_env_file, multiagent_env_file) = updateDeployerEnv()
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=${sso_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
+                            sh("podman run --replace -dt --env-file=${identity_env_file} --env-file=${redis_env_file} --env-file=${multiagent_env_file} --env-file=./UnifAI-secrets/.env --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
                             
                             def modules = params.MODULES_TO_DEPLOY.tokenize(',')
                             if(params.deploy_type == 'FRESH_INSTALL') {
@@ -310,11 +317,11 @@ pipeline {
                                         deployModules('shared-resources')
                                         break
 
-                                    case 'sso':
-                                        def version = params.SSO_VERSION?.trim() ?: params.VERSION?.trim()
-                                        updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/shared-resources/sso/", version)
-                                        updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/sso-values.yaml", version)
-                                        deployModules('sso')
+                                    case 'identity':
+                                        def version = params.IDENTITY_VERSION?.trim() ?: params.VERSION?.trim()
+                                        updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/shared-resources/identity/", version)
+                                        updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/identity-values.yaml", version)
+                                        deployModules('identity')
                                         break
 
                                     case 'backend':
