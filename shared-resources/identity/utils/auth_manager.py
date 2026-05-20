@@ -102,18 +102,10 @@ class AuthManager:
             logger.info("Connected to Redis")
 
     def _setup_session_configuration(self, app):
-        backend_env = (config.get("backend_env") or "development").lower()
-        if backend_env == "development":
-            # SameSite=None requires Secure; local UI/Identity are HTTP (e.g. :5000 / :13456).
-            cookie_secure = False
-            cookie_samesite = "Lax"
-        else:
-            cookie_secure = config.session_cookie_secure
-            cookie_samesite = config.session_cookie_samesite
         app.config.update({
-            'SESSION_COOKIE_SECURE': cookie_secure,
+            'SESSION_COOKIE_SECURE': config.session_cookie_secure,
             'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,
-            'SESSION_COOKIE_SAMESITE': cookie_samesite,
+            'SESSION_COOKIE_SAMESITE': config.session_cookie_samesite,
             'PERMANENT_SESSION_LIFETIME': timedelta(hours=config.permanent_session_lifetime)
         })
 
