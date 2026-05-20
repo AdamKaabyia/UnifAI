@@ -7,7 +7,7 @@ import { useView } from "@/contexts/ViewContext";
 
 import ExecutionTab from "@/components/agentic-ai/ExecutionTab";
 import CollaborationHubView from "@/components/agentic-ai/CollaborationHubView";
-import { buildMemberDisplay } from "@/utils/memberDisplay";
+import { useTeamMembers } from "@/hooks/use-team-members";
 import { StreamingDataProvider } from "@/components/agentic-ai/StreamingDataContext";
 
 export default function AgenticChats() {
@@ -19,27 +19,7 @@ export default function AgenticChats() {
     return params.get("runId");
   }, []);
 
-  const teamMembers = useMemo(() => {
-    if (!selectedTeam?.members) return [];
-    const seen = new Set<string>();
-    const result: ReturnType<typeof buildMemberDisplay>[] = [];
-    for (const m of selectedTeam.members) {
-      if (m.type === "user") {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          result.push(buildMemberDisplay(m.id, result.length));
-        }
-      } else if (m.type === "group" && m.group_members) {
-        for (const uid of m.group_members) {
-          if (!seen.has(uid)) {
-            seen.add(uid);
-            result.push(buildMemberDisplay(uid, result.length));
-          }
-        }
-      }
-    }
-    return result;
-  }, [selectedTeam?.members]);
+  const teamMembers = useTeamMembers();
 
   return (
     <>

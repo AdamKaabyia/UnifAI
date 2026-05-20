@@ -11,6 +11,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "@/http/axiosAgentConfig";
 import { cancelSession } from "@/api/sessions";
+import {
+  joinSession as joinSessionApi,
+  leaveSession as leaveSessionApi,
+  sendHeartbeat as sendHeartbeatApi,
+  fetchParticipants as fetchParticipantsApi,
+  fetchTypingUsers as fetchTypingUsersApi,
+} from "@/api/collaboration";
 import { useStreamingData } from "./StreamingDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSessionManagement } from "@/hooks/use-session-management";
@@ -168,12 +175,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const joinSession = useCallback(async (sessionId: string) => {
     const username = user?.username || "default";
     try {
-      await axios.post("/collaboration/session.join", {
-        sessionId,
-        userId: username,
-        displayName: user?.name || username,
-        role: "collaborator",
-      });
+      await joinSessionApi(sessionId, username, user?.name || username);
       joinedSessionRef.current = sessionId;
     } catch { /* degrade gracefully */ }
   }, [user]);
@@ -181,7 +183,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const leaveSession = useCallback(async (sessionId: string) => {
     const username = user?.username || "default";
     try {
-      await axios.post("/collaboration/session.leave", { sessionId, userId: username });
+      await leaveSessionApi(sessionId, username);
     } catch { /* best-effort */ }
     if (joinedSessionRef.current === sessionId) joinedSessionRef.current = null;
   }, [user]);
@@ -190,21 +192,14 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     const sid = joinedSessionRef.current;
     if (!sid) return;
     try {
-      await axios.post("/collaboration/session.heartbeat", {
-        sessionId: sid,
-        userId: user?.username || "default",
-      });
+      await sendHeartbeatApi(sid, user?.username || "default");
     } catch { /* best-effort */ }
   }, [user]);
 
   // ── Participant tracking ───────────────────────────────────────────────
   const fetchParticipants = useCallback(async (sessionId: string) => {
     try {
-      const res = await axios.get(
-        `/collaboration/session.participants?sessionId=${sessionId}`,
-      );
-      const participants: string[] =
-        (res.data?.participants || []).map((p: any) => p.user_id);
+      const participants = await fetchParticipantsApi(sessionId);
       setSessionParticipants(prev => {
         const existing = prev[sessionId];
         if (
@@ -265,13 +260,9 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
     await fetchParticipants(session.id);
 
     try {
-      const typingRes = await axios.get(
-        `/collaboration/session.typing?sessionId=${session.id}`,
-      );
+      const allTyping = await fetchTypingUsersApi(session.id);
       const currentUser = user?.username || "default";
-      setTypingUsers(
-        (typingRes.data?.typingUsers || []).filter((u: string) => u !== currentUser),
-      );
+      setTypingUsers(allTyping.filter((u: string) => u !== currentUser));
     } catch { /* ignore */ }
   }, [loadSessionMessages, fetchParticipants, user?.username, hub.contextUserId, hub.identityType]);
 

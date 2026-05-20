@@ -20,7 +20,7 @@ import { ItemValidationResult } from "./FieldValidation";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 import { useAuth } from "@/contexts/AuthContext";
-import { useView } from "@/contexts/ViewContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import { useToast } from "@/hooks/use-toast";
 import {
   acquireTeamEditLock,
@@ -67,9 +67,8 @@ export const ElementForm: React.FC<ElementFormProps> = ({
 
   const { fetchResourcesForCategory } = useWorkspaceData();
   const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
+  const { isTeam: isTeamWorkspace, userId: teamId } = useWorkspaceIdentity();
   const { toast } = useToast();
-  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
   const needsResourceEditLock =
     isOpen && isTeamWorkspace && !!editingElement?.rid && !!user?.username;
   const [resourceEditLockReady, setResourceEditLockReady] = useState(true);
@@ -81,7 +80,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
       setResourceLockHeld(false);
       return;
     }
-    if (!needsResourceEditLock || !selectedTeam || !user?.username) {
+    if (!needsResourceEditLock || !user?.username) {
       setResourceEditLockReady(true);
       setResourceLockHeld(false);
       return;
@@ -91,7 +90,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({
     setResourceLockHeld(false);
     let cancelled = false;
     let lockTaken = false;
-    const teamId = selectedTeam.id;
     const rid = editingElement!.rid;
     const displayName = user.name?.trim() || user.username;
 
@@ -143,7 +141,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   }, [
     isOpen,
     needsResourceEditLock,
-    selectedTeam?.id,
+    teamId,
     editingElement?.rid,
     user?.username,
     user?.name,
@@ -152,10 +150,9 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   ]);
 
   useEffect(() => {
-    if (!resourceLockHeld || !needsResourceEditLock || !selectedTeam || !user?.username || !editingElement?.rid) {
+    if (!resourceLockHeld || !needsResourceEditLock || !user?.username || !editingElement?.rid) {
       return;
     }
-    const teamId = selectedTeam.id;
     const rid = editingElement.rid;
     const displayName = user.name?.trim() || user.username;
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -186,7 +183,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({
   }, [
     resourceLockHeld,
     needsResourceEditLock,
-    selectedTeam?.id,
+    teamId,
     editingElement?.rid,
     user?.username,
     user?.name,

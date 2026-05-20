@@ -25,7 +25,7 @@ import GraphDisplay from "@/components/agentic-ai/graphs/GraphDisplay";
 import { useAgenticData } from "@/hooks/use-agentic-data";
 import { useWorkflowCalculations } from "@/hooks/use-workflow-calculations";
 import { useResourceDistribution } from "@/hooks/use-resource-distribution";
-import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
+import { useTeamMembers } from "@/hooks/use-team-members";
 import { CollabAvatar } from "@/components/shared/CollabAvatar";
 
 // ─── Rank visuals ────────────────────────────────────────────────────────────
@@ -96,27 +96,7 @@ export default function AgenticOverview() {
     return getEffectiveMemberCount(selectedTeam.members, selectedTeam.effective_member_count);
   }, [selectedTeam?.members, selectedTeam?.effective_member_count]);
 
-  const teamMembers = useMemo<MemberDisplay[]>(() => {
-    if (!selectedTeam?.members) return [];
-    const seen = new Set<string>();
-    const result: MemberDisplay[] = [];
-    for (const m of selectedTeam.members) {
-      if (m.type === "user") {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          result.push(buildMemberDisplay(m.id, result.length));
-        }
-      } else if (m.type === "group" && m.group_members) {
-        for (const uid of m.group_members) {
-          if (!seen.has(uid)) {
-            seen.add(uid);
-            result.push(buildMemberDisplay(uid, result.length));
-          }
-        }
-      }
-    }
-    return result;
-  }, [selectedTeam?.members]);
+  const teamMembers = useTeamMembers();
 
   const activeBlueprints = useMemo(() => {
     if (!activeSessions.data?.length || !workflows.data?.length) return [];

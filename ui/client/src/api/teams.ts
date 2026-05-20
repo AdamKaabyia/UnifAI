@@ -93,15 +93,30 @@ export async function updateTeam(
 }
 
 /**
- * Clean up all multi-agent data (resources, blueprints, sessions) owned by the
- * team identity, then delete the team record in Identity (Mongo).
+ * Delete the team record first, then clean up multi-agent data.
+ *
+ * Order matters: if the team delete (auth-guarded, may fail) is done first,
+ * a failure leaves all data intact.  If we cleaned up workspace data first
+ * and the team delete then failed, the user would see an empty team with
+ * all resources/blueprints/sessions already gone and no way to recover.
+ *
+ * If cleanup fails after the team is already deleted, the orphaned agent
+ * data is invisible (no team to access it through) and can be swept by a
+ * background job.
  */
 export async function deleteTeam(teamId: string, requestedBy: string): Promise<void> {
-  await agentApi.delete('/workspace/workspace.cleanup', {
-    data: { identityType: 'team', identityId: teamId },
-  });
-
   await identityApi.delete('/teams/team.delete', {
     params: { teamId, requestedBy },
   });
+
+  try {
+    await agentApi.delete('/workspace/workspace.cleanup', {
+      data: { identityType: 'team', identityId: teamId },
+    });
+  } catch (err) {
+    console.error(
+      `Team ${teamId} deleted but workspace cleanup failed. Orphaned agent data may remain.`,
+      err,
+    );
+  }
 }

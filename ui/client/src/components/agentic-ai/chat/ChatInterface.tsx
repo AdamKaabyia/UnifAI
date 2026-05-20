@@ -158,13 +158,21 @@ export default function ChatInterface({
     activeUserMessageIdRef.current = null;
   }, []);
 
-  // Typing indicator: debounced POST to collaboration endpoint
+  // Typing indicator: debounced POST to collaboration endpoint.
+  // Leading debounce prevents firing on every keystroke; the "start typing"
+  // signal is sent at most once per TYPING_DEBOUNCE_MS window.
+  const TYPING_DEBOUNCE_MS = 2000;
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTypingSentRef = useRef(0);
   const sendTypingSignal = useCallback(() => {
     if (!collaborationMode || !runId) return;
     const username = authUser?.username || "default";
-    sendTypingSignalApi(runId, username, true).catch(() => {});
-    // Auto-clear after 4s if no new keystroke
+    const now = Date.now();
+    if (now - lastTypingSentRef.current >= TYPING_DEBOUNCE_MS) {
+      lastTypingSentRef.current = now;
+      sendTypingSignalApi(runId, username, true).catch(() => {});
+    }
+    // Reset the auto-clear timer on every keystroke
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => {
       sendTypingSignalApi(runId, username, false).catch(() => {});
@@ -842,6 +850,11 @@ export default function ChatInterface({
           resetTextareaHeight();
           textareaRef.current?.focus();
         }, 0);
+      } else {
+        toast({
+          title: "Please wait",
+          description: "AI is still processing. Your message will be sent once it finishes.",
+        });
       }
       return;
     }

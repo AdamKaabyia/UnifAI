@@ -17,6 +17,7 @@ import { useStreamingData } from "@/components/agentic-ai/StreamingDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
 import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
+import { useToast } from "@/hooks/use-toast";
 import { useBlueprintValidation } from "@/hooks/use-blueprint-validation";
 import { useSessionManagement } from "@/hooks/use-session-management";
 import { useSessionStream } from "@/hooks/use-session-stream";
@@ -167,6 +168,7 @@ export function useSessionHub({
   const { selectedTeam } = useView();
   const { isTeam, userId: contextUserId, displayName, identityType } =
     useWorkspaceIdentity();
+  const { toast } = useToast();
 
   // Refs
   const sessionSelectRequestId = useRef(0);
@@ -456,10 +458,15 @@ export function useSessionHub({
       setChatToDelete(null);
     } catch (err) {
       console.error("Error deleting chat session:", err);
+      toast({
+        title: "Delete failed",
+        description: "Could not delete the chat session. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsDeleting(false);
     }
-  }, [chatToDelete, selectedSession?.id]);
+  }, [chatToDelete, selectedSession?.id, toast]);
 
   const cancelDeleteChat = useCallback(() => {
     setShowDeleteModal(false);
