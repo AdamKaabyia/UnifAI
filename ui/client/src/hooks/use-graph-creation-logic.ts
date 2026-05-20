@@ -11,6 +11,7 @@ import { getCategoryDisplay } from "@/components/shared/helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import { deriveThemeColors } from "@/lib/colorUtils";
 import axios from "../http/axiosAgentConfig";
 import * as yaml from "js-yaml";
@@ -130,11 +131,8 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   const [blueprintEditLockHeld, setBlueprintEditLockHeld] = useState(false);
 
   const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const USER_ID = isTeam ? selectedTeam!.id : user?.username;
-  const USER_DISPLAY_NAME = isTeam ? selectedTeam!.name : user?.name || "User";
-  const identityType = isTeam ? "team" : "user";
+  const { selectedTeam } = useView();
+  const { isTeam, userId: USER_ID, displayName: USER_DISPLAY_NAME, identityType } = useWorkspaceIdentity();
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)
   const deleteNodeRef = useRef<(id: string) => void>(() => {});

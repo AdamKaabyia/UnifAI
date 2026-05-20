@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import axios from '@/http/axiosAgentConfig';
-import { useAuth } from './AuthContext';
-import { useView } from './ViewContext';
+import { useWorkspaceIdentity } from '@/hooks/use-workspace-identity';
 import { catalogService } from '@/api/catalog';
 import { ElementValidationResult, CachedValidationResult, BlueprintValidationResult, BlueprintValidationRequest, CachedBlueprintValidationResult } from '@/types/validation';
 import { validateBlueprint as validateBlueprintApi } from '@/api/blueprints';
@@ -73,20 +72,12 @@ export const AgenticAIProvider: React.FC<AgenticAIProviderProps> = ({ children }
   const [error, setError] = useState<string | null>(null);
   /** Bumped when workspace or credential user changes so consumers re-run validateResources. */
   const [validationRevision, setValidationRevision] = useState(0);
-  const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
-  /** Owner id for resource/blueprint APIs: team id in team view, else username. */
-  const USER_ID = isTeamWorkspace ? selectedTeam!.id : (user?.username || "default");
-  /**
-   * Mongo auth keys are always per logged-in user. Team workspaces list resources under
-   * USER_ID (team id), but validators that call AuthService must use this id or OAuth
-   * probes look up (teamId, issuer) and get AUTH_EXPIRED while Configure still shows
-   * the user's tokens.
-   */
-  const CREDENTIAL_USER_ID = user?.username || "default";
-  const WORKSPACE_IDENTITY_TYPE = isTeamWorkspace ? "team" : "user";
-  const WORKSPACE_DISPLAY_NAME = isTeamWorkspace ? (selectedTeam?.name || "") : "";
+  const {
+    userId: USER_ID,
+    displayName: WORKSPACE_DISPLAY_NAME,
+    identityType: WORKSPACE_IDENTITY_TYPE,
+    credentialUserId: CREDENTIAL_USER_ID,
+  } = useWorkspaceIdentity();
   
   // Use ref to access latest cache without causing re-renders in callbacks
   const validationCacheRef = useRef(validationCache);
@@ -703,7 +694,7 @@ return String(ref);
   // Results were keyed only by rid; team view cached INVALID (wrong userId) until we
   // cleared. Also invalidate when switching team or user so ElementGrid re-validates.
   useEffect(() => {
-    const key = `${USER_ID}|${user?.username || ""}`;
+    const key = `${USER_ID}|${CREDENTIAL_USER_ID}`;
     if (prevWorkspaceCredentialKeyRef.current === null) {
       prevWorkspaceCredentialKeyRef.current = key;
       return;
@@ -716,7 +707,7 @@ return String(ref);
     setValidationStatusMap(new Map());
     setDependencyParentMap(new Map());
     setValidationRevision((r) => r + 1);
-  }, [USER_ID, user?.username]);
+  }, [USER_ID, CREDENTIAL_USER_ID]);
 
   // Fetch resources when user changes or component mounts
   useEffect(() => {

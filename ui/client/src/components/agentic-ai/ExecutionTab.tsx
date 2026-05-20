@@ -22,6 +22,7 @@ import { fetchResolvedBlueprint } from '@/api/blueprints'
 import { useStreamingData } from './StreamingDataContext'
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import WorkflowsPanel from "./WorkflowsPanel";
 import {
   Dialog,
@@ -127,11 +128,8 @@ export default function ExecutionTab({
 
   const { nodeListRef, forceUpdate, clearStream } = useStreamingData();
   const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const displayName = isTeam ? selectedTeam!.name : (user?.name || "User");
-  const identityType = isTeam ? "team" : "user";
+  const { selectedTeam } = useView();
+  const { isTeam, userId: contextUserId, displayName, identityType } = useWorkspaceIdentity();
   
   // Ref to hold the updateNodeList callback for use in stream subscription
   const updateNodeListRef = useRef<((chunkData: any) => void) | null>(null);

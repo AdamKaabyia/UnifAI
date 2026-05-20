@@ -5,6 +5,7 @@ import { cancelSession } from "@/api/sessions";
 import { useStreamingData } from "./StreamingDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import { ChatSession, ChatMessage, ChatSessionData } from "@/types/session";
 import { transformSessionData, sortSessionsByTimestamp } from "@/utils/sessionHelpers";
 import { useSessionManagement } from "@/hooks/use-session-management";
@@ -65,11 +66,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
 
   const { nodeListRef, clearStream } = useStreamingData();
   const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const userDisplayName = isTeam ? selectedTeam!.name : (user?.name || "User");
-  const identityType = isTeam ? "team" : "user";
+  const { selectedTeam } = useView();
+  const { isTeam, userId: contextUserId, displayName: userDisplayName, identityType } = useWorkspaceIdentity();
 
   const sessionSelectRequestId = useRef(0);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);

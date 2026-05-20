@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion } from "framer-motion";
 import { Trash2, Users, Pencil, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/contexts/AuthContext";
 import { useView } from "@/contexts/ViewContext";
 import { useShared } from "@/contexts/SharedContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -72,13 +72,9 @@ export default function WorkflowsPanel({
   
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
+  const { selectedTeam } = useView();
   const { openShareForItem } = useShared();
-  
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const identityType = isTeam ? "team" : "user";
+  const { isTeam, userId: contextUserId, identityType } = useWorkspaceIdentity();
   const workspaceScopeRef = useRef({ contextUserId, identityType });
   workspaceScopeRef.current = { contextUserId, identityType };
   

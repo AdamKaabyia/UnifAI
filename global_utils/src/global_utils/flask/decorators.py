@@ -279,6 +279,52 @@ def with_authenticated_user(f):
     return decorated
 
 
+def _parse_identity_params(
+    kwargs: dict,
+) -> tuple[str, str, str]:
+    """Extract ``(user_id, identity_type, display_name)`` from the request.
+
+    Reads from query parameters first, then JSON body, then *kwargs*
+    (injected by ``@from_body`` / ``@from_query``).  Used by both
+    ``with_identity`` and ``with_require_identity_authorization`` to avoid
+    duplicating the same extraction logic.
+    """
+    body = request.get_json(silent=True) or {}
+    user_id = (
+        request.args.get("userId")
+        or body.get("userId")
+        or kwargs.get("userId")
+        or kwargs.get("user_id")
+        or ""
+    )
+    identity_type = (
+        request.args.get("identityType")
+        or body.get("identityType")
+        or kwargs.get("identityType")
+        or kwargs.get("identity_type")
+        or "user"
+    )
+    display_name = (
+        request.args.get("displayName")
+        or body.get("displayName")
+        or kwargs.get("displayName")
+        or kwargs.get("display_name")
+        or ""
+    )
+    return str(user_id).strip(), str(identity_type).strip().lower() or "user", str(display_name)
+
+
+def _resolve_identity_or_error(kwargs: dict) -> tuple[Identity | None, tuple | None]:
+    """Parse identity params and resolve, returning ``(identity, None)`` or ``(None, error_response)``."""
+    user_id, identity_type, display_name = _parse_identity_params(kwargs)
+    if not user_id:
+        return None, (jsonify({"error": "userId is required"}), 400)
+    try:
+        return resolve_identity(user_id, identity_type, display_name), None
+    except ValueError as e:
+        return None, (jsonify({"error": str(e)}), 400)
+
+
 def with_identity(f):
     """Decorator that resolves ``Identity`` from the incoming request.
 
@@ -298,28 +344,10 @@ def with_identity(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        body = request.get_json(silent=True) or {}
-
-        user_id = request.args.get("userId") or body.get("userId")
-        identity_type = (
-            request.args.get("identityType")
-            or body.get("identityType")
-            or "user"
-        )
-        display_name = (
-            request.args.get("displayName")
-            or body.get("displayName")
-            or ""
-        )
-
-        if not user_id:
-            return jsonify({"error": "userId is required"}), 400
-
-        try:
-            kwargs["identity"] = resolve_identity(user_id, identity_type, display_name)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
-
+        identity, err = _resolve_identity_or_error(kwargs)
+        if err:
+            return err
+        kwargs["identity"] = identity
         return f(*args, **kwargs)
     return decorated
 
@@ -354,7 +382,7 @@ def with_require_identity_authorization(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        body = request.get_json(silent=True) or {}
+        user_id, identity_type_raw, _ = _parse_identity_params(kwargs)
 
         # ── Authorization check ───────────────────────────────────────
         authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
@@ -365,50 +393,23 @@ def with_require_identity_authorization(f):
                     "error_type": "AUTHENTICATION_REQUIRED",
                 }), 401
         else:
-            identity_type_raw = str(
-                kwargs.get("identity_type")
-                or request.args.get("identityType")
-                or body.get("identityType")
-                or "user"
-            ).strip().lower() or "user"
-
-            claimed_id = str(
-                kwargs.get("user_id")
-                or kwargs.get("userId")
-                or request.args.get("userId")
-                or body.get("userId")
-                or ""
-            ).strip()
-
             if identity_type_raw == "team":
-                if claimed_id and not _is_team_member(authenticated_user, claimed_id):
+                if user_id and not _is_team_member(authenticated_user, user_id):
                     return jsonify({
                         "error": "Access denied: you are not a member of this team",
                         "error_type": "TEAM_ACCESS_DENIED",
                     }), 403
-            elif claimed_id and claimed_id.casefold() != authenticated_user.casefold():
+            elif user_id and user_id.casefold() != authenticated_user.casefold():
                 return jsonify({
                     "error": "Access denied: userId does not match authenticated user",
                     "error_type": "USER_ACCESS_DENIED",
                 }), 403
 
         # ── Identity resolution ───────────────────────────────────────
-        user_id = request.args.get("userId") or body.get("userId")
-        identity_type = (
-            request.args.get("identityType")
-            or body.get("identityType")
-            or "user"
-        )
-        display_name = request.args.get("displayName") or body.get("displayName") or ""
-
-        if not user_id:
-            return jsonify({"error": "userId is required"}), 400
-
-        try:
-            kwargs["identity"] = resolve_identity(user_id, identity_type, display_name)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
-
+        identity, err = _resolve_identity_or_error(kwargs)
+        if err:
+            return err
+        kwargs["identity"] = identity
         return f(*args, **kwargs)
 
     return decorated

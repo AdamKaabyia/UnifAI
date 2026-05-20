@@ -7,11 +7,10 @@ import {
   ElementSchema,
   CatalogResponse,
 } from "../types/workspace";
-import { useAuth } from "@/contexts/AuthContext";
-import { useView } from "@/contexts/ViewContext";
 import { useToast } from "./use-toast";
 import { catalogService } from "@/api/catalog";
 import { useAgenticAI } from "@/contexts/AgenticAIContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 
 // Types for Resources API responses
 interface ResourceInstance {
@@ -52,13 +51,7 @@ export const useWorkspaceData = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { addOrUpdateResource, removeResource, revalidateResourceAndAncestors } = useAgenticAI();
-
-  const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const USER_ID = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const USER_DISPLAY_NAME = isTeam ? selectedTeam!.name : (user?.name || "User");
-  const identityType = isTeam ? "team" : "user";
+  const { userId: USER_ID, displayName: USER_DISPLAY_NAME, identityType } = useWorkspaceIdentity();
 
   // Fetch all available categories and element types
   const fetchCategories = useCallback(async () => {

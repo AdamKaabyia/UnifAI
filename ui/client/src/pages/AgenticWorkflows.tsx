@@ -5,6 +5,7 @@ import StatusBar from "@/components/layout/StatusBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgenticAI } from "@/contexts/AgenticAIContext";
 import { useView } from "@/contexts/ViewContext";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -43,9 +44,8 @@ export default function AgenticWorkflows() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { cacheBlueprintValidationResults } = useAgenticAI();
-  const { viewMode, selectedTeam } = useView();
-  /** Team API identity only when a team is selected (matches ExecutionTab / graph builder hooks). */
-  const isTeamWorkspace = viewMode === "team" && !!selectedTeam;
+  const { selectedTeam } = useView();
+  const { isTeam: isTeamWorkspace, userId: contextUserId, displayName: userDisplayName, identityType } = useWorkspaceIdentity();
   const [, navigate] = useLocation();
   
   // Handle validation changes from the flow graph
@@ -83,13 +83,6 @@ export default function AgenticWorkflows() {
         return;
       }
 
-      const contextUserId = isTeamWorkspace
-        ? selectedTeam!.id
-        : user!.username;
-      const userDisplayName = isTeamWorkspace
-        ? selectedTeam!.name
-        : user!.name || "User";
-      const identityType = isTeamWorkspace ? "team" : "user";
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,

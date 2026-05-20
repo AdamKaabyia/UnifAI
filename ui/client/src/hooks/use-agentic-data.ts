@@ -1,6 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
-import { useView } from "@/contexts/ViewContext";
 import {
   fetchAgenticStats,
   fetchActiveSessions,
@@ -8,13 +6,10 @@ import {
   fetchResourceCategories,
 } from "@/api/agentic";
 import { fetchResolvedBlueprints } from "@/api/blueprints";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 
 export function useAgenticData() {
-  const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const userId = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const identityType = isTeam ? "team" : "user";
+  const { userId, identityType } = useWorkspaceIdentity();
 
   // Use aggregated stats endpoint for optimal performance
   const agenticStats = useQuery({

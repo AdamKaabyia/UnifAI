@@ -10,9 +10,8 @@ import { GraphNode } from "../../pages/AgenticWorkflows"
 import { useStreamingData, NodeEntry } from "./StreamingDataContext"
 import axios from '../../http/axiosAgentConfig'
 import { GraphFlow } from './graphs/interfaces'
-import { useAuth } from "@/contexts/AuthContext";
-import { useView } from "@/contexts/ViewContext";
 import { fetchResolvedBlueprints } from "@/api/blueprints";
+import { useWorkspaceIdentity } from "@/hooks/use-workspace-identity";
 
 interface LogEntry {
   id: string;
@@ -70,11 +69,7 @@ export default function ExecutionStream({
   const [isPaused, setIsPaused] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const { nodeListRef } = useStreamingData();
-  const { user } = useAuth();
-  const { viewMode, selectedTeam } = useView();
-  const isTeam = viewMode === "team" && !!selectedTeam;
-  const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
-  const identityType = isTeam ? "team" : "user";
+  const { userId: contextUserId, identityType } = useWorkspaceIdentity();
 
   const extractNodeData = (graphFlow: GraphFlow): { id: string; name: string; description: string | null }[] => {
     if (!graphFlow || !graphFlow.plan) {
