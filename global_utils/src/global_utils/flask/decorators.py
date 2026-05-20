@@ -10,27 +10,24 @@ handlers. These are designed to be consumed by any Flask-based service
 (MAS, RAG, etc.) without duplication.
 """
 import logging
-import time
 from functools import wraps
-from threading import Lock
 from typing import Any, Callable
 
-import requests as http_requests
 from flask import current_app, g, jsonify, request, session
 
 from global_utils.identity import Identity, IdentityType, resolve_identity
+from global_utils.identity_client import IdentityClient
 from global_utils.redis import get_identity_session, get_identity_username
 
 logger = logging.getLogger(__name__)
 
-# g attribute names (single place for both helpers as all modules will use the same functions)
 G_IDENTITY_SESSION = "identity_session"
 G_IDENTITY_USERNAME = "identity_username"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Pluggable identity base URL provider
 #
-# Services that own an outbound IdentityTeamsClient should call
+# Services that own an outbound IdentityClient should call
 # ``configure_identity_base(url)`` at startup instead of populating Flask's
 # ``app.config["identity_host"]`` / ``app.config["directory_sso_url"]``.
 # When configured this way, the decorators never read identity-related values
@@ -38,6 +35,7 @@ G_IDENTITY_USERNAME = "identity_username"
 # ──────────────────────────────────────────────────────────────────────────────
 
 _configured_identity_base: str = ""
+_identity_client: IdentityClient | None = None
 
 
 def configure_identity_base(base_url: str) -> None:
@@ -47,89 +45,18 @@ def configure_identity_base(base_url: str) -> None:
     resolved identity host URL.  When set, ``_identity_service_base()`` uses
     this value instead of reading from Flask's ``app.config``.
     """
-    global _configured_identity_base
+    global _configured_identity_base, _identity_client
     _configured_identity_base = (base_url or "").rstrip("/")
+    _identity_client = IdentityClient(base_url=_configured_identity_base) if _configured_identity_base else None
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Team-membership cache – short TTL so revocations take effect quickly
-# ──────────────────────────────────────────────────────────────────────────────
-
-_TEAM_IDS_CACHE_TTL_SEC = 45.0
-_team_ids_cache: dict[str, tuple[float, frozenset[str]]] = {}
-_team_ids_cache_lock = Lock()
-
-
-def _get_cached_team_ids(username: str) -> frozenset[str] | None:
-    now = time.monotonic()
-    with _team_ids_cache_lock:
-        entry = _team_ids_cache.get(username)
-        if entry is not None and (now - entry[0]) < _TEAM_IDS_CACHE_TTL_SEC:
-            return entry[1]
-    return None
-
-
-def _set_cached_team_ids(username: str, team_ids: frozenset[str]) -> None:
-    with _team_ids_cache_lock:
-        _team_ids_cache[username] = (time.monotonic(), team_ids)
-
-
-def _fetch_teams_payload_from_identity(username: str, base: str) -> list:
-    """Raw ``teams`` array from Identity ``teams.list`` for *username*."""
-    resp = http_requests.get(
-        f"{base}/api/teams/teams.list",
-        params={"userId": username},
-        timeout=5,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"teams.list HTTP {resp.status_code}")
-    return resp.json().get("teams", []) or []
-
-
-def _fetch_team_ids_from_identity(username: str, base: str) -> frozenset[str]:
-    teams = _fetch_teams_payload_from_identity(username, base)
-    return frozenset(
-        str(t.get("team_id"))
-        for t in teams
-        if t.get("team_id") is not None
-    )
-
-
-def _resolve_team_id_for_member(username: str, team_name_or_id: str) -> str | None:
-    """Map a team display name or ``team_id`` to the canonical id for teams the user may access.
-
-    Used by APIs that accept a human-readable ``teamName`` while membership checks
-    and workspace ownership use ``team_id``.
-
-    When no Identity base URL is configured, returns *team_name_or_id* stripped
-    (legacy / local dev — no server-side validation).
-
-    Returns ``None`` when Identity is configured but the user has no matching team
-    or ``teams.list`` fails.
-    """
-    raw = str(team_name_or_id).strip()
-    if not raw:
-        return None
-
+def _get_identity_client() -> IdentityClient | None:
+    """Return the module-level ``IdentityClient``, lazily creating from Flask config as fallback."""
+    if _identity_client is not None:
+        return _identity_client
     base = _identity_service_base()
-    if not base:
-        return raw
-
-    try:
-        teams = _fetch_teams_payload_from_identity(username, base)
-    except Exception:
-        logger.exception("teams.list failed during team id resolution")
-        return None
-
-    for t in teams:
-        tid = str(t.get("team_id") or "").strip()
-        if not tid:
-            continue
-        if raw.casefold() == tid.casefold():
-            return tid
-        nm = str(t.get("name") or "").strip()
-        if nm and raw.casefold() == nm.casefold():
-            return tid
+    if base:
+        return IdentityClient(base_url=base)
     return None
 
 
@@ -138,7 +65,7 @@ def _identity_service_base() -> str:
 
     Prefers the value registered via :func:`configure_identity_base`.
     Falls back to Flask ``app.config`` (legacy — for services that have not
-    yet migrated to the outbound IdentityTeamsClient pattern).
+    yet migrated to the IdentityClient pattern).
     """
     if _configured_identity_base:
         return _configured_identity_base
@@ -162,24 +89,25 @@ def _is_team_member(username: str, team_id: str) -> bool:
     the service is unreachable or returns an error. Skips the check when no
     base URL is set (e.g. local dev without Identity).
 
-    Successful ``teams.list`` responses are cached briefly per username to
-    reduce load on Identity (see ``_TEAM_IDS_CACHE_TTL_SEC``).
+    Uses the shared ``IdentityClient`` which handles caching internally.
     """
-    base = _identity_service_base()
-    if not base:
+    client = _get_identity_client()
+    if client is None:
         return True
+    return client.is_member(username, team_id)
 
-    cached = _get_cached_team_ids(username)
-    if cached is not None:
-        return team_id in cached
 
-    try:
-        team_ids = _fetch_team_ids_from_identity(username, base)
-        _set_cached_team_ids(username, team_ids)
-        return team_id in team_ids
-    except Exception:
-        logger.exception("Team membership check failed — denying access")
-        return False
+def _resolve_team_id_for_member(username: str, team_name_or_id: str) -> str | None:
+    """Map a team display name or ``team_id`` to the canonical id for teams the user may access.
+
+    Returns *team_name_or_id* stripped when not configured (legacy/local-dev).
+    Returns ``None`` when configured but the user has no matching team.
+    """
+    client = _get_identity_client()
+    if client is None:
+        raw = str(team_name_or_id).strip()
+        return raw or None
+    return client.resolve_team_id(username, team_name_or_id)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -59,6 +59,7 @@ from outbound.mongo.auth_token_repository import MongoCredentialStore
 from outbound.redis.auth_pending_store import RedisFlowStateStore
 from outbound.auth.http_oauth_client import HttpxAuthClient
 
+from global_utils.identity_client import IdentityClient
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_redis_url
 
@@ -248,15 +249,16 @@ class AppContainer(metaclass=SingletonMeta):
             background_engine=background_engine,
         )
 
-        self.directory_provider = self._build_directory_provider(cfg)
-
-        # Outbound client for Identity pod team APIs (membership checks, team-id
-        # resolution).  Centralises all ``teams.*`` HTTP calls so inbound adapters
-        # (Flask endpoints, decorators) never need to compute or store the identity
-        # base URL themselves — they resolve it through this client.
-        from outbound.identity_teams_client import IdentityTeamsClient
+        # Single shared IdentityClient — the only object that makes HTTP calls
+        # to the Identity pod.  Both the teams wrapper and the directory wrapper
+        # delegate to it, and the auth decorators use it via configure_identity_base.
         identity_base = (cfg.directory_sso_url or cfg.identity_host or "").rstrip("/")
-        self.identity_teams_client = IdentityTeamsClient(base_url=identity_base)
+        self.identity_client = IdentityClient(base_url=identity_base)
+
+        self.directory_provider = self._build_directory_provider(cfg, self.identity_client)
+
+        from outbound.identity_teams_client import IdentityTeamsClient
+        self.identity_teams_client = IdentityTeamsClient(identity_client=self.identity_client)
 
         self.share_repo = MongoShareRepository(
             db_name=cfg.mongo_db,
@@ -331,31 +333,28 @@ class AppContainer(metaclass=SingletonMeta):
         return None
 
     @staticmethod
-    def _build_directory_provider(cfg: AppConfig):
+    def _build_directory_provider(cfg: AppConfig, identity_client: IdentityClient):
         provider_name = cfg.directory_provider.strip().lower()
         if not provider_name:
             return None
 
         if provider_name == "sso":
-            return AppContainer._build_identity_provider(cfg)
+            return AppContainer._build_identity_provider(cfg, identity_client)
 
         raise ValueError(
             f"Unknown directory_provider: '{provider_name}'. Supported: sso"
         )
 
     @staticmethod
-    def _build_identity_provider(cfg: AppConfig):
+    def _build_identity_provider(cfg: AppConfig, identity_client: IdentityClient):
         from outbound.identity_directory_client import IdentityDirectoryClient
-        import logging
-        logger = logging.getLogger(__name__)
 
-        base_url = (cfg.directory_sso_url or cfg.identity_host or "").strip()
-        if not base_url:
+        if not identity_client.configured:
             raise ValueError(
                 "identity_host or directory_sso_url is required when directory_provider='sso'"
             )
-        logger.info("Directory provider: identity (%s)", base_url)
+        logger.info("Directory provider: identity (%s)", identity_client._base)
         return IdentityDirectoryClient(
-            base_url=base_url.rstrip("/"),
+            identity_client=identity_client,
             timeout=cfg.directory_timeout,
         )
