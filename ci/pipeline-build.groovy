@@ -240,11 +240,6 @@ pipeline {
                         }
                     }
                 }
-                post {
-                    always {
-                        cleanPodmanSystem()
-                    }
-                }
             }
         }
 
@@ -275,6 +270,11 @@ pipeline {
                     ]
                 }
             }
+        }
+    }
+    post {
+        always {
+            cleanPodmanSystem()
         }
     }
 
