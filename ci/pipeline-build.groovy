@@ -98,10 +98,11 @@ def tagAndPushImageToRegistry( buildParams,component) {
 }
 
 def cleanWorkspace(component) {
+    def componentLower = component.toLowerCase().replace("-", "")
     sh """
-        podman rm -f  ${component} || true
-        podman rmi \$(podman images -a --filter "reference=${component}:${VERSION}" -q) -f || true
-        podman rmi -f ${component}:latest || true  
+        podman rm -f  ${componentLower} || true
+        podman rmi \$(podman images -a --filter "reference=${componentLower}:${VERSION}" -q) -f || true
+        podman rmi -f ${componentLower}:latest || true  
     """
 }
 
