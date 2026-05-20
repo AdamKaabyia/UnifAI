@@ -67,8 +67,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Configuration
 # =============================================================================
 
-# DEFAULT_BASE_URL = "https://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
-DEFAULT_BASE_URL = "http://localhost:5000"  # Override with env var or CLI arg as needed
+DEFAULT_BASE_URL = "https://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
 DEFAULT_POLLING_INTERVAL = 10
 MIN_POLLING_INTERVAL = 5
 MAX_POLLING_INTERVAL = 60
