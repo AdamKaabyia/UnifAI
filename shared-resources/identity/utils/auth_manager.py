@@ -4,7 +4,7 @@ Handles user authentication, session management, and token validation
 """
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Any, Optional
+from typing import Any
 import os, uuid, logging
 import requests as http_requests
 from flask import request, jsonify, session, redirect, url_for, current_app
@@ -18,23 +18,6 @@ config = AppConfig.get_instance()
 
 logger = logging.getLogger('auth_manager')
 
-
-def directory_request_user_token() -> Optional[str]:
-    """OIDC access token for directory / identity-resolve calls.
-
-    Prefer ``X-User-Token`` when present (programmatic clients). For browser
-    sessions authenticated via cookie + Redis, fall back to the access token
-    stored server-side so the UI does not need ``/api/auth/user`` to expose the
-    raw token to JavaScript.
-    """
-    header = request.headers.get("X-User-Token")
-    if header:
-        return header
-    auth_manager = current_app.extensions.get("auth_manager")
-    if auth_manager and auth_manager.is_authenticated():
-        session_data = auth_manager._get_server_session() or {}
-        return session_data.get("access_token")
-    return None
 
 
 class AuthManager:
@@ -278,9 +261,11 @@ class AuthManager:
             # Add admin permission based on config (checks admin_allowed_users)
             user['is_admin'] = self._check_admin_permission(user)
 
+            session_data = self._get_server_session() or {}
             return jsonify({
                 'user': user,
                 'authenticated': True,
+                'access_token': session_data.get('access_token'),
             })
         
         @self.app.route('/api/auth/user/groups')

@@ -14,11 +14,13 @@ from global_utils.embedding import (
     EmbeddingProcessingError,
 )
 from global_utils.identity import Identity, IdentityType
+from global_utils.identity_client import IdentityClient
 
 __all__ = [
     # Identity
     "Identity",
     "IdentityType",
+    "IdentityClient",
     # Pydantic helpers
     "CoercedStr",
     "coerce_to_str",

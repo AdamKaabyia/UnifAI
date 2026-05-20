@@ -3,7 +3,6 @@ from typing import Callable
 
 from flask import Blueprint, jsonify, current_app, request
 
-from utils.auth_manager import directory_request_user_token
 from utils.directory_cache import DirectoryCache
 
 logger = logging.getLogger(__name__)
@@ -19,7 +18,7 @@ def _parse_limit(default: int = 20) -> int:
 
 
 def _user_token():
-    return directory_request_user_token()
+    return request.headers.get("X-User-Token")
 
 
 def _cached_fetch(cache, cache_key: str, fetch: Callable, response_key: str, log_action: str):
