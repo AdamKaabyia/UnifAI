@@ -56,7 +56,7 @@ RUN python3 -m venv --prompt "virtualenv" venv
 ENV VIRTUAL_ENV=$HOME/app/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN pip install -v -e "./app/[all]" 2>&1
+RUN pip install -e "./app/[all]"
 RUN /bin/bash -c "pip install -e ./global_utils/"
 
 ENTRYPOINT ["./app/entrypoint.sh"]
