@@ -51,8 +51,6 @@ COPY --from=build /ui/build /usr/share/nginx/html
 RUN chown -R default:root /usr/share/nginx/html && chmod -R 775 /usr/share/nginx/html
 COPY ui/deployment/nginx.conf.template /etc/nginx/nginx.conf.template
 
-RUN chmod -R g+rwx /var/log/nginx && chown -R default:root /var/log/nginx
-
 USER default
 
 EXPOSE 8080
