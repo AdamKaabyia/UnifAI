@@ -51,7 +51,7 @@ def validate_team(team_id: str):
     authenticated = request.headers.get("X-Authenticated-User", "").strip()
     if not authenticated:
         return jsonify({"error": "Missing authenticated user"}), 401
-    if not current_app.container.identity_teams_client.is_member(authenticated, team_id):
+    if not current_app.container.identity_provider.is_member(authenticated, team_id):
         return jsonify({"error": "Access denied: you are not a member of this team"}), 403
     return None
 
@@ -67,7 +67,7 @@ def validate_session_access(session_id: str):
     except KeyError:
         return None, (jsonify({"error": f"Session {session_id} not found"}), 404)
     if record.identity.type == IdentityType.TEAM:
-        if not current_app.container.identity_teams_client.is_member(authenticated, record.identity.id):
+        if not current_app.container.identity_provider.is_member(authenticated, record.identity.id):
             return None, (jsonify({"error": "Access denied"}), 403)
     elif authenticated.casefold() != record.identity.id.casefold():
         return None, (jsonify({"error": "Access denied"}), 403)

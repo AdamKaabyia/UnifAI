@@ -41,7 +41,7 @@ def create_share(
 ):
     """Create share invitation."""
     try:
-        teams_client = current_app.container.identity_teams_client
+        identity_provider = current_app.container.identity_provider
         sender_type_norm = str(sender_type or "user").strip().lower()
         claimed_owner = str(sender_identity_id or "").strip()
         if sender_type_norm == "team":
@@ -49,7 +49,7 @@ def create_share(
                 return jsonify(
                     {"error": "senderIdentityId (team id) is required when senderType is team"},
                 ), 400
-            if not teams_client.is_member(authenticated_user, claimed_owner):
+            if not identity_provider.is_member(authenticated_user, claimed_owner):
                 return jsonify({"error": "Not authorized to share as this team"}), 403
             effective_sender_id = claimed_owner
         else:
@@ -179,17 +179,17 @@ def share_to_team(authenticated_user, team_name, item_kind, item_id, sender_team
     validation against the resource passes correctly.
     """
     try:
-        teams_client = current_app.container.identity_teams_client
+        identity_provider = current_app.container.identity_provider
 
         # Resolve the destination team and verify the caller is a member.
-        dest_team_id = teams_client.resolve_team_id(authenticated_user, team_name)
+        dest_team_id = identity_provider.resolve_team_id(authenticated_user, team_name)
         if dest_team_id is None:
             return jsonify({"error": "Not authorized to share to this team"}), 403
 
         # Determine effective sender: team-owned resource or personal resource.
         if sender_team_id:
             sender_team_id = str(sender_team_id).strip()
-            if not teams_client.is_member(authenticated_user, sender_team_id):
+            if not identity_provider.is_member(authenticated_user, sender_team_id):
                 return jsonify({"error": "Not authorized to share as this team"}), 403
             effective_sender_id = sender_team_id
         else:
@@ -209,8 +209,8 @@ def share_to_team(authenticated_user, team_name, item_kind, item_id, sender_team
         authorized_owner_ids = {authenticated_user}
         if sender_team_id:
             authorized_owner_ids.add(sender_team_id)
-        elif teams_client.configured:
-            team_ids = teams_client.get_team_ids(authenticated_user)
+        elif identity_provider.requires_authentication:
+            team_ids = identity_provider.get_team_ids(authenticated_user)
             if team_ids:
                 authorized_owner_ids.update(team_ids)
             else:
@@ -317,10 +317,10 @@ def get_share(authenticated_user, share_id):
         invite = svc.get_invite(share_id)
 
         # Check authorization: sender (user or team member), or recipient
-        teams_client = current_app.container.identity_teams_client
+        identity_provider = current_app.container.identity_provider
         sender_ok = (
             invite.sender_identity.type == IdentityType.TEAM
-            and teams_client.is_member(authenticated_user, invite.sender_identity.id)
+            and identity_provider.is_member(authenticated_user, invite.sender_identity.id)
         ) or ShareService._principal_matches_identity(invite.sender_identity, authenticated_user)
         recipient_ok = ShareService._principal_matches_identity(
             invite.recipient_identity, authenticated_user
