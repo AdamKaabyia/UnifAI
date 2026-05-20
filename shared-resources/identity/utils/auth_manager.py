@@ -249,6 +249,9 @@ class AuthManager:
                     session_expires_at.timestamp()
                 )
                 self.redis_store.hset(identity_session_key(session_id), session_data, ttl_seconds=ttl_seconds)
+                
+                logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
+
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""
