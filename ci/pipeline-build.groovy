@@ -100,7 +100,7 @@ def tagAndPushImageToRegistry( buildParams,component) {
 def cleanWorkspace(component) {
     sh """
         podman rm -f  ${component} || true
-        podman rmi -f ${component}:${VERSION} || true
+        podman rmi $(podman images -a --filter "reference=${component}:${VERSION}" -q) -f || true
         podman rmi -f ${component}:latest || true  
     """
 }
@@ -238,6 +238,11 @@ pipeline {
                                 }
                             }
                         }
+                    }
+                }
+                post {
+                    always {
+                        cleanPodmanSystem()
                     }
                 }
             }
