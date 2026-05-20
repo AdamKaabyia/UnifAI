@@ -31,7 +31,7 @@ def build_redis_store(config: AppConfig) -> RedisKVStore:
     return RedisKVStore(client)
 
 
-def build_team_service(config: AppConfig):
+def build_team_service(config: AppConfig, user_groups_cache=None):
     """Create MongoClient, MongoTeamRepository, and TeamService."""
     from pymongo import MongoClient
     from teams.repository.mongo_repository import MongoTeamRepository
@@ -45,4 +45,5 @@ def build_team_service(config: AppConfig):
     return TeamService(
         repository=team_repo,
         directory_provider=directory_provider,
+        user_groups_cache=user_groups_cache,
     )

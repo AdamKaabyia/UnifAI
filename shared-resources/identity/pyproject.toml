@@ -21,8 +21,6 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "gunicorn",
-    "redis",
-    "pymongo",
     "ldap3",
 ]
 

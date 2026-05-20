@@ -176,10 +176,12 @@ class AuthManager:
                     "User %s authenticated successfully",
                     userinfo.get('preferred_username'),
                 )
-                self._cache_user_groups(
-                    userinfo.get('preferred_username'),
-                    token.get('access_token'),
-                )
+                svc = current_app.extensions.get('team_service')
+                if svc:
+                    svc.cache_user_groups(
+                        userinfo.get('preferred_username'),
+                        token.get('access_token'),
+                    )
                 # Redirect to frontend with auth status and state parameter
                 # Frontend will extract the original URL from state and restore it
                 state_param = f"&state={quote(request_state, safe='')}" if request_state else ""
@@ -294,9 +296,11 @@ class AuthManager:
 
             if groups is None:
                 access_token = session_data.get('access_token')
-                groups = self._fetch_user_groups(username, access_token)
-                if cache:
-                    cache.set_groups(username, groups)
+                svc = current_app.extensions.get('team_service')
+                if svc:
+                    groups = svc.fetch_user_groups_as_dicts(username, access_token)
+                    if cache:
+                        cache.set_groups(username, groups)
 
             if groups:
                 try:
@@ -419,38 +423,6 @@ class AuthManager:
             return False
 
     
-    def _fetch_user_groups(self, username: str, access_token: str = None) -> list:
-        """Fetch user groups from the directory provider and return as dicts."""
-        groups = []
-        try:
-            svc = self.app.extensions.get('team_service')
-            if svc and svc.has_directory:
-                dir_groups = svc.get_user_groups(username, user_token=access_token)
-                groups = [g.model_dump(mode="json") for g in dir_groups]
-        except Exception as e:
-            logger.warning("Failed to fetch groups for %s: %s", username, e)
-        return groups
-
-    def _cache_user_groups(self, username: str, access_token: str = None) -> None:
-        """Fetch the user's directory groups, cache them in Redis, and
-        refresh ``group_members`` on any teams that reference those groups
-        so the effective member count stays up-to-date."""
-        if not username:
-            return
-        try:
-            groups = self._fetch_user_groups(username, access_token)
-            cache = self.app.extensions.get('user_groups_cache')
-            if cache:
-                cache.set_groups(username, groups)
-                logger.info("Cached %d groups for user %s", len(groups), username)
-
-            if groups:
-                svc = self.app.extensions.get('team_service')
-                if svc:
-                    svc.refresh_group_members(groups)
-        except Exception as e:
-            logger.warning("Failed to cache groups for %s: %s", username, e)
-
     def _check_admin_permission(self, user: dict) -> bool:
         """
         Check if user has admin permission (can access analytics and other admin features)

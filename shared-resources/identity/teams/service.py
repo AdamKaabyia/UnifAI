@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from directory.models import DirectoryUser, DirectoryGroup
 from directory.provider import DirectoryProvider
 from teams.models import Team, TeamMember, TeamMemberType
 from teams.repository.repository import TeamRepository
+
+if TYPE_CHECKING:
+    from utils.user_groups_cache import UserGroupsCache
+
+logger = logging.getLogger(__name__)
 
 
 class TeamService:
@@ -12,9 +20,11 @@ class TeamService:
         self,
         repository: TeamRepository,
         directory_provider: Optional[DirectoryProvider] = None,
+        user_groups_cache: Optional["UserGroupsCache"] = None,
     ):
         self._repo = repository
         self._directory = directory_provider
+        self._groups_cache = user_groups_cache
 
     # ── team CRUD ──────────────────────────────────────────────────────
 
@@ -130,6 +140,36 @@ class TeamService:
             members = g.get("members")
             if group_id and members is not None:
                 self._repo.update_group_members(group_id, members)
+
+    # ── user-group fetching & caching ─────────────────────────────────
+
+    def fetch_user_groups_as_dicts(self, username: str, access_token: Optional[str] = None) -> List[dict]:
+        """Fetch user groups from the directory provider and return as serialized dicts."""
+        groups: List[dict] = []
+        try:
+            if self.has_directory:
+                dir_groups = self.get_user_groups(username, user_token=access_token)
+                groups = [g.model_dump(mode="json") for g in dir_groups]
+        except Exception as e:
+            logger.warning("Failed to fetch groups for %s: %s", username, e)
+        return groups
+
+    def cache_user_groups(self, username: str, access_token: Optional[str] = None) -> None:
+        """Fetch the user's directory groups, cache them in Redis, and
+        refresh ``group_members`` on any teams that reference those groups
+        so the effective member count stays up-to-date."""
+        if not username:
+            return
+        try:
+            groups = self.fetch_user_groups_as_dicts(username, access_token)
+            if self._groups_cache:
+                self._groups_cache.set_groups(username, groups)
+                logger.info("Cached %d groups for user %s", len(groups), username)
+
+            if groups:
+                self.refresh_group_members(groups)
+        except Exception as e:
+            logger.warning("Failed to cache groups for %s: %s", username, e)
 
     # ── helpers ────────────────────────────────────────────────────────
 

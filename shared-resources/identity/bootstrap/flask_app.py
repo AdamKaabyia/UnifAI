@@ -73,7 +73,7 @@ def create_app() -> Flask:
         ttl_seconds=config.directory_cache_ttl,
     )
 
-    app.extensions['team_service'] = build_team_service(config)
+    app.extensions['team_service'] = build_team_service(config, user_groups_cache=user_groups_cache)
     # Register HTTP adapters (blueprints)
     _register_blueprints(app)
     
