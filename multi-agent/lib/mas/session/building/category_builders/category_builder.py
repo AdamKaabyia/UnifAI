@@ -69,7 +69,7 @@ class CategoryBuilder(ABC):
             )
 
         try:
-            extra = self._extra_kwargs(resource_spec.config, session_registry)
+            extra = self._extra_kwargs(resource_spec.config, session_registry, deps=deps)
             return factory.create(validated, deps=deps, **extra)
         except Exception as e:
             raise PluginConfigurationError(
@@ -77,5 +77,7 @@ class CategoryBuilder(ABC):
             ) from e
 
     # subclasses may override
-    def _extra_kwargs(self, cfg, session_registry: SessionRegistry) -> dict[str, Any]:
+    def _extra_kwargs(
+        self, cfg, session_registry: SessionRegistry, deps: Optional[ElementDeps] = None,
+    ) -> dict[str, Any]:
         return {}

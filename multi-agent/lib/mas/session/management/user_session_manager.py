@@ -81,6 +81,10 @@ class UserSessionManager:
         """Lightweight fetch — returns typed SessionRecord, no graph build."""
         return self._repo.fetch(run_id)
 
+    def save_record(self, record: SessionRecord) -> None:
+        """Persist an already-loaded record (e.g. after context updates)."""
+        self._repo.save(record)
+
     def get_chat(self, run_id: str) -> SessionChat:
         """Projected fetch — only messages and output from graph state."""
         return self._repo.fetch_chat(run_id)

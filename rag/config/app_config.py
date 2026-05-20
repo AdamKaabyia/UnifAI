@@ -33,6 +33,7 @@ class AppConfig(SharedConfig):
     upload_folder: str = "/app/shared"
     backend_env: str = "development"
     version: str = "1.0.0"
+    secret_key: str = ""
 
     # Umami Configuration
     umami_url: str = "0.0.0.0"

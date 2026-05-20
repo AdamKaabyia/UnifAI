@@ -62,6 +62,13 @@ class ResourceRepository(ABC):
     def exists(self, rid: str) -> bool: ...
 
     @abstractmethod
+    def count_by_config_field(
+        self, user_id: str, field: str, value: str, exclude_rid: str = "",
+    ) -> int:
+        """Count resources where cfg_dict.<field> == value for a user."""
+        ...
+
+    @abstractmethod
     def group_count(
         self, 
         user_id: str, 

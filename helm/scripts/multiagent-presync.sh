@@ -10,5 +10,7 @@ source "$(dirname "$0")/postsync-lib.sh"
 # This will be parsed by Pydantic Settings as a list type
 # Create configmap
 create_or_update_configmap multiagent-be-security \
-  --from-literal=admin_allowed_users="$admin_allowed_users"
+  --from-literal=admin_allowed_users="$admin_allowed_users" \
+  --from-literal=CREDENTIAL_ENCRYPTION_KEY="$CREDENTIAL_ENCRYPTION_KEY" \
+  --from-literal=MCP_AUTH_STATE_SECRET="$MCP_AUTH_STATE_SECRET"
 

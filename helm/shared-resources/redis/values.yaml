@@ -12,6 +12,7 @@ image:
   tag: '9.7'
   pullPolicy: IfNotPresent
 
+redisConfigMapName: redis-config
 
 storage:
   accessModes:

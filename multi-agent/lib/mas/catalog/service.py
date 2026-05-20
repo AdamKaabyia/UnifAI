@@ -14,15 +14,19 @@ class CatalogService:
         self.reg = registry
 
     def get_all_elements_summary(self) -> CatalogListDTO:
-        """Get all elements as summary DTOs, organized by category"""
+        """Get all elements as summary DTOs, organized by category."""
         elements_by_category = {}
 
         for category in self.reg.list_categories():
+            if category.is_hidden():
+                continue
             category_name = category.value if hasattr(category, 'value') else str(category)
             elements = []
 
             for type_key in self.reg.list_types(category):
                 spec_cls = self.reg.get_spec(category, type_key)
+                if getattr(spec_cls, 'hidden', False):
+                    continue
                 elements.append(ElementSummaryDTO(
                     category=category_name,
                     type=type_key,
@@ -30,7 +34,7 @@ class CatalogService:
                     hints=spec_cls.hints if hasattr(spec_cls, 'hints') else []
                 ))
 
-            if elements:  # Only include categories that have elements
+            if elements:
                 elements_by_category[category_name] = elements
 
         return CatalogListDTO(elements=elements_by_category)
@@ -58,8 +62,8 @@ class CatalogService:
         )
 
     def list_categories(self) -> List[str]:
-        """List all available element categories"""
-        return [c.value for c in self.reg.list_categories()]
+        """List all available element categories (excludes hidden categories)."""
+        return [c.value for c in self.reg.list_categories() if not c.is_hidden()]
 
     def list_types(self, category: str) -> List[str]:
         """List all element types in a category"""

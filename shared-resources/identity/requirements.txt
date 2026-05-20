@@ -1,0 +1,9 @@
+flask
+flask-cors
+requests
+Authlib
+PyJWT
+python-dotenv
+pydantic
+pydantic-settings
+redis

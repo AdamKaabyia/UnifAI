@@ -327,14 +327,16 @@ def set_metadata(blueprint_id, metadata):
 @blueprints_bp.route("/blueprint.validate", methods=["POST"])
 @from_body({
     "blueprint_id": fields.Str(data_key="blueprintId", required=True),
+    "user_id": fields.Str(data_key="userId", load_default=""),
     "timeout_seconds": fields.Float(data_key="timeoutSeconds", load_default=10.0),
 })
-def validate_blueprint(blueprint_id, timeout_seconds):
+def validate_blueprint(blueprint_id, user_id, timeout_seconds):
     """Validate all elements in a saved blueprint."""
     svc = current_app.container.blueprint_service
     try:
         result = svc.validate_blueprint(
             blueprint_id=blueprint_id,
+            user_id=user_id,
             timeout_seconds=timeout_seconds,
         )
         return jsonify(result.model_dump()), 200

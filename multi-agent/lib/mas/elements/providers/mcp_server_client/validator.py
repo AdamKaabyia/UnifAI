@@ -1,13 +1,18 @@
 """
 elements/providers/mcp_server_client/validator.py
 
-Validator for MCP Provider - checks endpoint reachability using McpProviderFactory.
+Validator for MCP Provider — uses McpProviderFactory for a real connection probe.
+
+Uses the same transport path as the wizard and runtime (McpProviderFactory),
+and resolves auth credentials via ``core/auth`` before probing.
 """
 
-import anyio
+import time
+import logging
 from concurrent.futures import CancelledError
 from typing import List
 
+import anyio
 from global_utils.utils.async_bridge import get_async_bridge
 from mas.elements.common.validator import (
     BaseElementValidator,
@@ -19,23 +24,18 @@ from mas.elements.common.validator import (
 from mas.elements.providers.mcp_server_client.config import McpProviderConfig
 from mas.elements.providers.mcp_server_client.mcp_provider_factory import McpProviderFactory
 
+logger = logging.getLogger(__name__)
+
 
 class McpProviderValidator(BaseElementValidator):
     """
     Validates MCP Provider configuration.
-    
-    Checks:
-    - MCP server connectivity
-    - Ability to list tools from the server
+
+    Uses McpProviderFactory.create_async() for a real MCP connection probe,
+    matching the same transport path the wizard and runtime use.
     """
 
     def __init__(self, factory: McpProviderFactory = None):
-        """
-        Initialize validator with optional factory injection.
-        
-        Args:
-            factory: McpProviderFactory instance (creates default if not provided)
-        """
         super().__init__()
         self._factory = factory or McpProviderFactory()
 
@@ -44,12 +44,6 @@ class McpProviderValidator(BaseElementValidator):
         config: McpProviderConfig,
         context: ValidationContext,
     ) -> ValidatorReport:
-        """
-        Validate MCP provider config.
-        
-        Synchronous method - runs async checks internally using AsyncBridge.
-        Returns ValidatorReport (service adds metadata).
-        """
         messages: List[ValidationMessage] = []
 
         try:
@@ -61,8 +55,7 @@ class McpProviderValidator(BaseElementValidator):
                 str(e),
                 field="mcp_url",
             ))
-        except RuntimeError as e:
-            # MCP library cancel scope bug - handle here only
+        except Exception as e:
             messages.append(self._error(
                 ValidationCode.ENDPOINT_UNREACHABLE.value,
                 f"Connection failed: {e}",
@@ -82,14 +75,21 @@ class McpProviderValidator(BaseElementValidator):
         
         Uses anyio.fail_after INSIDE the async function for timeout control.
         """
+        start = time.time()
+
+        auth_cred = None
+        if context.user_id and context.auth_service:
+            lookup_id = getattr(config, "server_identifier", "") or str(config.mcp_url)
+            auth_cred = context.auth_service.bind(context.user_id, lookup_id)
+
         try:
             with anyio.fail_after(context.timeout_seconds):
-                await self._factory.create_async(config)
-            
-            # Connection successful
+                await self._factory.create_async(config, auth_credential=auth_cred)
+
+            elapsed = (time.time() - start) * 1000
             messages.append(self._info(
                 "CONNECTION_OK",
-                f"Successfully connected to MCP server at {config.mcp_url}",
+                f"Connected to MCP server at {config.mcp_url} ({elapsed:.0f}ms)",
                 field="mcp_url",
             ))
 
@@ -100,11 +100,24 @@ class McpProviderValidator(BaseElementValidator):
                 field="mcp_url",
             ))
         except RuntimeError:
-            # Let RuntimeError propagate to validate() for handling
             raise
         except Exception as e:
-            messages.append(self._error(
-                ValidationCode.ENDPOINT_UNREACHABLE.value,
-                f"Connection failed: {str(e)}",
-                field="mcp_url",
-            ))
+            error_msg = str(e)
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                messages.append(self._error(
+                    ValidationCode.INVALID_CREDENTIALS.value,
+                    "Server rejected the credentials — sign in again or update your access token",
+                    field="mcp_url",
+                ))
+            elif "403" in error_msg or "Forbidden" in error_msg:
+                messages.append(self._error(
+                    ValidationCode.INVALID_CREDENTIALS.value,
+                    "Authenticated but not authorized — check your scopes or contact the server administrator",
+                    field="mcp_url",
+                ))
+            else:
+                messages.append(self._error(
+                    ValidationCode.ENDPOINT_UNREACHABLE.value,
+                    f"Connection failed: {e}",
+                    field="mcp_url",
+                ))

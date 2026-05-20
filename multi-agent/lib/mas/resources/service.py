@@ -16,7 +16,6 @@ from mas.catalog.card_service import ElementCardService
 from mas.resources.resolver import DependencyResolver
 from mas.validation.service import ElementValidationService
 
-
 class ResourcesService:
     """
     Public facade. Performs schema validation via ElementRegistry
@@ -29,17 +28,25 @@ class ResourcesService:
             element_registry: ElementRegistry,
             validation_service: ElementValidationService = None,
             card_service: ElementCardService = None,
+            auth_service=None,
     ):
         self._store = resource_registry
         self.element_registry = element_registry
         self._card_service = card_service
         self._dependency_resolver = DependencyResolver(resource_registry=self._store)
         self._validation_service = validation_service
+        self._auth_service = auth_service
+
+    def set_auth_service(self, auth_service) -> None:
+        """Late-bind the auth service (created after ResourcesService in the container)."""
+        self._auth_service = auth_service
 
     # ---------- CRUD ----------
     def create(self, *, user_id, category, type, name, config) -> Resource:
         model_cls = self.element_registry.get_schema(ResourceCategory(category), type)
         cfg_model = model_cls(**config)
+
+        self._run_pre_save_hook(cfg_model, user_id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -64,9 +71,13 @@ class ResourcesService:
 
     def update(self, rid: str, *, config: dict, name: str = None) -> Resource:
         doc = self._store.get(rid)
+        old_server_id = doc.cfg_dict.get("server_identifier", "")
+
         model_cls = self.element_registry.get_schema(
             ResourceCategory(doc.category), doc.type)
         cfg_model = model_cls(**config)
+
+        self._run_pre_save_hook(cfg_model, doc.user_id)
 
         nested_refs = list(RefWalker.external_rids(cfg_model))
 
@@ -76,10 +87,20 @@ class ResourcesService:
         if name is not None:
             doc.name = name
 
-        return self._store.update(doc)
+        result = self._store.update(doc)
+
+        new_server_id = doc.cfg_dict.get("server_identifier", "")
+        if old_server_id and old_server_id != new_server_id:
+            self._cleanup_orphaned_credential(doc.user_id, old_server_id)
+
+        return result
 
     def delete(self, rid: str) -> None:
+        doc = self._store.get(rid)
         self._store.delete(rid)
+        server_id = doc.cfg_dict.get("server_identifier", "")
+        if server_id:
+            self._cleanup_orphaned_credential(doc.user_id, server_id)
 
     # ---------- READ ----------
     def get(self, rid: str) -> Resource:
@@ -137,6 +158,7 @@ class ResourcesService:
     def validate_resource(
         self,
         rid: str,
+        user_id: str = "",
         timeout_seconds: float = 10.0,
     ) -> ElementValidationResult:
         """
@@ -150,11 +172,12 @@ class ResourcesService:
 
         ordered_configs = self._build_configs_from_rids(ordered_rids)
 
-        return self._validate_and_get(ordered_configs, rid, timeout_seconds)
+        return self._validate_and_get(ordered_configs, rid, timeout_seconds, user_id=user_id)
 
     def validate_resources(
         self,
         rids: List[str],
+        user_id: str = "",
         timeout_seconds: float = 10.0,
         max_workers: int = 10,
     ) -> List[ElementValidationResult]:
@@ -170,13 +193,14 @@ class ResourcesService:
             return []
 
         if len(rids) == 1:
-            return [self._validate_resource_safe(rids[0], timeout_seconds)]
+            return [self._validate_resource_safe(rids[0], user_id, timeout_seconds)]
 
-        return self._validate_in_parallel(rids, timeout_seconds, max_workers)
+        return self._validate_in_parallel(rids, user_id, timeout_seconds, max_workers)
 
     def _validate_in_parallel(
         self,
         rids: List[str],
+        user_id: str,
         timeout_seconds: float,
         max_workers: int,
     ) -> List[ElementValidationResult]:
@@ -186,7 +210,7 @@ class ResourcesService:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
                 executor.submit(
-                    self._validate_resource_safe, rid, timeout_seconds
+                    self._validate_resource_safe, rid, user_id, timeout_seconds
                 ): idx
                 for idx, rid in enumerate(rids)
             }
@@ -200,11 +224,12 @@ class ResourcesService:
     def _validate_resource_safe(
         self,
         rid: str,
+        user_id: str,
         timeout_seconds: float,
     ) -> ElementValidationResult:
         """Validate a single resource with exception handling."""
         try:
-            return self.validate_resource(rid=rid, timeout_seconds=timeout_seconds)
+            return self.validate_resource(rid=rid, user_id=user_id, timeout_seconds=timeout_seconds)
         except KeyError:
             return ElementValidationResult.create_error(
                 rid=rid,
@@ -285,7 +310,22 @@ class ResourcesService:
             raise KeyError(f"Resource not found: {rid}")
         return cards[rid]
 
+    def _cleanup_orphaned_credential(self, user_id: str, server_id: str) -> None:
+        """Delete the stored credential if no other resource uses the same server_identifier."""
+        if not self._auth_service:
+            return
+        remaining = self._store.count_by_config_field(
+            user_id, "server_identifier", server_id,
+        )
+        if remaining == 0:
+            self._auth_service.delete_credential(user_id, server_id)
+
     # ---------- Helpers ----------
+    def _run_pre_save_hook(self, cfg_model: BaseModel, user_id: str) -> None:
+        """Call on_pre_save on the config model if it supports it."""
+        if hasattr(cfg_model, "on_pre_save"):
+            cfg_model.on_pre_save(user_id, auth_service=self._auth_service)
+
     def _ensure_validation_service(self) -> None:
         """Raise if validation service not configured."""
         if not self._validation_service:
@@ -321,8 +361,13 @@ class ResourcesService:
         ordered_configs: List[ElementConfigMeta],
         target_rid: str,
         timeout_seconds: float,
+        user_id: str = "",
     ) -> ElementValidationResult:
         """Validate configs in order and return result for target rid."""
-        context = ValidationContext(timeout_seconds=timeout_seconds)
+        context = ValidationContext(
+            timeout_seconds=timeout_seconds,
+            user_id=user_id,
+            auth_service=self._auth_service,
+        )
         results = self._validation_service.validate_ordered(ordered_configs, context)
         return results[target_rid]
