@@ -133,6 +133,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
   const USER_ID = isTeam ? selectedTeam!.id : user?.username;
+  const USER_DISPLAY_NAME = isTeam ? selectedTeam!.name : user?.name || "User";
   const identityType = isTeam ? "team" : "user";
 
   // Stable refs for callbacks embedded in node data (avoids stale closures)
@@ -1141,7 +1142,7 @@ export const useGraphCreationLogic = (options: UseGraphCreationLogicOptions = {}
             setIsSaving(false);
             return;
           }
-          response = await saveBlueprint(yamlString, USER_ID, identityType);
+          response = await saveBlueprint(yamlString, USER_ID, USER_DISPLAY_NAME, identityType);
           blueprintId = response.blueprint_id;
         }
 

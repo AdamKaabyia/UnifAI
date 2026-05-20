@@ -130,6 +130,7 @@ export default function ExecutionTab({
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
   const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
+  const displayName = isTeam ? selectedTeam!.name : (user?.name || "User");
   const identityType = isTeam ? "team" : "user";
   
   // Ref to hold the updateNodeList callback for use in stream subscription
@@ -520,6 +521,7 @@ export default function ExecutionTab({
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,
+        displayName: displayName,
         identityType,
       };
 

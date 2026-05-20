@@ -68,6 +68,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
   const contextUserId = isTeam ? selectedTeam!.id : (user?.username || "default");
+  const userDisplayName = isTeam ? selectedTeam!.name : (user?.name || "User");
   const identityType = isTeam ? "team" : "user";
 
   const sessionSelectRequestId = useRef(0);
@@ -268,6 +269,7 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
       await axios.post("/sessions/user.session.create", {
         blueprintId: graphId,
         userId: contextUserId,
+        displayName: userDisplayName,
         identityType,
       });
       const response = await axios.get(

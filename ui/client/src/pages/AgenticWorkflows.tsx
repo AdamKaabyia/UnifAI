@@ -86,10 +86,14 @@ export default function AgenticWorkflows() {
       const contextUserId = isTeamWorkspace
         ? selectedTeam!.id
         : user!.username;
+      const userDisplayName = isTeamWorkspace
+        ? selectedTeam!.name
+        : user!.name || "User";
       const identityType = isTeamWorkspace ? "team" : "user";
       const selectedBlueprint = {
         blueprintId: graphId,
         userId: contextUserId,
+        displayName: userDisplayName,
         identityType,
       };
 

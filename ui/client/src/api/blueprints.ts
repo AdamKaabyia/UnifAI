@@ -167,11 +167,13 @@ export async function deleteBlueprint(blueprintId: string): Promise<DeleteBluepr
 export async function saveBlueprint(
   blueprintRaw: string,
   userId: string,
+  displayName: string,
   identityType?: string,
 ): Promise<SaveBlueprintResponse> {
   const { data } = await axios.post<SaveBlueprintResponse>('/blueprints/blueprint.save', {
     blueprintRaw,
     userId,
+    displayName,
     identityType: identityType || 'user',
   });
   return data;

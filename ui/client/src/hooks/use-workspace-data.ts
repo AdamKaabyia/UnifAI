@@ -57,6 +57,7 @@ export const useWorkspaceData = () => {
   const { viewMode, selectedTeam } = useView();
   const isTeam = viewMode === "team" && !!selectedTeam;
   const USER_ID = isTeam ? selectedTeam!.id : (user?.username || "default");
+  const USER_DISPLAY_NAME = isTeam ? selectedTeam!.name : (user?.name || "User");
   const identityType = isTeam ? "team" : "user";
 
   // Fetch all available categories and element types
@@ -342,6 +343,7 @@ export const useWorkspaceData = () => {
           const savePayload = {
             userId: USER_ID,
             identityType: identityType,
+            displayName: USER_DISPLAY_NAME,
             category,
             type,
             config: cfg_dict,
