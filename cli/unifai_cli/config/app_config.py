@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppConfig(BaseSettings):
     """CLI configuration — resolved from environment variables or defaults."""
 
-    mas_url: str = "http://10.46.254.131:8002"
+    mas_url: str = "http://localhost:8002"
     api_prefix: str = "/api"
     sso_url: str = "http://localhost:13456"
 
