@@ -2,15 +2,6 @@ from global_utils.config.config import SharedConfig
 
 
 class AppConfig(SharedConfig):
-    """
-    Multi-agent service config.
-
-    ``mongodb_ip`` defaults to loopback for local dev. Set ``MONGODB_IP`` / ``mongodb_ip``
-    in the environment in Kubernetes or shared compose so pods reach the real host.
-    """
-
-    mongodb_ip: str = "127.0.0.1"
-
     mongo_db: str = "UnifAI"
     blueprint_coll: str = "blueprints"
     resources_coll: str = "resources"
@@ -18,7 +9,7 @@ class AppConfig(SharedConfig):
     shares_coll: str = "shares"
     templates_coll: str = "templates"
     credentials_coll: str = "credentials"
-    mas_api_bind_host: str = "0.0.0.0"
+    hostname: str = "0.0.0.0"
     port: str = "8002"
     version: str = "1.0.0"
     admin_allowed_users: list = []  # Populate with user_ids (usernames) to grant admin access
@@ -26,8 +17,7 @@ class AppConfig(SharedConfig):
     # Engine
     engine_name: str = "temporal"
     temporal_task_queue: str = "graph-engine"
-    # Redis streaming tuning ────────────────────────────────────────────────
-    redis_stream_ttl: int = 3600
+    # Redis streaming tuning
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
 
