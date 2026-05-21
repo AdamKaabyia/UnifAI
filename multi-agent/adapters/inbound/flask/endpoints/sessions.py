@@ -364,7 +364,7 @@ def get_session_meta(authenticated_user, session_id):
             # would never trigger; an explicit assignment is required.)
             payload["typing_users"] = collab.get_typing_users(session_id)
             try:
-                participants_obj = collab.get_participants(session_id)
+                participants_obj = collab.get_participants(session_id, user_id=authenticated_user)
                 payload["participants"] = [
                     p.user_id for p in participants_obj.participants
                 ]

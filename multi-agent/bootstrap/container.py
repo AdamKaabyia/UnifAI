@@ -294,7 +294,7 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         self.collaboration_service = self._create_collaboration_service(
-            cfg, self.session_repo
+            cfg, self.session_repo, self.identity_provider
         )
 
         self._initialized = True
@@ -314,7 +314,7 @@ class AppContainer(metaclass=SingletonMeta):
         return LocalChannelFactory()
 
     @staticmethod
-    def _create_collaboration_service(cfg: AppConfig, session_repo):
+    def _create_collaboration_service(cfg: AppConfig, session_repo, identity_provider):
         redis_url = get_redis_url()
         if redis_url:
             from outbound.redis import RedisCollaborationStore
@@ -322,6 +322,7 @@ class AppContainer(metaclass=SingletonMeta):
             return CollaborationService(
                 store=store,
                 session_repo=session_repo,
+                identity_provider=identity_provider,
                 presence_ttl=cfg.collaboration_presence_ttl,
                 edit_lock_ttl=cfg.collaboration_edit_lock_ttl_sec,
             )

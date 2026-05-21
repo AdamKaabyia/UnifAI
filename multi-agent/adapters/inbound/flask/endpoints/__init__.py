@@ -9,8 +9,7 @@ from inbound.flask.endpoints.health import health_bp
 from inbound.flask.endpoints.shares import shares_bp
 from inbound.flask.endpoints.statistics import statistics_bp
 from inbound.flask.endpoints.templates import templates_bp
-from inbound.flask.endpoints.collaboration import collaboration_bp
-from inbound.flask.endpoints.collaboration_locks import collaboration_locks_bp
+from inbound.flask.endpoints.collaboration import collaboration_bp, collaboration_locks_bp
 from inbound.flask.endpoints.workspace import workspace_bp
 from inbound.flask.endpoints.credentials import credentials_bp
 
