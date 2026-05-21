@@ -53,6 +53,10 @@ class IdentityClient:
         with self._cache_lock:
             self._cache[username] = (time.monotonic(), teams)
 
+    def _invalidate_cached_teams(self, username: str) -> None:
+        with self._cache_lock:
+            self._cache.pop(username, None)
+
     # ── Teams API ─────────────────────────────────────────────────────
 
     def list_teams_for_user(self, username: str) -> list[dict]:
@@ -96,16 +100,18 @@ class IdentityClient:
         """Check team membership.
 
         Fails **open** (returns ``True``) when not configured so local-dev
-        works without an Identity pod.  Fails **closed** (returns ``False``)
-        when configured but the request fails.
+        works without an Identity pod.  When configured, checks cached team
+        IDs first; on a cache miss (team not found), invalidates the cache
+        and retries with a fresh HTTP call so that newly-created teams are
+        recognised immediately instead of waiting for the cache TTL.
         """
         if not self._base:
             return True
-        try:
-            return team_id in self.get_team_ids(username)
-        except Exception:
-            logger.exception("IdentityClient.is_member check failed — denying")
-            return False
+        team_ids = self.get_team_ids(username)
+        if team_id in team_ids:
+            return True
+        self._invalidate_cached_teams(username)
+        return team_id in self.get_team_ids(username)
 
     def resolve_team_id(
         self, username: str, team_name_or_id: str,
