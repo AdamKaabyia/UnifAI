@@ -79,7 +79,7 @@ resources:
 
 storage:
   volumeName: "unifai-qdrant-volume"
-  requestedSize: 10Gi
+  requestedSize: 100Gi
   className: aws-ebs
   accessModes:
     - ReadWriteOnce
