@@ -124,8 +124,8 @@ class ValidationContext(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    def oauth_lookup_user_id(self) -> str:
-        """User id passed to AuthService for bearer/OAuth headers (never a team id when credential_user_id is set)."""
+    def credential_lookup_user_id(self) -> str:
+        """Resolve the user id for credential lookup — prefers credential_user_id (the logged-in human) over user_id (which may be a team id)."""
         c = (self.credential_user_id or "").strip()
         if c:
             return c
