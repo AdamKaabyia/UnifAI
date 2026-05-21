@@ -14,7 +14,7 @@ import requests as _http
 from typing import Any
 import os, uuid, logging
 import requests as http_requests
-from flask import request, jsonify, session, redirect, url_for, current_app
+from flask import request, jsonify, session, redirect, current_app
 from authlib.integrations.flask_client import OAuth
 from authlib.common.errors import AuthlibBaseError
 from config.app_config import AppConfig
@@ -113,6 +113,17 @@ class AuthManager:
             return 0
         remaining = float(session_expires_at) - datetime.now().timestamp()
         return max(0, int(remaining))
+
+    def _oauth_callback_redirect_uri(self) -> str:
+        """
+        OAuth redirect URI for /api/auth/callback.
+
+        Local dev: http://hostname_local:port/api/auth/callback
+        Production: {identity_host}/api/auth/callback (IDENTITY_HOST env)
+        """
+        if config.backend_env == "production":
+            return f"{config.identity_host.rstrip('/')}/api/auth/callback"
+        return f"http://{config.hostname_local}:{config.port}/api/auth/callback"
     
     def _register_auth_routes(self):
         """Register authentication routes"""
@@ -127,14 +138,7 @@ class AuthManager:
             if not client_state:
                 return jsonify({'error': 'State parameter is required'}), 400
             
-            # Get the OAuth callback redirect URI
-            redirect_uri = config.get(
-                'redirect_url',
-                url_for('auth_callback', _external=True, _scheme='https') 
-                if config.backend_env == "production" 
-                else f"http://{config.hostname_local}:{config.port}/api/auth/callback"
-            )
-            
+            redirect_uri = self._oauth_callback_redirect_uri()
             # Pass the client-provided state through to Keycloak
             # Keycloak will echo it back in the callback
             return self.keycloak_client.authorize_redirect(redirect_uri, state=client_state)
@@ -168,11 +172,7 @@ class AuthManager:
                     logger.error(f"CLI auth callback: Keycloak returned error={kc_error or 'no code'}")
                     return redirect(f"{cli_callback_url}?auth=error")
                 try:
-                    is_production = config.backend_env == "production"
-                    scheme = "https" if is_production else "http"
-                    redirect_uri = (
-                        f"{scheme}://{config.hostname_local}:{config.port}/api/auth/callback"
-                    )
+                    redirect_uri = self._oauth_callback_redirect_uri()
                     realm = config.get('keycloak_realm', 'master')
                     token_url = (
                         f"{config.keycloak_base_url}/realms/{realm}"
