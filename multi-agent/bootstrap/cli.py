@@ -55,7 +55,7 @@ def dev(
     from inbound.flask.flask_app import create_app
 
     flask_app = create_app(container, config=cfg)
-    bind_host = host or cfg.bind_host
+    bind_host = host or cfg.hostname
     bind_port = port or int(cfg.port)
     flask_app.run(host=bind_host, port=bind_port, debug=True)
 
@@ -74,7 +74,7 @@ def serve(
     import sys
 
     _, cfg = _build_container()
-    bind_host = host or cfg.bind_host
+    bind_host = host or cfg.hostname
     bind_port = port or int(cfg.port)
 
     sys.argv = [
