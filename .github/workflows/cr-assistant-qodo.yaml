@@ -1,0 +1,34 @@
+# .github/workflows/pr-agent.yml
+name: PR Agent (QODO)
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to scan'
+        required: true
+        default: 'main'
+  push:
+    branches:
+        - GENIE-1609_qodo_pr_agent
+#   pull_request:
+#     types: [opened, synchronize]
+jobs:
+  pr_agent_job:
+    runs-on: ubuntu-latest
+    permissions:
+        issues: write
+        pull-requests: write
+        contents: read
+
+    steps:
+    - name: PR Agent action step
+      uses: the-pr-agent/pr-agent@main
+      env:
+        # OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        config.model: "gemini/gemini-3.1-flash-lite-preview"
+        config.fallback_models: '["gemini/gemini-2.5-pro"]'
+        GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        github_action_config.auto_review: "true"
+        github_action_config.auto_describe: "true"
+        github_action_config.auto_improve: "true"
