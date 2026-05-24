@@ -44,10 +44,18 @@ function AppRoutes() {
   const [isDocuments] = useRoute("/documents");
   const [isSlackAddSource] = useRoute("/slack/add-source");
 
-  const isAgenticRoute = isChat || isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
+  const isAgenticRoute = isAgenticOverview || isAgenticAI || isInventory || isAgenticChats || isTemplates;
   const isTeamBlockedRagRoute =
     viewMode === "team" &&
     (isRagOverview || isSlack || isDocuments || isSlackAddSource);
+
+  if (isChat) {
+    return (
+      <AgenticAIProvider>
+        <Route path="/chat/:token" component={PublicChat} />
+      </AgenticAIProvider>
+    );
+  }
 
   if (isAgenticRoute || isTeamBlockedRagRoute) {
     return (
@@ -59,7 +67,6 @@ function AppRoutes() {
             <Route path="/inventory" component={AgentRepository} />
             <Route path="/agentic-chats" component={AgenticChats} />
             <Route path="/templates" component={AgenticTemplates} />
-            <Route path="/chat/:token" component={PublicChat} />
           </Switch>
         </AgenticLayout>
       </AgenticAIProvider>
