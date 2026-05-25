@@ -54,4 +54,6 @@ create_or_update_resource "secret generic" shared-secret \
   --from-literal=UMAMI_USERNAME="$UMAMI_USERNAME" \
   --from-literal=UMAMI_PASSWORD="$UMAMI_PASSWORD" \
   --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
-  --from-literal=SECRET_KEY="$secret_key"
+  --from-literal=SECRET_KEY="$secret_key" \
+  --from-literal=VAULT_ROLE_ID="$vault_role_id" \
+  --from-literal=VAULT_SECRET_ID="$vault_secret_id"
