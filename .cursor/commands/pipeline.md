@@ -132,7 +132,7 @@ Execute the phases applicable to the selected mode, IN ORDER. Do not skip phases
 2. Switch persona to the Design Reviewer.
 3. Critically review the **full design produced in Phase 1** (the in-chat output), following the skill's review dimensions.
 4. Present the review under a `## PHASE 2: DESIGN REVIEW` header.
-5. **ADR file annotation (only if ADR File is not NONE):** After completing the full in-chat review, read the ADR file at the path recorded in the pipeline state. Update section **7. Reviewer Feedback** in that file with the review findings, verdict, and revision items. This step happens AFTER the in-chat review is complete — the file annotation is a secondary output derived from the review, not a replacement for it.
+5. **ADR file annotation (only if ADR File is not NONE):** Pass the `ADR File` path from the pipeline state as input context to the reviewer skill. The reviewer skill handles the file annotation as defined in its own instructions (Part 2 of its output format).
 6. Extract the verdict. Then follow the DESIGN REVIEW VERDICT HANDLER below.
 
 #### DESIGN REVIEW VERDICT HANDLER
