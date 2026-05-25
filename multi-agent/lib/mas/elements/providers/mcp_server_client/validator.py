@@ -92,7 +92,6 @@ class McpProviderValidator(BaseElementValidator):
                 )
 
         try:
-            start = time.time()
             with anyio.fail_after(context.timeout_seconds):
                 await self._factory.create_async(config, auth_credential=auth_cred)
 
