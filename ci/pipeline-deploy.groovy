@@ -162,39 +162,6 @@ def updateValuesYaml(String filePath , String version) {
     echo "✅ Updated ${filePath} successfully"
 }
 
-// def updateDeployerEnv() {
-//     echo "🔄 updating deployer env with new values"
-//     def identity_env_file = null
-//     def redis_env_file = null
-//     def multiagent_env_file = null
-//     if (params.deploy_location == 'PRODUCTION') {
-//         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-production")
-//         identity_env_file = "./UnifAI-secrets/production/.env_identity"
-//         redis_env_file = "./UnifAI-secrets/production/.env_redis"
-//         multiagent_env_file = "./UnifAI-secrets/production/.env_multi_agent"
-//     } else if (params.deploy_location == 'STAGING') {
-//         updateEnvFile("./UnifAI-secrets/.env", "umami_website_name", "unifai-staging")
-//         identity_env_file = "./UnifAI-secrets/staging/.env_identity"
-//         redis_env_file = "./UnifAI-secrets/staging/.env_redis"
-//         multiagent_env_file = "./UnifAI-secrets/staging/.env_multi_agent"
-//     }
-//     echo("✅ Deployer env updated successfully")
-//     return [identity_env_file, redis_env_file, multiagent_env_file]
-// }
-
-
-// def updateEnvFile(String filePath, String key, String value) {
-//     if (!fileExists(filePath)) {
-//         error "❌ File not found: ${filePath}"
-//     }
-    
-//     echo "🔧 Updating ${key} in ${filePath}..."
-//     def content = readFile(filePath)
-//     // Safe replacement
-//     def newContent = content.replaceFirst(/(?m)^${key}=.*/, "${key}=${value}")
-//     writeFile(file: filePath, text: newContent)
-// }
-
 def deployModules(module){
     echo "deploying modules: ${module}"
     sh("podman exec -t helmfile bash -lc 'helmfile -f ${module}.yaml.gotmpl apply'")
