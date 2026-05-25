@@ -90,8 +90,8 @@ export default function Analytics() {
     : [];
 
   const topUsersData = analytics?.active_users?.slice(0, 8).map((u: UserActivity) => ({
-    name: truncateUserId(u.user_id, 12),
-    fullName: u.user_id,
+    name: truncateUserId(u.display_name || u.identity_id, 12),
+    fullName: u.display_name || u.identity_id,
     runs: u.run_count,
     blueprints: u.blueprints_used,
     completed: u.status_breakdown?.COMPLETED || 0,

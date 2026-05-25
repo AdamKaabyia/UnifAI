@@ -33,6 +33,7 @@ import {
 import { MemberDisplay, buildMemberDisplay } from "@/utils/memberDisplay";
 import type { ChatSessionData } from "@/types/session";
 import { transformSessionData } from "@/utils/sessionHelpers";
+import type { CarouselMode } from "@/components/shared/ViewModeToggle";
 
 const COLLAB_POLL_INTERVAL = 3000;
 const COLLAB_HEARTBEAT_INTERVAL = 30000;
@@ -51,6 +52,11 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
   const [isSessionBusy, setIsSessionBusy] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [carouselMode, setCarouselMode] = useState<CarouselMode>('normal');
+
+  const handleSetCarouselMode = useCallback((mode: CarouselMode) => {
+    setCarouselMode(mode);
+  }, []);
 
   const { user } = useAuth();
   const { clearStream } = useStreamingData();
@@ -375,6 +381,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           triggerExecution={triggerExecution}
           onCancelSession={handleCancelSession}
           getSessionParticipantMembers={getSessionParticipantMembers}
+          carouselMode={carouselMode}
+          onSetCarouselMode={handleSetCarouselMode}
         />
         <CollaborationHubRightPanel
           selectedSession={hub.selectedSession}
@@ -387,6 +395,8 @@ export default function CollaborationHubView({ runId, teamMembers, teamName }: C
           blueprintValidationResults={hub.blueprintValidationResults}
           isValidatingBlueprint={hub.isValidatingBlueprint}
           getSessionParticipantMembers={getSessionParticipantMembers}
+          carouselMode={carouselMode}
+          onSetCarouselMode={handleSetCarouselMode}
         />
       </div>
 

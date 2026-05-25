@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
-import { MessageSquare, Users, Clock, Trash2, Plus, Columns3, Network } from "lucide-react";
+import { MessageSquare, Users, Clock, Trash2, Plus } from "lucide-react";
 import ChatInterface from "./chat/ChatInterface";
 import ExecutionStream from "./ExecutionStream";
 import GraphDisplay from "./graphs/GraphDisplay";
@@ -28,6 +28,7 @@ import { FlowObject } from "./graphs/interfaces";
 import { UmamiTrack } from '@/components/ui/umamitrack';
 import { UmamiEvents } from '@/config/umamiEvents';
 import { useSessionHub } from "@/hooks/use-session-hub";
+import { ViewModeToggle, type CarouselMode } from "@/components/shared/ViewModeToggle";
 
 /**
  * Session execution payload (fire-and-forget submit + stream subscribe pattern)
@@ -65,12 +66,12 @@ export default function ExecutionTab({ runId }: ExecutionTabProps): React.ReactE
   const [blueprintGraphWidth, setBlueprintGraphWidth] = useState(30);
   const [isResizing, setIsResizing] = useState(false);
   const [activeResizer, setActiveResizer] = useState<'left' | 'right' | null>(null);
-  const [carouselMode, setCarouselMode] = useState<'normal' | 'chat' | 'graph'>('normal');
+  const [carouselMode, setCarouselMode] = useState<CarouselMode>('normal');
 
   const isChatOnlyMode = hub.selectedSession?.fromSharedLink ?? false;
 
   // ── Carousel mode ──────────────────────────────────────────────────────
-  const handleSetCarouselMode = useCallback((mode: 'normal' | 'chat' | 'graph') => {
+  const handleSetCarouselMode = useCallback((mode: CarouselMode) => {
     if (isChatOnlyMode) return;
     const availableWidth = 100 - chatSidebarWidth;
     switch (mode) {
@@ -382,29 +383,11 @@ export default function ExecutionTab({ runId }: ExecutionTabProps): React.ReactE
                 transition={{ delay: 0.3, duration: 0.2 }}
                 className="absolute top-3 right-3 z-10"
               >
-                <div className="flex items-center bg-background-surface border border-gray-700 rounded-lg p-0.5 shadow-lg">
-                  <button
-                    onClick={() => handleSetCarouselMode('normal')}
-                    className="p-1.5 rounded-md transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
-                    title="Split View"
-                  >
-                    <Columns3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleSetCarouselMode('chat')}
-                    className="p-1.5 rounded-md transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
-                    title="Full Chat View"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleSetCarouselMode('graph')}
-                    className="p-1.5 rounded-md transition-all duration-200 bg-primary text-white shadow-sm"
-                    title="Full Graph View"
-                  >
-                    <Network className="h-4 w-4" />
-                  </button>
-                </div>
+                <ViewModeToggle
+                  mode={carouselMode}
+                  onModeChange={handleSetCarouselMode}
+                  className="shadow-lg"
+                />
               </motion.div>
             )}
             <div className="p-0 flex-grow">

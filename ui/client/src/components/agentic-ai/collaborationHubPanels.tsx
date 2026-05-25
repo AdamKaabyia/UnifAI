@@ -28,6 +28,7 @@ import type { ChatSession, ChatMessage } from "@/types/session";
 import type { FlowObject } from "./graphs/interfaces";
 import type { SessionPayload } from "./ExecutionTab";
 import type { ElementValidationResult } from "@/types/validation";
+import { ViewModeToggle, type CarouselMode } from "@/components/shared/ViewModeToggle";
 
 export interface CollaborationHubSessionSidebarProps {
   chatSessions: ChatSession[];
@@ -154,6 +155,8 @@ export interface CollaborationHubMainColumnProps {
   triggerExecution: (payload: SessionPayload) => Promise<unknown>;
   onCancelSession: () => Promise<void>;
   getSessionParticipantMembers: (sessionId: string) => MemberDisplay[];
+  carouselMode?: CarouselMode;
+  onSetCarouselMode?: (mode: CarouselMode) => void;
 }
 
 export function CollaborationHubMainColumn({
@@ -170,7 +173,10 @@ export function CollaborationHubMainColumn({
   triggerExecution,
   onCancelSession,
   getSessionParticipantMembers,
+  carouselMode,
+  onSetCarouselMode,
 }: CollaborationHubMainColumnProps) {
+  if (carouselMode === 'graph') return null;
   return (
     <div className="flex-1 flex flex-col min-w-0">
       <div className="px-5 py-3 border-b border-gray-800 bg-background-surface flex items-center gap-3 flex-shrink-0">
@@ -227,6 +233,8 @@ export function CollaborationHubMainColumn({
             collaborationMode={true}
             teamMembers={teamMembers}
             typingUsers={typingUsers}
+            carouselMode={carouselMode}
+            onSetCarouselMode={onSetCarouselMode}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -253,6 +261,8 @@ export interface CollaborationHubRightPanelProps {
   blueprintValidationResults?: Record<string, ElementValidationResult>;
   isValidatingBlueprint: boolean;
   getSessionParticipantMembers: (sessionId: string) => MemberDisplay[];
+  carouselMode?: CarouselMode;
+  onSetCarouselMode?: (mode: CarouselMode) => void;
 }
 
 export function CollaborationHubRightPanel({
@@ -266,9 +276,22 @@ export function CollaborationHubRightPanel({
   blueprintValidationResults,
   isValidatingBlueprint,
   getSessionParticipantMembers,
+  carouselMode,
+  onSetCarouselMode,
 }: CollaborationHubRightPanelProps) {
+  if (carouselMode === 'chat') return null;
+  const isGraphOnly = carouselMode === 'graph';
   return (
-    <div className="w-[340px] border-l border-gray-800 bg-background-card flex flex-col flex-shrink-0 hidden xl:flex">
+    <div className={`${isGraphOnly ? 'flex-1' : 'w-[340px]'} border-l border-gray-800 bg-background-card flex flex-col flex-shrink-0 hidden xl:flex relative`}>
+      {isGraphOnly && onSetCarouselMode && (
+        <div className="absolute top-3 right-3 z-10">
+          <ViewModeToggle
+            mode={carouselMode ?? 'normal'}
+            onModeChange={onSetCarouselMode}
+            className="shadow-lg"
+          />
+        </div>
+      )}
       <div className="flex-1 min-h-0 flex flex-col border-b border-gray-800">
         <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">

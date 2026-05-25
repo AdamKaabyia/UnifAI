@@ -269,16 +269,20 @@ class MongoSessionRepository(SessionRepository):
 
     # ---------- Facet Definitions ----------
 
+    _FACET_IDENTITY_TYPE_KEY = "identity_type"
+    _FACET_IDENTITY_ID_KEY = "identity_id"
+
     def _owner_status_facet(self) -> list:
         """Group sessions by identity (type+id) and status."""
         return [
             {"$group": {
                 "_id": {
-                    self._IDENTITY_TYPE_FIELD: f"${self._IDENTITY_TYPE_FIELD}",
-                    self._IDENTITY_ID_FIELD: f"${self._IDENTITY_ID_FIELD}",
+                    self._FACET_IDENTITY_TYPE_KEY: f"${self._IDENTITY_TYPE_FIELD}",
+                    self._FACET_IDENTITY_ID_KEY: f"${self._IDENTITY_ID_FIELD}",
                     self._STATUS_FIELD: f"${self._STATUS_FIELD}"
                 },
-                "count": {"$sum": 1}
+                "count": {"$sum": 1},
+                "display_name": {"$first": "$identity.display_name"}
             }}
         ]
 
@@ -287,8 +291,8 @@ class MongoSessionRepository(SessionRepository):
         return [
             {"$group": {
                 "_id": {
-                    self._IDENTITY_TYPE_FIELD: f"${self._IDENTITY_TYPE_FIELD}",
-                    self._IDENTITY_ID_FIELD: f"${self._IDENTITY_ID_FIELD}",
+                    self._FACET_IDENTITY_TYPE_KEY: f"${self._IDENTITY_TYPE_FIELD}",
+                    self._FACET_IDENTITY_ID_KEY: f"${self._IDENTITY_ID_FIELD}",
                     self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
                 },
                 "count": {"$sum": 1}
@@ -342,7 +346,7 @@ class MongoSessionRepository(SessionRepository):
                         "$concat": [
                             f"${self._IDENTITY_TYPE_FIELD}",
                             ":",
-                            f"${self._IDENTITY_ID_FIELD}",
+                            {"$ifNull": ["$identity.display_name", f"${self._IDENTITY_ID_FIELD}"]},
                         ]
                     }
                 }
@@ -432,5 +436,16 @@ class MongoSessionRepository(SessionRepository):
 
     @staticmethod
     def _to_grouped_counts(docs: List[Dict]) -> List[GroupedCount]:
-        """Transform MongoDB aggregation results to GroupedCount DTOs."""
-        return [GroupedCount(fields=doc["_id"], count=doc["count"]) for doc in docs]
+        """Transform MongoDB aggregation results to GroupedCount DTOs.
+
+        Merges any extra accumulator fields (beyond _id and count) into the
+        fields dict so they are accessible via GroupedCount.get().
+        """
+        results = []
+        for doc in docs:
+            fields = dict(doc["_id"]) if isinstance(doc["_id"], dict) else {"_id": doc["_id"]}
+            for key, val in doc.items():
+                if key not in ("_id", "count"):
+                    fields[key] = val
+            results.append(GroupedCount(fields=fields, count=doc["count"]))
+        return results

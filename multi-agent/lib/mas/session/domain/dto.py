@@ -6,6 +6,7 @@ class SessionListItem(BaseModel):
     session_id: str
     metadata: Dict[str, Any]
     started_at: str
+    last_active_at: str = ""
     blueprint_id: str
     blueprint_exists: bool = True
 
@@ -20,6 +21,7 @@ class SessionListItem(BaseModel):
                 "public_usage_scope": public_usage_scope,
             },
             started_at=rc.get("started_at", ""),
+            last_active_at=rc.get("last_active_at", ""),
             blueprint_id=doc.get("blueprint_id", ""),
             blueprint_exists=blueprint_exists
         )
