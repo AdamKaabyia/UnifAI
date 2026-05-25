@@ -20,8 +20,8 @@ class SessionListItem(BaseModel):
                 **doc.get("metadata", {}),
                 "public_usage_scope": public_usage_scope,
             },
-            started_at=rc.get("started_at", ""),
-            last_active_at=rc.get("last_active_at", ""),
+            started_at=rc.get("started_at") or "",
+            last_active_at=rc.get("last_active_at") or "",
             blueprint_id=doc.get("blueprint_id", ""),
             blueprint_exists=blueprint_exists
         )
