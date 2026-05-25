@@ -13,9 +13,9 @@ on:
         description: 'Which branch do you want to use?'
         required: true
         default: 'GENIE-948_hashicorp_integration'
-  push:
-    branches:
-      - GENIE-948_hashicorp_integration
+  # push:
+  #   branches:
+  #     - GENIE-948_hashicorp_integration
 
 jobs:
   test_hashicorp_vault:

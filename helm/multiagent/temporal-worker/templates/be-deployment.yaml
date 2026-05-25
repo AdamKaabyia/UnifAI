@@ -49,15 +49,15 @@ spec:
           {{- end }}
           envFrom:
             - configMapRef:
-                name: multiagent-temporal-worker-configmap
+                name: {{ .Values.globalConfigMapName }}
             - configMapRef:
                 name: multiagent-be-configmap
-            - secretRef:
-                name: {{ .Values.MultiagentSecretName }}
+            - configMapRef:
+                name: multiagent-temporal-worker-configmap
             - secretRef:
                 name: {{ .Values.globalSecretName }}
-            - configMapRef:
-                name: {{ .Values.globalConfigMapName }}
+            - secretRef:
+                name: {{ .Values.MultiagentSecretName }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

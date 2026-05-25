@@ -29,5 +29,3 @@ create_or_update_resource "secret generic" redis-secret \
   --from-literal=REDIS_PASSWORD="$redis_password" \
   --from-literal=RI_REDIS_USERNAME="$redis_username" \
   --from-literal=RI_REDIS_PASSWORD="$redis_password"
-  # --from-literal=RI_USERNAME="$ri_username" \
-  # --from-literal=RI_PASSWORD="$ri_password"
