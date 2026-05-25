@@ -20,14 +20,8 @@ on:
 jobs:
   test_hashicorp_vault:
     runs-on: linux
-    environment:
-      name: ${{ needs.setup_environment.outputs.CLUSTER }}
     env:
-      BRANCH: ${{ needs.setup_environment.outputs.BRANCH }}
-      CLUSTER: ${{ needs.setup_environment.outputs.CLUSTER }}
-      NAMESPACE: ${{ vars.NAMESPACE }}
-      VERIFY_TLS: ${{ vars.VERIFY_TLS }}
-      API_URL: ${{ vars.API_URL }}
+      BRANCH: ${{ inputs.target_branch }}
     steps:
 
       - name: Import Secrets
