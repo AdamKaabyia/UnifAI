@@ -52,6 +52,17 @@ Before creating anything new, check if:
 
 If reusable logic exists, USE IT. Do NOT duplicate.
 
+### Identity Object Usage (STRICT — multi-agent only)
+
+The `multi-agent` module uses a structured `Identity` object for resource ownership instead of flat `user_id` strings. When writing code in `multi-agent/`:
+
+- Use `Identity` (`from mas.core.identity import Identity`) for all ownership and scoping of blueprints, resources, sessions, shares, and templates.
+- At the API boundary (Flask adapters), resolve raw `userId` + `identityType` params into an `Identity` object using `resolve_identity()` or the `@with_require_identity_authorization` decorator. Never pass flat `user_id` deeper than the adapter layer.
+- Use the `identity_q()` helper for MongoDB queries scoped to an owner.
+- `user_id` remains correct for human-specific concerns: OAuth credentials (`credential_user_id`), collaboration participants, and auth headers.
+
+When working in modules outside `multi-agent/`, follow the existing ownership pattern in that module (typically flat `user_id`). Do not introduce `Identity` dependencies into modules that don't already use it unless explicitly instructed. However, add a comment on each ownership-related usage noting the gap, e.g.: `# TODO: uses flat user_id — migrate to Identity object (see mas.core.identity)`.
+
 ### Quality Standards
 
 - All functions require type hints.
