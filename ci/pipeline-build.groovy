@@ -59,7 +59,10 @@ def buildDockerImage(String component) {
     def componentLower = component.toLowerCase().replace("-", "")
 
     sh "echo '>>> Build START: ${componentLower}' && date"
-    def status = sh(script: """podman build -t ${componentLower}:${VERSION} -t ${componentLower}:latest -f ${component}/${dockerfile} ${context} 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0; fflush() }' > ${logFile}""", returnStatus: true)
+    def status = sh(script: """#!/bin/bash
+        set -o pipefail
+        podman build -t ${componentLower}:${VERSION} -t ${componentLower}:latest -f ${component}/${dockerfile} ${context} 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0; fflush() }' > ${logFile}""",
+        returnStatus: true)
     sh "echo '>>> Build END: ${componentLower}' && date"
 
     if (status != 0) {
