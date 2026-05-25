@@ -61,7 +61,7 @@ The `multi-agent` module uses a structured `Identity` object for resource owners
 - Use the `identity_q()` helper for MongoDB queries scoped to an owner.
 - `user_id` remains correct for human-specific concerns: OAuth credentials (`credential_user_id`), collaboration participants, and auth headers.
 
-When working in modules outside `multi-agent/`, follow the existing ownership pattern in that module (typically flat `user_id`). Do not introduce `Identity` dependencies into modules that don't already use it unless explicitly instructed. However, add a comment on each ownership-related usage noting the gap, e.g.: `# TODO: uses flat user_id — migrate to Identity object (see mas.core.identity)`.
+When working in modules outside `multi-agent/`, follow the existing ownership pattern in that module (typically flat `user_id`). Do not introduce `Identity` dependencies into modules that don't already use it unless explicitly instructed. Report any ownership-related `user_id` usage in the implementation summary (see "Identity migration gaps" in the Output Format section).
 
 ### Quality Standards
 
@@ -96,4 +96,5 @@ Before listing changes, provide:
 After all changes, provide:
 - **Reuse summary**: list existing components leveraged.
 - **Architecture check**: confirm dependency direction is correct, no business logic leakage.
+- **Identity migration gaps**: list any files outside `multi-agent/` where ownership-related code uses flat `user_id` instead of the `Identity` object. For each, state the file path, the usage, and that it is a candidate for future migration to `mas.core.identity.Identity`. If none, state "None — all ownership code uses Identity."
 - **Files changed**: total count of new and modified files.
