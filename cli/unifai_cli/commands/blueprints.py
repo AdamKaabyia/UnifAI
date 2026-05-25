@@ -27,7 +27,7 @@ def list_cmd(
     from unifai_cli.display.formatting import console, render_blueprint_table
 
     user_id = resolve_user_id(user)
-    client = build_client(mas_url)
+    client = build_client(mas_url, user_id=user_id)
 
     try:
         summaries = client.list_blueprint_summaries(user_id)

@@ -10,8 +10,12 @@ class BlueprintsAPI(MASClient):
     """API methods for workflow blueprints."""
 
     def list_blueprint_summaries(self, user_id: str) -> List[dict]:
-        return self._get("blueprints", "available.blueprints.summary.get",
-                         params={"userId": user_id})
+        return self._get(
+            "blueprints",
+            "available.blueprints.summary.get",
+            params={"userId": user_id},
+            user_id=user_id,
+        )
 
     def get_blueprint(self, blueprint_id: str) -> dict:
         return self._get("blueprints", "blueprint.info.get",

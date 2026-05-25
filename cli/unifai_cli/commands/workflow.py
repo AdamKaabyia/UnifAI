@@ -34,7 +34,7 @@ def run_cmd(
     from unifai_cli.display.formatting import console
 
     user_id = resolve_user_id(user)
-    client = build_client(mas_url)
+    client = build_client(mas_url, user_id=user_id)
 
     bp_id = _resolve_blueprint(client, user_id, blueprint_id, blueprint_name)
     if bp_id is None:
@@ -136,7 +136,7 @@ def _execute_turn(client: MASClient, session_id: str, prompt: str,
         )
         display_streaming_events(response, console)
         return True
-    except Exception as stream_err:
+    except Exception:
         # Streaming may not be available — fall back to submit + poll
         pass
 

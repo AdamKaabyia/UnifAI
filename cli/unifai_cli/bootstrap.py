@@ -21,11 +21,14 @@ class _UnifAIClient(BlueprintsAPI, ResourcesAPI, SessionsAPI):
     """Composite client with blueprints, resources, and sessions capabilities."""
 
 
-def build_client(mas_url: Optional[str] = None) -> MASClient:
+def build_client(mas_url: Optional[str] = None, user_id: Optional[str] = None) -> MASClient:
     """Build a MAS API client from URL flag or environment."""
     config = AppConfig.get_instance()
     url = mas_url or os.environ.get("MAS_URL", config.mas_url)
-    return _UnifAIClient(url)
+    client = _UnifAIClient(url)
+    if user_id:
+        client.set_authenticated_user(user_id)
+    return client
 
 
 def resolve_user_id(user_option: Optional[str] = None) -> str:

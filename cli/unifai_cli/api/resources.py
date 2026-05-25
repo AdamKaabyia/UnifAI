@@ -12,7 +12,7 @@ class ResourcesAPI(MASClient):
         params = {"userId": user_id, "limit": limit, "offset": offset}
         if category:
             params["category"] = category
-        return self._get("resources", "resources.list", params=params)
+        return self._get("resources", "resources.list", params=params, user_id=user_id)
 
     def get_resource(self, resource_id: str) -> dict:
         return self._get("resources", "resource.get",
