@@ -2,6 +2,7 @@
 export interface ChatMessage {
   content: string;
   role: "user" | "assistant";
+  sender_id?: string;
 }
 
 // Shared ChatSession interface used across components
@@ -17,6 +18,8 @@ export interface ChatSession {
   fromSharedLink?: boolean;
   blueprintName?: string; // The workflow display name from spec_dict.name
   isSharingDisabled?: boolean; // Track if sharing is disabled for this session
+  status?: string;
+  statusMessage?: string;
 }
 
 // Types for the API response
@@ -31,4 +34,6 @@ export interface ChatSessionData {
 export interface SessionStateData {
   final_output: string;
   messages: ChatMessage[];
+  status?: string;
+  status_message?: string;
 }

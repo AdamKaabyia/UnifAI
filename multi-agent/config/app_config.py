@@ -23,9 +23,21 @@ class AppConfig(SharedConfig):
     redis_stream_ttl: int = 3600
     redis_stream_block_ms: int = 5000
     redis_stream_batch_size: int = 50
+
+    # Collaboration hub — Redis-backed multi-user session presence ──────────
+    collaboration_presence_ttl: int = 300
+    collaboration_edit_lock_ttl_sec: int = 180
+
+    # Directory provider: "sso" (via Identity pod) or "" to disable
+    directory_provider: str = ""
+    directory_timeout: int = 10
+
+    # Identity HTTP base for directory + teams HTTP APIs (optional override).
+    # When empty, ``identity_host`` is used for ``IdentityDirectoryClient`` and auth decorators.
+    directory_sso_url: str = ""
+
     # Auth
     oauth_state_secret: str = secrets.token_urlsafe(32)
     identity_host: str = "http://localhost:13456"
     oauth_callback_path: str = "/api/credentials/callback"
     credential_encryption_key: str = ""
-
