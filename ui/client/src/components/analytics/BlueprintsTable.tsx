@@ -109,7 +109,7 @@ export function BlueprintsTable({ blueprints, colors }: BlueprintsTableProps) {
                                     );
                                   })
                                 ) : (
-                                  <div className="text-gray-400">No user data</div>
+                                  <div className="text-gray-400">No identities found</div>
                                 )}
                               </div>
                             </div>

@@ -346,7 +346,7 @@ class MongoSessionRepository(SessionRepository):
                         "$concat": [
                             f"${self._IDENTITY_TYPE_FIELD}",
                             ":",
-                            {"$ifNull": ["$identity.display_name", f"${self._IDENTITY_ID_FIELD}"]},
+                            f"${self._IDENTITY_ID_FIELD}",
                         ]
                     }
                 }

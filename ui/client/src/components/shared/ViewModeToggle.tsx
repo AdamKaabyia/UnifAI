@@ -28,6 +28,8 @@ export function ViewModeToggle({ mode, onModeChange, className }: ViewModeToggle
               : "text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
           }`}
           title={title}
+          aria-label={title}
+          aria-pressed={mode === btnMode}
         >
           <Icon className="h-4 w-4" />
         </button>
