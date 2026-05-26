@@ -29,10 +29,13 @@ export function useCarouselLayout({
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
-    if (disabled && carouselMode !== "normal") {
-      setCarouselModeState("normal");
-      setChatWidth(defaultChatPercent);
-      setGraphWidth(defaultGraphPercent);
+    if (disabled) {
+      if (carouselMode !== "normal") {
+        setCarouselModeState("normal");
+        setChatWidth(defaultChatPercent);
+        setGraphWidth(defaultGraphPercent);
+      }
+      setIsResizing(false);
     }
   }, [disabled]);
 
@@ -68,7 +71,7 @@ export function useCarouselLayout({
 
   const handleResizeMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!isResizing) return;
+      if (!isResizing || disabled) return;
       const container = document.querySelector(containerSelector);
       if (!container) return;
       const rect = container.getBoundingClientRect();
@@ -77,7 +80,7 @@ export function useCarouselLayout({
       setChatWidth(clamped);
       setGraphWidth(100 - clamped);
     },
-    [isResizing, containerSelector, minPercent, maxPercent],
+    [isResizing, disabled, containerSelector, minPercent, maxPercent],
   );
 
   const handleResizeMouseUp = useCallback(() => {

@@ -359,7 +359,7 @@ export function CollaborationHubRightPanel({
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="font-medium text-gray-400">Started</dt>
+            <dt className="font-medium text-gray-400">Last active</dt>
             <dd>{selectedSession?.lastActive || "—"}</dd>
           </div>
           <div className="flex justify-between">

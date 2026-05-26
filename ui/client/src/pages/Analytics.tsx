@@ -320,7 +320,7 @@ export default function Analytics() {
 
         {/* Footer */}
         <div className="mt-6 text-center text-xs text-gray-500">
-          Data generated at: {analytics?.generated_at ? new Date(analytics.generated_at).toLocaleString() : 'N/A'} • Auto-refreshes every 60 seconds
+          Data generated at: {analytics?.generated_at ? new Date(analytics.generated_at).toLocaleString() : 'N/A'} • Auto-refreshes every 30 seconds
         </div>
       </main>
     );

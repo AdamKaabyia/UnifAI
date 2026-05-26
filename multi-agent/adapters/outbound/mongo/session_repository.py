@@ -9,7 +9,7 @@ from mas.session.domain.session_record import SessionRecord
 from mas.session.domain.models import SessionChat, TimeSeriesPoint, SystemAnalyticsData
 from mas.blueprints.models.blueprint import BlueprintExecutionStats
 from mas.session.domain.status import SessionStatus
-from mas.core.identity import Identity
+from mas.core.identity import Identity, IdentityFieldKey
 from mas.core.dto import GroupedCount
 
 from outbound.mongo.helpers import identity_q
@@ -219,12 +219,15 @@ class MongoSessionRepository(SessionRepository):
                     "$dateTrunc": {
                         "date": {"$dateFromString": {
                             "dateString": self._ACTIVITY_DATE_EXPR,
+                            "onError": None,
+                            "onNull": None,
                         }},
                         "unit": truncate_unit
                     }
                 },
                 "count": {"$sum": 1}
             }},
+            {"$match": {"_id": {"$ne": None}}},
             {"$sort": {"_id": 1}},
             {"$limit": self._MAX_TIME_SERIES_POINTS}
         ]
@@ -277,16 +280,13 @@ class MongoSessionRepository(SessionRepository):
 
     # ---------- Facet Definitions ----------
 
-    _FACET_IDENTITY_TYPE_KEY = "identity_type"
-    _FACET_IDENTITY_ID_KEY = "identity_id"
-
     def _owner_status_facet(self) -> list:
         """Group sessions by identity (type+id) and status."""
         return [
             {"$group": {
                 "_id": {
-                    self._FACET_IDENTITY_TYPE_KEY: f"${self._IDENTITY_TYPE_FIELD}",
-                    self._FACET_IDENTITY_ID_KEY: f"${self._IDENTITY_ID_FIELD}",
+                    IdentityFieldKey.IDENTITY_TYPE: f"${self._IDENTITY_TYPE_FIELD}",
+                    IdentityFieldKey.IDENTITY_ID: f"${self._IDENTITY_ID_FIELD}",
                     self._STATUS_FIELD: f"${self._STATUS_FIELD}"
                 },
                 "count": {"$sum": 1},
@@ -299,8 +299,8 @@ class MongoSessionRepository(SessionRepository):
         return [
             {"$group": {
                 "_id": {
-                    self._FACET_IDENTITY_TYPE_KEY: f"${self._IDENTITY_TYPE_FIELD}",
-                    self._FACET_IDENTITY_ID_KEY: f"${self._IDENTITY_ID_FIELD}",
+                    IdentityFieldKey.IDENTITY_TYPE: f"${self._IDENTITY_TYPE_FIELD}",
+                    IdentityFieldKey.IDENTITY_ID: f"${self._IDENTITY_ID_FIELD}",
                     self._BLUEPRINT_FIELD: f"${self._BLUEPRINT_FIELD}"
                 },
                 "count": {"$sum": 1}
@@ -331,7 +331,11 @@ class MongoSessionRepository(SessionRepository):
                         ]
                     }
                 },
-                "last_run": {"$max": self._ACTIVITY_DATE_EXPR},
+                "last_run": {"$max": {"$dateFromString": {
+                    "dateString": self._ACTIVITY_DATE_EXPR,
+                    "onError": None,
+                    "onNull": None,
+                }}},
                 "avg_duration_ms": {
                     "$avg": {
                         "$cond": [

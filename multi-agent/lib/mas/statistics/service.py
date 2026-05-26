@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from mas.blueprints.service import BlueprintService
 from mas.session.service import SessionService
 from mas.resources.service import ResourcesService
-from mas.core.identity import Identity
+from mas.core.identity import Identity, IdentityFieldKey
 from mas.core.dto import GroupedCount
 from mas.blueprints.models.blueprint import BlueprintExecutionStats
 from global_utils.utils.time_utils import format_utc_iso
@@ -294,8 +294,8 @@ class StatisticsService:
         """
         user_data: Dict[str, UserActivity] = {}
         for item in status_counts:
-            identity_id = item.get("identity_id")
-            identity_type = item.get("identity_type", "user")
+            identity_id = item.get(IdentityFieldKey.IDENTITY_ID)
+            identity_type = item.get(IdentityFieldKey.IDENTITY_TYPE, "user")
             display_name = item.get("display_name") or ""
             status = item.get("status")
             count = item.count
@@ -320,8 +320,8 @@ class StatisticsService:
         
         identity_blueprints: Dict[str, Set[str]] = {}
         for item in blueprint_counts:
-            identity_id = item.get("identity_id")
-            identity_type = item.get("identity_type", "user")
+            identity_id = item.get(IdentityFieldKey.IDENTITY_ID)
+            identity_type = item.get(IdentityFieldKey.IDENTITY_TYPE, "user")
             blueprint_id = item.get("blueprint_id")
             if identity_id:
                 composite_key = f"{identity_type}:{identity_id}"
@@ -362,8 +362,8 @@ class StatisticsService:
             count = item.count
             total_runs += count
             
-            identity_id = item.get("identity_id")
-            identity_type = item.get("identity_type", "user")
+            identity_id = item.get(IdentityFieldKey.IDENTITY_ID)
+            identity_type = item.get(IdentityFieldKey.IDENTITY_TYPE, "user")
             if identity_id:
                 identity_keys.add(f"{identity_type}:{identity_id}")
             
