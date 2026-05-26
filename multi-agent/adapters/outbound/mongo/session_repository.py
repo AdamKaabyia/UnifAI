@@ -11,7 +11,7 @@ from mas.blueprints.models.blueprint import BlueprintExecutionStats
 from mas.session.domain.status import SessionStatus
 from mas.core.identity import Identity
 from mas.core.dto import GroupedCount
-from global_utils.utils.time_utils import format_utc_iso
+
 from outbound.mongo.helpers import identity_q
 
 logger = logging.getLogger(__name__)
@@ -27,12 +27,18 @@ class MongoSessionRepository(SessionRepository):
 
     _IDENTITY_TYPE_FIELD = "identity.type"
     _IDENTITY_ID_FIELD = "identity.id"
-    _TIME_FIELD = "run_context.started_at"
+    _STARTED_AT_FIELD = "run_context.started_at"
+    _ACTIVITY_FIELD = "run_context.last_active_at"
     _STATUS_FIELD = "status"
     _BLUEPRINT_FIELD = "blueprint_id"
     _RUN_ID_FIELD = "run_id"
     _OWNER_ALIAS = "owner_id"
     _MAX_TIME_SERIES_POINTS = 1000
+
+    # Prefer last_active_at; fall back to started_at for older sessions
+    _ACTIVITY_DATE_EXPR: Dict[str, Any] = {
+        "$ifNull": ["$run_context.last_active_at", "$run_context.started_at"]
+    }
 
     def __init__(
             self,
@@ -69,7 +75,7 @@ class MongoSessionRepository(SessionRepository):
         )
 
         self._col.create_index(
-            [(self._TIME_FIELD, pymongo.DESCENDING)],
+            [(self._ACTIVITY_FIELD, pymongo.DESCENDING)],
             background=True,
         )
 
@@ -77,7 +83,7 @@ class MongoSessionRepository(SessionRepository):
             [
                 (self._IDENTITY_TYPE_FIELD, pymongo.ASCENDING),
                 (self._IDENTITY_ID_FIELD, pymongo.ASCENDING),
-                (self._TIME_FIELD, pymongo.DESCENDING),
+                (self._ACTIVITY_FIELD, pymongo.DESCENDING),
             ],
             background=True,
         )
@@ -211,7 +217,9 @@ class MongoSessionRepository(SessionRepository):
             {"$group": {
                 "_id": {
                     "$dateTrunc": {
-                        "date": {"$dateFromString": {"dateString": f"${self._TIME_FIELD}"}},
+                        "date": {"$dateFromString": {
+                            "dateString": self._ACTIVITY_DATE_EXPR,
+                        }},
                         "unit": truncate_unit
                     }
                 },
@@ -323,19 +331,19 @@ class MongoSessionRepository(SessionRepository):
                         ]
                     }
                 },
-                "last_run": {"$max": f"${self._TIME_FIELD}"},
+                "last_run": {"$max": self._ACTIVITY_DATE_EXPR},
                 "avg_duration_ms": {
                     "$avg": {
                         "$cond": [
                             {"$and": [
                                 {"$ne": ["$run_context.finished_at", None]},
                                 {"$ne": ["$run_context.finished_at", ""]},
-                                {"$ne": [f"${self._TIME_FIELD}", None]},
-                                {"$ne": [f"${self._TIME_FIELD}", ""]},
+                                {"$ne": [f"${self._STARTED_AT_FIELD}", None]},
+                                {"$ne": [f"${self._STARTED_AT_FIELD}", ""]},
                             ]},
                             {"$subtract": [
                                 {"$dateFromString": {"dateString": "$run_context.finished_at"}},
-                                {"$dateFromString": {"dateString": f"${self._TIME_FIELD}"}}
+                                {"$dateFromString": {"dateString": f"${self._STARTED_AT_FIELD}"}}
                             ]},
                             None
                         ]
@@ -379,16 +387,38 @@ class MongoSessionRepository(SessionRepository):
         """
         Build a MongoDB match filter for time-based queries.
 
+        Filters on last_active_at (falls back to started_at for older
+        sessions) so that "Today" shows sessions *used* today, not
+        only those *created* today.  Uses $dateFromString so the
+        comparison works regardless of timezone-suffix format.
+
         Args:
             since: Cutoff datetime (None = no time filter)
-            require_exists: If True, also require the time field to exist
-                            (needed for $dateFromString in time series)
+            require_exists: If True, also require at least one time
+                            field to exist (needed for $dateFromString
+                            in time series)
         """
         if since is None:
-            return {self._TIME_FIELD: {"$exists": True}} if require_exists else {}
+            if require_exists:
+                return {"$or": [
+                    {self._ACTIVITY_FIELD: {"$exists": True, "$nin": [None, ""]}},
+                    {self._STARTED_AT_FIELD: {"$exists": True, "$nin": [None, ""]}},
+                ]}
+            return {}
 
-        cutoff = format_utc_iso(since)
-        return {self._TIME_FIELD: {"$gte": cutoff}}
+        match: Dict[str, Any] = {
+            "$expr": {
+                "$gte": [
+                    {"$dateFromString": {
+                        "dateString": self._ACTIVITY_DATE_EXPR,
+                        "onError": None,
+                        "onNull": None,
+                    }},
+                    since,
+                ]
+            }
+        }
+        return match
 
     def _aggregate_group_count(
         self,
