@@ -1,9 +1,8 @@
 """
 Workflow command group — start and interact with workflow sessions.
 
-Supports two execution modes:
-  - Streaming (via /user.session.execute with stream=true) for real-time output
-  - Background (via /user.session.submit + polling) as fallback
+Execution uses POST /user.session.submit + GET /session.subscribe (UI path),
+with submit + poll as fallback when subscribe is unavailable.
 """
 from __future__ import annotations
 
@@ -123,25 +122,28 @@ def _resolve_by_selection(client: MASClient, user_id: str) -> Optional[str]:
 def _execute_turn(client: MASClient, session_id: str, prompt: str,
                   user_id: str, console) -> bool:
     """
-    Execute a single user turn.  Tries streaming first, falls back to
-    submit+poll if streaming is not available.
+    Execute a single user turn via submit + subscribe (same as the UI).
+
+    Falls back to submit + poll if the subscribe stream is unavailable.
 
     Returns True on success, False on failure.
     """
     from unifai_cli.display.streaming import display_streaming_events
 
+    inputs = {"user_prompt": prompt}
+
     try:
-        response = client.execute_session(
-            session_id, {"user_prompt": prompt}, stream=True,
+        response = client.run_session_turn(
+            session_id, inputs, scope="public", user_id=user_id,
         )
-        display_streaming_events(response, console)
-        return True
+        if display_streaming_events(response, console):
+            return True
+        return False
     except Exception:
-        # Streaming may not be available — fall back to submit + poll
         pass
 
     try:
-        client.submit_session(session_id, {"user_prompt": prompt}, user_id=user_id)
+        client.submit_session(session_id, inputs, user_id=user_id)
         _poll_until_done(client, session_id, console)
         return True
     except Exception as e:
@@ -245,18 +247,35 @@ def _show_final_answer(client, run_id, console):
 
     try:
         chat = client.get_session_chat(run_id)
+        status = (chat.get("status") or "").upper()
+        status_message = chat.get("status_message") or ""
+
+        if status == "FAILED":
+            console.print(
+                f"[red]Workflow failed:[/red] {status_message or 'No details available.'}"
+            )
+            return
+        if status == "CANCELLED":
+            console.print("[dim]Workflow cancelled.[/dim]")
+            return
+
         output = chat.get("output", "")
         if output:
             console.print(Panel(output, title="[bold]Assistant[/bold]", border_style="blue"))
-        else:
-            messages = chat.get("messages", [])
-            if messages:
-                last = messages[-1]
-                content = last.get("content", "")
-                if content and last.get("role") != "user":
-                    console.print(Panel(content, title="[bold]Assistant[/bold]", border_style="blue"))
-                    return
-            status = client.get_session_status(run_id)
+            return
+
+        messages = chat.get("messages", [])
+        if messages:
+            last = messages[-1]
+            content = last.get("content", "")
+            if content and last.get("role") != "user":
+                console.print(Panel(content, title="[bold]Assistant[/bold]", border_style="blue"))
+                return
+
+        if status:
             console.print(f"[dim]Session status: {status} (no output yet)[/dim]")
+        else:
+            session_status = client.get_session_status(run_id)
+            console.print(f"[dim]Session status: {session_status} (no output yet)[/dim]")
     except Exception as e:
         console.print(f"[dim]Could not retrieve answer: {e}[/dim]")

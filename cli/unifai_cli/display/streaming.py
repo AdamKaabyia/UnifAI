@@ -28,13 +28,12 @@ def iter_ndjson(response) -> Iterator[dict]:
             continue
 
 
-def display_streaming_events(response, console: Console) -> None:
+def display_streaming_events(response, console: Console) -> bool:
     """
     Read NDJSON events from a streaming HTTP response and display
     them in real time.
 
-    Events are plain dicts with a ``type`` field.  Unknown event types
-    are silently skipped to stay forward-compatible with new node types.
+    Returns True on ``stream_end``, False on ``stream_error`` or early close.
     """
     current_node = None
 
@@ -46,6 +45,18 @@ def display_streaming_events(response, console: Console) -> None:
 
         if event_type == "heartbeat":
             continue
+
+        if event_type == "stream_end":
+            if current_node is not None:
+                console.print()
+            return True
+
+        if event_type == "stream_error":
+            if current_node is not None:
+                console.print()
+            error = event.get("error", "Unknown stream error")
+            console.print(f"  [red]Stream error:[/red] {error}")
+            return False
 
         if event_type == "llm_token":
             node = event.get("display_name") or event.get("node", "")
@@ -87,3 +98,4 @@ def display_streaming_events(response, console: Console) -> None:
 
     if current_node is not None:
         console.print()
+    return True
