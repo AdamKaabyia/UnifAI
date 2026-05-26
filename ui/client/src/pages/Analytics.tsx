@@ -47,8 +47,8 @@ export default function Analytics() {
     queryFn: () => fetchSystemWideStats(timeRange, user?.username || user?.sub),
     staleTime: 60000,
     gcTime: 300000,
-    refetchInterval: 60000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
     enabled: hasAccess,
   });
 
