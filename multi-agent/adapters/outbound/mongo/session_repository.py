@@ -368,21 +368,18 @@ class MongoSessionRepository(SessionRepository):
     @staticmethod
     def _to_blueprint_stats(docs: List[Dict]) -> List[BlueprintExecutionStats]:
         """Transform blueprint_stats facet results to typed domain models."""
-        results = []
-        for doc in docs:
-            last_run = doc.get("last_run")
-            if isinstance(last_run, datetime):
-                last_run = last_run.isoformat()
-            results.append(BlueprintExecutionStats(
+        return [
+            BlueprintExecutionStats(
                 blueprint_id=doc["_id"],
                 total_runs=doc.get("total_runs", 0),
                 completed_runs=doc.get("completed_runs", 0),
                 failed_runs=doc.get("failed_runs", 0),
-                last_run=last_run,
+                last_run=doc.get("last_run"),
                 avg_duration_ms=doc.get("avg_duration_ms"),
                 users=doc.get("users", [])
-            ))
-        return results
+            )
+            for doc in docs
+        ]
 
     # ---------- Private Helpers ----------
 

@@ -410,7 +410,7 @@ class StatisticsService:
                 run_count=stats.total_runs,
                 unique_users=len(stats.users),
                 avg_duration_seconds=avg_duration_seconds,
-                last_run_at=stats.last_run,
+                last_run_at=format_utc_iso(stats.last_run) if stats.last_run else None,
                 success_rate=success_rate,
                 completed_runs=stats.completed_runs,
                 failed_runs=stats.failed_runs,
