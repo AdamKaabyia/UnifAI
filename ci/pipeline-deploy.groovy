@@ -103,9 +103,7 @@ def updateGlobalConfigYaml(String filePath) {
 
     if (values?.env) {
         values.env.FRONTEND_URL = "https://unifai-ui-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
-        // will be used once SSO team adds the new routes to the configuration
         values.env.IDENTITY_HOST = "https://unifai-identity-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
-        // values.env.IDENTITY_HOST = "https://unifai-sso-backend-tag-ai--pipeline.apps.stc-ai-e1-prod.rtc9.p1.openshiftapps.com"
     }
     writeYaml file: filePath, data: values, overwrite: true
     echo "📄 successfully Updated routes values in ${filePath}:\n" + writeYaml(returnText: true, data: values)
@@ -189,42 +187,6 @@ def deleteRunningApplication(){
     sh("sleep 10")
 }
 
-// // temporary fix for dataflow deployment deletion, after we move completely to the new rag naming this function is obsolete
-// def cleanOldDataflow(){
-//     echo("Removing old dataflow application")
-    
-//     // Capture the output properly
-//     def result = sh(
-//         script: "podman exec -t helmfile bash -c 'helm ls | grep 'dataflow' || true'",
-//         returnStdout: true
-//     ).trim()
-    
-//     if(result.length() > 0) {
-//         // Split by newlines to get all releases, not just the first one
-//         echo("found old dataflow releases: ${result}")
-//         def releases = result.split('\n')
-        
-//         releases.each { release ->
-//             // Extract the release name (first column in helm ls output)
-//             def releaseName = release.split(/\s+/)[0]
-//             echo("Deleting helm release: ${releaseName}")
-//             sh("podman exec -t helmfile bash -c 'helm uninstall ${releaseName}'")
-//         }
-        
-//         // Wait for all dataflow resources to be deleted
-//         sh("""
-//             until ! oc get deployment,statefulset,svc 2>/dev/null | grep 'dataflow'; do
-//                 echo 'Waiting for dataflow deployment deletion...'
-//                 sleep 5
-//             done
-//         """)
-//         echo("All dataflow applications successfully deleted")
-//         sh("sleep 5")
-//     } else {
-//         echo("No dataflow releases found")
-//     }
-// }
-
 def cleanWorkspace() {
     sh """
         podman rm -f helmfile
@@ -265,7 +227,6 @@ pipeline {
                     checkout([$class: 'GitSCM',
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
-                        //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
                         extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/UnifAI-secrets/"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[

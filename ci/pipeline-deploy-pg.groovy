@@ -42,7 +42,7 @@ def secret_lists = [
     identity_stage: ['client_id', 'client_secret', 'keycloak_realm', 'keycloak_base_url'],
     rabbitmq: ['rmq_username', 'rmq_password'],
     umami: ['umami_username', 'umami_password'],
-    global_config: ['secret_key'],
+    global_config: ['secret_key', 'vault_role_id', 'vault_secret_id', 'langfuse_base_url', 'langfuse_public_key', 'langfuse_secret_key'],
     multiagent: ['CREDENTIAL_ENCRYPTION_KEY', 'MCP_AUTH_STATE_SECRET'],
     rag: ['default_slack_bot_token', 'default_slack_user_token'],
 ]
@@ -204,7 +204,6 @@ pipeline {
                     checkout([$class: 'GitSCM',
                         branches: [[name: "${buildParams.CredMainRepoBranch}"]],
                         doGenerateSubmoduleConfigurations: false,
-                        //extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}"]],
                         extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "${buildParams.DevRoot}/${params.BRANCH}/helm/UnifAI-secrets/"]],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
