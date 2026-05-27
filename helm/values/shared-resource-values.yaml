@@ -30,7 +30,7 @@ qdrant:
       cpu: 4
       memory: 12Gi
   storage:
-    size: 10Gi
+    requestedSize: 10Gi
     storageClassName: aws-ebs
 
 rabbitmq:
