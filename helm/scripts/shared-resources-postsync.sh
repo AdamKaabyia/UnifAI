@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 set +e
 echo "Starting shared-resources postsync hook..."
 

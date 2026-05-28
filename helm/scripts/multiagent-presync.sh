@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x  # Print each command
 set +e  # Disable immediate exit on error
 echo "Starting multiagent-presync hook..."
 # Source common functions

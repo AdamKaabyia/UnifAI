@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x  # Print each command
 set +e  # Disable immediate exit on error
 echo "Starting redis-presync hook..."
 # Source common functions
