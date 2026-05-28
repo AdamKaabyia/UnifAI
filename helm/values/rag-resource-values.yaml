@@ -83,7 +83,7 @@ unifai_rag_celery_beat:
       memory: 256Mi
 storage:
   volumeName: unifai-rag-shared-storage
-  requestedSize: 10Gi
+  requestedSize: 100Gi
   className: aws-efs-tier-c1
   accessModes:
     - ReadWriteMany

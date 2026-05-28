@@ -8,7 +8,7 @@ mongodb:
     type: ClusterIP
     port: 27017
   storage:
-    size: 10Gi
+    size: 100Gi
     storageClassName: aws-ebs
 
 qdrant:
@@ -30,7 +30,7 @@ qdrant:
       cpu: 4
       memory: 12Gi
   storage:
-    requestedSize: 10Gi
+    requestedSize: 100Gi
     storageClassName: aws-ebs
 
 rabbitmq:
