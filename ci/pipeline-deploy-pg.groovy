@@ -114,6 +114,13 @@ def updateValuesYaml(String filePath , String version) {
     def values = readYaml file: filePath
 
     values.each { sectionName, sectionData ->
+        echo "🔍 DEBUG: section=${sectionName}, type=${sectionData.getClass().getName()}"
+        if (sectionName == 'storage' && sectionData instanceof Map) {
+            if (sectionData.requestedSize == '100Gi') {
+                sectionData.requestedSize = '10Gi'
+                echo "🏷 Updated top-level storage requestedSize: ${sectionData.requestedSize}"
+            }
+        }
         if (sectionData instanceof Map) {
             if (params.debug_mode) {
                 echo "🛠 Setting debug mode in section: ${sectionName}"
@@ -130,6 +137,14 @@ def updateValuesYaml(String filePath , String version) {
             if (sectionData.env?.VERSION == '') {
                 sectionData.env.VERSION = version
                 echo "🏷 Updated VERSION: ${sectionData.env.VERSION}"
+            }
+            if (sectionData.storage?.requestedSize == '100Gi') {
+                sectionData.storage.requestedSize = '10Gi'
+                echo "🏷 Updated storage requested size: ${sectionData.storage.requestedSize}"
+            }
+            if (sectionData.storage?.size == '100Gi') {
+                sectionData.storage.size = '10Gi'
+                echo "🏷 Updated storage size: ${sectionData.storage.size}"
             }
         }
     }
