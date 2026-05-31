@@ -263,7 +263,7 @@ pipeline {
 
                     echo "Triggering deployment pipeline with MODULES_TO_DEPLOY = ${modulesToDeploy}"
                     // build job: 'Unifai-playground-deploy',
-                    build job: 'Unifai-playground-deploy-git',
+                    build job: 'Unifai-playground-deploy',
                     parameters: [
                         string(name: 'PIPELINE_BRANCH', value: params.PIPELINE_BRANCH),
                         string(name: 'deploy_namespace', value: params.deploy_namespace),
