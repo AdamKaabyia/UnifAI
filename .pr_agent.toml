@@ -2,8 +2,7 @@
 response_language = "en-US"
 
 [github_app]
-#pr_commands = ["/generate_labels", "/agentic_review"]
-pr_commands = ["/generate_labels", "/agentic_review"]
+pr_commands = ["/agentic_describe", "/agentic_review"]
 handle_push_trigger = true
 push_commands = ["/agentic_review"]
 
@@ -50,3 +49,12 @@ Act as a senior software engineer deeply familiar with this project's architectu
 finding_overflow_count = 5
 expand_description = true
 expand_code = true
+
+[pr_description]
+publish_labels = true
+add_original_user_description = true
+generate_ai_title = false
+enable_pr_type = true
+enable_pr_diagram = true
+enable_semantic_files_types = true
+use_bullet_points = true
