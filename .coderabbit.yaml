@@ -22,6 +22,10 @@ reviews:
     - "ui/**"
     - "ci/**"
     - "helm/**"
+    - "local-development/**"
+    - "cli/**"
+    - "rag/**"
+    - "shared-resources/**"
     - ".github/**"
     - ".cursor/**"
 
