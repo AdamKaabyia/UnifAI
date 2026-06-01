@@ -9,7 +9,8 @@ push_commands = ["/agentic_review"]
 [review_agent]
 demand_self_review = true
 approve_pr_on_self_review = true
-
+comments_location_policy = "inline" # options: "summary" "inline" "both"
+inline_comments_severity_threshold = 1
 issues_user_guidelines = """
 This repository represents an agentic AI system with a modular, layered architecture.
 
