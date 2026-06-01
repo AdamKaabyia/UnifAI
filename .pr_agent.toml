@@ -6,6 +6,10 @@ pr_commands = ["/agentic_describe", "/agentic_review"]
 handle_push_trigger = true
 push_commands = ["/agentic_review"]
 
+[config]
+enable_auto_approval = true
+auto_approve_for_no_suggestions = true
+
 [review_agent]
 demand_self_review = true
 approve_pr_on_self_review = true
