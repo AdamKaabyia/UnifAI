@@ -3,17 +3,25 @@
 
 global_utils/ @odaiodeh @nirsisr @Lina-AbuYousef
 backend/ @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi
-multi-agent/ @odaiodeh @nirsisr @Lina-AbuYousef
 rag/ @odaiodeh @nirsisr @Lina-AbuYousef
 ui/ @nirsisr @Lina-AbuYousef @MayaCrmi
 shared-resources/ @yhabushi79 @nirsisr @sfiresht
+multi-agent/ @odaiodeh @nirsisr @Lina-AbuYousef
 
-# Deployment
-helm/ @sfiresht @yhabushi79 @MayaCrmi
 # CI/CD & Testing locations
-ci/ @sfiresht @yhabushi79 @MayaCrmi
-tests/ @sfiresht @yhabushi @odaiodeh @nirsisr @labuyous @mcarmi @shanitzvii
+ci/ @sfiresht @yhabushi79 @MayaCrmi @shanitzvii 
 .github/ @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii @omrisaba-rh
 .cursor/ @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii @omrisaba-rh
+tests/ @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii @omrisaba-rh
+cli/ @odaiodeh @nirsisr @sfiresht
+local-development/ @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii
 .coderabbit.yaml @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii @omrisaba-rh
 .pr_agent.toml @sfiresht @yhabushi79 @odaiodeh @nirsisr @Lina-AbuYousef @MayaCrmi @shanitzvii @omrisaba-rh
+
+# Deployment
+helm/ @sfiresht @yhabushi79 @MayaCrmi @shanitzvii 
+
+
+
+
+
