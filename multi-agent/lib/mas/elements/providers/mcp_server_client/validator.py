@@ -97,7 +97,7 @@ class McpProviderValidator(BaseElementValidator):
 
             messages.append(self._info(
                 "CONNECTION_OK",
-                f"Connected to MCP server",
+                "Connected to MCP server",
                 field="mcp_url",
             ))
 
