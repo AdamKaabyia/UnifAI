@@ -77,7 +77,7 @@ class ValidateConnectionAction(BaseAction):
         user_id = input_data.user_id
         server_id = input_data.server_identifier
 
-        auth_cred = self._auth.bind(user_id, server_id) if (self._auth and user_id and server_id and not input_data.credential_token) else None
+        # auth_cred = self._auth.bind(user_id, server_id) if (self._auth and user_id and server_id and not input_data.credential_token) else None
 
         config = McpProviderConfig(
             mcp_url=input_data.mcp_url,
@@ -87,17 +87,14 @@ class ValidateConnectionAction(BaseAction):
         )
 
         try:
-            import anyio
-            with anyio.fail_after(10.0):
-                await self._factory.create_async(config, auth_credential=auth_cred)
+            await self._factory.create_async(config)
             elapsed = (time.time() - start) * 1000
-            is_authed = bool(input_data.credential_token) or bool(auth_cred)
             return ValidateConnectionOutput(
                 success=True,
                 message=f"Connected ({elapsed:.0f}ms)",
                 is_reachable=True,
-                authenticated=is_authed,
-                status="authenticated" if is_authed else "",
+                authenticated=False,
+                status="",
                 server_identifier=server_id or mcp_url,
                 response_time_ms=elapsed,
             )
@@ -108,18 +105,30 @@ class ValidateConnectionAction(BaseAction):
                 response_time_ms=(time.time() - start) * 1000,
             )
         except Exception as e:
-            if "cancel scope" in str(e).lower():
+            elapsed = (time.time() - start) * 1000
+            error_msg = str(e)
+            if "401" in error_msg or "Unauthorized" in error_msg:
                 return ValidateConnectionOutput(
                     success=True,
-                    message="Server is reachable but requires authentication",
+                    message="Server rejected credentials — sign in again",
                     is_reachable=True,
                     authenticated=False,
                     status="auth_required",
                     server_identifier=mcp_url,
-                    response_time_ms=(time.time() - start) * 1000,
+                    response_time_ms=elapsed,
+                )
+            if "403" in error_msg or "Forbidden" in error_msg:
+                return ValidateConnectionOutput(
+                    success=True,
+                    message="Authenticated but not authorized — check scopes",
+                    is_reachable=True,
+                    authenticated=False,
+                    status="auth_required",
+                    server_identifier=mcp_url,
+                    response_time_ms=elapsed,
                 )
             return ValidateConnectionOutput(
                 success=False, message=f"Connection failed: {e}",
                 is_reachable=False,
-                response_time_ms=(time.time() - start) * 1000,
+                response_time_ms=elapsed,
             )

@@ -16,6 +16,7 @@ from mas.actions.common.base_action import BaseAction
 from mas.actions.common.action_models import BaseActionInput, BaseActionOutput, ActionType
 from mas.core.auth.service import AuthService
 from mas.core.enums import ResourceCategory, AuthStatus, AuthErrorCode
+from mas.elements.providers.mcp_server_client.identifiers import Identifier
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class DiscoveryAction(BaseAction):
     output_schema = DiscoveryOutput
     version = "1.0.0"
     tags = {"auth", "discovery"}
-    elements = {(ResourceCategory.PROVIDER.value, "mcp_server_client")}
+    elements = {(ResourceCategory.PROVIDER.value, Identifier.TYPE)}
 
     def __init__(self, auth_service: Optional[AuthService] = None):
         super().__init__()

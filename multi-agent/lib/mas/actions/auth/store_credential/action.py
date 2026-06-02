@@ -26,6 +26,7 @@ from mas.actions.common.action_models import (
 from mas.core.auth.service import AuthService
 from mas.core.auth.credentials.models import StoredCredential, TokenStatus
 from mas.core.enums import ResourceCategory, AuthStatus, AuthErrorCode, SchemeType
+from mas.elements.providers.mcp_server_client.identifiers import Identifier
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class StoreCredentialAction(BaseAction):
     version = "1.0.0"
     tags = {"auth", "credential"}
     elements = {
-        (ResourceCategory.PROVIDER.value, "mcp_server_client"),
+        (ResourceCategory.PROVIDER.value, Identifier.TYPE),
     }
 
     def __init__(self, auth_service: Optional[AuthService] = None):
