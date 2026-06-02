@@ -80,11 +80,13 @@ class ClaudeAgentNodeConfig(NodeBaseConfig):
 
     # --- Skills ---
 
-    skills_repos: List[str] = Field(
-        default_factory=list,
-        description="GitHub repo URLs containing skills to clone and make available "
-                    "to the Claude agent session (e.g., 'https://github.com/org/skills-repo')"
+    skills_repos: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Skill sources — each key is the skill path within the repo and "
+                    "the value is the git repo URL "
+                    '(e.g., {"skills/docx": "https://github.com/org/repo"})'
     )
+
 
     # --- Advanced ---
 

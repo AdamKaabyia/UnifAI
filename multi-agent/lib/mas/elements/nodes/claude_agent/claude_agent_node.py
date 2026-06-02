@@ -59,7 +59,7 @@ class ClaudeAgentNode(
             allowed_tools: Optional[List[str]] = None,
             disallowed_tools: Optional[List[str]] = None,
             # Skills
-            skills_repos: Optional[List[str]] = None,
+            skills_repos: Optional[Dict[str, str]] = None,
             cwd: Optional[str] = None,
             # Advanced
             env_vars: Optional[Dict[str, str]] = None,
@@ -80,7 +80,7 @@ class ClaudeAgentNode(
             "Glob", "Grep", "WebSearch", "WebFetch",
         ]
         self._disallowed_tools = disallowed_tools or []
-        self._skills_repos = skills_repos or []
+        self._skills_repos = skills_repos or {}
         self._cwd = cwd
         self._env_vars = env_vars or {}
 
@@ -324,28 +324,53 @@ class ClaudeAgentNode(
         return work_dir
 
     def _clone_skills_repos(self, base_dir: str) -> None:
-        """Clone skills repos into .claude/skills/ within the working directory."""
+        """Install skills into .claude/skills/ within the working directory.
+
+        Each entry maps a git repo URL to a path within it pointing to
+        the skill folder. The repo is shallow-cloned into a temp directory,
+        the skill subfolder is copied to .claude/skills/{folder_name}/,
+        and the temp clone is removed.
+        """
         skills_dir = os.path.join(base_dir, ".claude", "skills")
         os.makedirs(skills_dir, exist_ok=True)
 
-        for repo_url in self._skills_repos:
+        for skill_path, repo_url in self._skills_repos.items():
             try:
-                repo_name = (
-                    repo_url.rstrip("/").split("/")[-1].replace(".git", "")
-                )
-                target_dir = os.path.join(skills_dir, repo_name)
-                if not os.path.exists(target_dir):
-                    subprocess.run(
-                        ["git", "clone", "--depth=1", repo_url, target_dir],
-                        check=True,
-                        capture_output=True,
-                        timeout=120,
-                    )
+                self._install_skill(repo_url, skill_path, skills_dir)
             except Exception as e:
                 print(
                     f"ClaudeAgent {self.uid}: "
-                    f"Failed to clone skills repo {repo_url}: {e}"
+                    f"Failed to install skill from {repo_url} "
+                    f"(path: {skill_path}): {e}"
                 )
+
+    def _install_skill(
+        self, repo_url: str, skill_path: str, skills_dir: str
+    ) -> None:
+        """Clone a repo to temp, copy only the skill subfolder to skills_dir."""
+        tmp_dir = tempfile.mkdtemp(prefix="claude_skill_clone_")
+        try:
+            subprocess.run(
+                ["git", "clone", "--depth=1", repo_url, tmp_dir],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+
+            source_path = os.path.join(tmp_dir, skill_path)
+            if not os.path.isdir(source_path):
+                raise FileNotFoundError(
+                    f"Skill path '{skill_path}' not found in repo {repo_url}"
+                )
+
+            skill_name = os.path.basename(source_path.rstrip(os.sep))
+            target_dir = os.path.join(skills_dir, skill_name)
+
+            if os.path.exists(target_dir):
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_path, target_dir)
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # ========== RESULT HANDLING ==========
 

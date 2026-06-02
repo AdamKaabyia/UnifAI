@@ -47,6 +47,7 @@ class ClaudeAgentNodeValidator(BaseElementValidator):
         self._check_model(config, messages)
         self._check_permission_mode(config, messages)
         self._check_max_turns(config, messages)
+        self._check_skills_repos(config, messages)
 
         if config.retriever:
             retriever_rid = self._extract_rid(config.retriever)
@@ -120,6 +121,31 @@ class ClaudeAgentNodeValidator(BaseElementValidator):
                 "max_turns must be at least 1",
                 field="max_turns",
             ))
+
+    def _check_skills_repos(
+        self,
+        config: ClaudeAgentNodeConfig,
+        messages: List[ValidationMessage],
+    ) -> None:
+        for skill_path, repo_url in config.skills_repos.items():
+            if not skill_path or not skill_path.strip():
+                messages.append(self._error(
+                    "MISSING_SKILL_PATH",
+                    "skills_repos: skill_path key must not be empty",
+                    field="skills_repos",
+                ))
+            elif ".." in skill_path.split("/"):
+                messages.append(self._error(
+                    "INVALID_SKILL_PATH",
+                    f"skills_repos[{skill_path}]: skill_path must not contain '..' segments",
+                    field="skills_repos",
+                ))
+            if not repo_url or not repo_url.strip():
+                messages.append(self._error(
+                    "MISSING_SKILL_REPO_URL",
+                    f"skills_repos[{skill_path}]: repo URL value is required",
+                    field="skills_repos",
+                ))
 
     @staticmethod
     def _extract_rid(ref_obj) -> str:
