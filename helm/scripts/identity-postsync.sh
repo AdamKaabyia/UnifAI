@@ -1,0 +1,14 @@
+#!/bin/bash
+set +e
+echo "Starting identity postsync hook..."
+
+source "$(dirname "$0")/postsync-lib.sh"
+
+IDENTITY_ADDR=$(wait_for_ip unifai-identity) || exit 1
+IDENTITY_PORT=$(wait_for_port unifai-identity) || exit 1
+IDENTITY_IP=$(wait_for_service_name unifai-identity) || exit 1
+
+create_or_update_configmap identity-svc-config \
+  --from-literal=IDENTITY_ADDR="$IDENTITY_ADDR" \
+  --from-literal=IDENTITY_PORT="$IDENTITY_PORT" \
+  --from-literal=IDENTITY_IP="$IDENTITY_IP"

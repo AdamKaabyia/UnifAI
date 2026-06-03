@@ -127,10 +127,10 @@ class AuthManager:
         OAuth redirect URI for /api/auth/callback.
 
         Local dev: http://hostname_local:port/api/auth/callback
-        Production: {identity_host}/api/auth/callback (IDENTITY_HOST env)
+        Production: {frontend_url}/api3/auth/callback (behind nginx proxy)
         """
         if config.backend_env == "production":
-            return f"{config.identity_host.rstrip('/')}/api/auth/callback"
+            return f"{config.frontend_url.rstrip('/')}/api3/auth/callback"
         return f"http://{config.hostname_local}:{config.port}/api/auth/callback"
     
     def _register_auth_routes(self):
