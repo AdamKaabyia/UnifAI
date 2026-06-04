@@ -21,6 +21,7 @@ env:
   # RABBITMQ_PORT: "5672"
   BACKEND_ENV: "production" #options - production development
   ROLE: "flask" #options - flask celery debug
+  SHARED_STORAGE: "/app/shared"
   GOOGLE_APPLICATION_CREDENTIALS: "/opt/app-root/src/config/gcp/gcp-sa-key.json"
 
 
@@ -139,6 +140,9 @@ autoscaling:
 
 # Additional volumes on the output Deployment definition.
 volumes:
+  - name: unifai-multiagent-shared-storage
+    persistentVolumeClaim:
+      claimName: unifai-multiagent-shared-storage
   - name: gcp-credentials
     secret:
       secretName: gcp-vertex-credentials
@@ -146,6 +150,8 @@ volumes:
 
 # Additional volumeMounts on the output Deployment definition.
 volumeMounts:
+  - name: unifai-multiagent-shared-storage
+    mountPath: /app/shared
   - name: gcp-credentials
     mountPath: /opt/app-root/src/config/gcp
     readOnly: true
