@@ -19,6 +19,8 @@ multiagent_server:
     GUNICORN_WORKERS: "9"
     GUNICORN_THREADS: "8"
     GUNICORN_TIMEOUT: "600"
+    SHARED_STORAGE: "/app/shared"
+    GOOGLE_APPLICATION_CREDENTIALS: "/opt/app-root/src/config/gcp/gcp-sa-key.json"
     VERSION: ""
 
 multiagent_temporal_worker:
@@ -41,6 +43,7 @@ multiagent_temporal_worker:
     ROLE: "temporal-worker" # options are flask celery debug
     WORKER_THREADS: "100"
     SHARED_STORAGE: "/app/shared"
+    GOOGLE_APPLICATION_CREDENTIALS: "/opt/app-root/src/config/gcp/gcp-sa-key.json"
     VERSION: ""
 
 storage:
