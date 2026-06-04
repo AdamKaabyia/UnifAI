@@ -138,17 +138,15 @@ autoscaling:
   # targetMemoryUtilizationPercentage: 80
 
 # Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+volumes:
+  - name: unifai-multiagent-shared-storage
+    persistentVolumeClaim:
+      claimName: unifai-multiagent-shared-storage
 
 # Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+volumeMounts:
+  - name: unifai-multiagent-shared-storage
+    mountPath: /app/shared
 
 nodeSelector: {}
 
