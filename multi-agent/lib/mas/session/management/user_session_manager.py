@@ -1,6 +1,10 @@
+import logging
+import os
+import shutil
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
+from config.app_config import AppConfig
 from mas.session.repository.repository import SessionRepository
 from mas.session.building.workflow_session_factory import WorkflowSessionFactory
 from mas.session.domain.workflow_session import WorkflowSession
@@ -13,6 +17,8 @@ from mas.blueprints.service import BlueprintService
 from mas.session.domain.models import SessionChat, SessionMeta, TimeSeriesPoint, SystemAnalyticsData
 from mas.session.domain.exceptions import BlueprintNotFoundError
 from mas.core.identity import Identity
+
+logger = logging.getLogger(__name__)
 
 
 class UserSessionManager:
@@ -60,6 +66,7 @@ class UserSessionManager:
         session_meta = metadata or SessionMeta()
         run_id = str(uuid.uuid4())
         ctx = ExecutionContext(
+            session_id=run_id,
             identity=identity,
             engine_name=self._factory.engine_name,
         )
@@ -110,7 +117,18 @@ class UserSessionManager:
 
     def delete_session(self, run_id: str) -> bool:
         """Delete a session by run_id. Returns True if deleted, False if not found."""
-        return self._repo.delete(run_id)
+        deleted = self._repo.delete(run_id)
+        if deleted:
+            self._cleanup_session_storage(run_id)
+        return deleted
+
+    @staticmethod
+    def _cleanup_session_storage(run_id: str) -> None:
+        """Remove the shared storage folder created for this session."""
+        session_dir = os.path.join(AppConfig.get("shared_storage"), run_id)
+        if os.path.isdir(session_dir):
+            shutil.rmtree(session_dir, ignore_errors=True)
+            logger.info("Cleaned up session storage: %s", session_dir)
 
     # ---------- statistics ----------
 

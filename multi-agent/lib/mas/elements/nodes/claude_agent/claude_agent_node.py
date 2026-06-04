@@ -63,6 +63,9 @@ class ClaudeAgentNode(
             cwd: Optional[str] = None,
             # Advanced
             env_vars: Optional[Dict[str, str]] = None,
+            # Runtime context
+            execution_holder: Any = None,
+            shared_storage: str = "/app/shared",
             # Standard
             retriever: Any = None,
             **kwargs: Any,
@@ -83,8 +86,19 @@ class ClaudeAgentNode(
         self._skills_repos = skills_repos or {}
         self._cwd = cwd
         self._env_vars = env_vars or {}
+        self._execution_holder = execution_holder
+        self._shared_storage = shared_storage
 
         self._max_context_messages = 20
+
+    @property
+    def session_id(self) -> str:
+        if self._execution_holder is None:
+            return ""
+        try:
+            return self._execution_holder.context.session_id
+        except RuntimeError:
+            return ""
 
     def run(self, state: StateView) -> StateView:
         """Main entry point - process all incoming TaskPackets."""
@@ -313,10 +327,21 @@ class ClaudeAgentNode(
         """
         Prepare working directory for the Claude agent session.
 
-        Clones skills repos if configured.
-        Creates a temp directory if no cwd is set.
+        Path: /tmp/{session_id}/{node_uid}/
+        Reuses an existing directory for the same session + node,
+        giving persistence across multiple prompts in one session.
+        Falls back to a random temp dir when session_id is unavailable.
         """
-        work_dir = self._cwd or tempfile.mkdtemp(prefix="claude_agent_")
+        if self._cwd:
+            work_dir = self._cwd
+        elif self.session_id:
+            work_dir = os.path.join(
+                self._shared_storage, self.session_id, self.uid
+            )
+        else:
+            work_dir = tempfile.mkdtemp(prefix="claude_agent_")
+
+        os.makedirs(work_dir, exist_ok=True)
 
         if self._skills_repos:
             self._clone_skills_repos(work_dir)
