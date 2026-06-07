@@ -40,4 +40,5 @@ class AppConfig(SharedConfig):
     oauth_state_secret: str = secrets.token_urlsafe(32)
     identity_host: str = "http://localhost:13456"
     oauth_callback_path: str = "/api/credentials/callback"
+    identity_provider_mode: str = ""
     credential_encryption_key: str = ""
