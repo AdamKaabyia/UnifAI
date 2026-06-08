@@ -2,6 +2,7 @@
 export interface ChatMessage {
   content: string;
   role: "user" | "assistant";
+  sender_id?: string;
 }
 
 // Shared ChatSession interface used across components
@@ -27,6 +28,7 @@ export interface ChatSessionData {
   blueprint_id: string;
   session_id: string;
   started_at: string;
+  last_active_at?: string;
   blueprint_exists: boolean;
 }
 
