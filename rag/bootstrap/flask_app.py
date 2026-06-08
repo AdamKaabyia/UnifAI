@@ -45,6 +45,11 @@ def create_app() -> Flask:
         origins=os.environ.get("FRONTEND_URL", "http://localhost:5000"),
     )
     
+    # Identity wiring — make Redis store and IdentityClient available to decorators
+    from bootstrap.app_container import redis_kv_store, identity_client
+    app.extensions['redis_kv_store'] = redis_kv_store()
+    app.extensions['identity_client'] = identity_client()
+
     # Register HTTP adapters (blueprints)
     _register_blueprints(app)
     

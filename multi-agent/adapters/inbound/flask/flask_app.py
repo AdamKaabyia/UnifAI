@@ -21,8 +21,7 @@ def create_app(container, config: AppConfig = None) -> Flask:
 
     CORS(app, resources={r"/api/*": {"origins": "*",
                                      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                                     "allow_headers": ["Content-Type", "Authorization",
-                                                       "X-Authenticated-User"],
+                                     "allow_headers": ["Content-Type", "Authorization"],
                                      "supports_credentials": True}})
 
     app.container = container

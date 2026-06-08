@@ -5,6 +5,7 @@ from global_utils.redis.constants import IDENTITY_SESSION_PREFIX, identity_sessi
 from global_utils.redis.redis_kv_store import RedisKVStore
 from global_utils.redis.server_session import get_identity_session, get_identity_username
 from global_utils.redis.session_model import UserSessionData
+from global_utils.redis.team_cache import TeamMembershipCache
 
 __all__ = [
     "build_redis_client",
@@ -13,5 +14,6 @@ __all__ = [
     "RedisKVStore",
     "get_identity_session",
     "get_identity_username",
+    "TeamMembershipCache",
     "UserSessionData",
 ]

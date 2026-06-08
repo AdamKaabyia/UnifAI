@@ -79,6 +79,18 @@ class UserSessionData(BaseModel):
             flat[key] = value
         return cls.model_validate(flat)
 
+    @property
+    def user_id(self) -> str | None:
+        """Alias for ``username``, aligning with ``g.user_id`` convention."""
+        return self.username
+
     def has_auth_credentials(self) -> bool:
         """True when both username and access_token are set (typical for authenticated)."""
         return bool(self.username and self.access_token)
+
+    def is_session_expired(self) -> bool:
+        """True when ``session_expires_at`` is set and in the past."""
+        if self.session_expires_at is None:
+            return False
+        from datetime import datetime
+        return datetime.now().timestamp() >= self.session_expires_at

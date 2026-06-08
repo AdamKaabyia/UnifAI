@@ -26,6 +26,8 @@ class SharedConfig(BaseSettings):
     redis_db: int = 0
     redis_decode_responses: bool = True
 
+    identity_host: str = ""
+
     # shared loading order
     model_config = SettingsConfigDict(
         env_prefix="",

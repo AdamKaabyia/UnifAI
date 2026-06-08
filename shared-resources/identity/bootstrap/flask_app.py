@@ -19,6 +19,7 @@ from config.app_config import AppConfig
 from config.logging_config import LoggingConfig
 from global_utils.flask.request_rules import RequestRules
 from bootstrap.factories import build_auth_stack, build_team_service
+from global_utils.redis import TeamMembershipCache
 from utils.user_groups_cache import UserGroupsCache
 from utils.directory_cache import DirectoryCache
 
@@ -73,7 +74,14 @@ def create_app() -> Flask:
         ttl_seconds=config.directory_cache_ttl,
     )
 
-    app.extensions['team_service'] = build_team_service(config, user_groups_cache=user_groups_cache)
+    team_membership_cache = TeamMembershipCache(redis_store)
+    app.extensions['team_membership_cache'] = team_membership_cache
+
+    app.extensions['team_service'] = build_team_service(
+        config,
+        user_groups_cache=user_groups_cache,
+        team_membership_cache=team_membership_cache,
+    )
     # Register HTTP adapters (blueprints)
     _register_blueprints(app)
     

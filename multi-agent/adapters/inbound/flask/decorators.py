@@ -1,17 +1,24 @@
 """
 Flask decorators for identity resolution and authorization.
 
-MAS owns its own auth decorators. They read the IdentityProvider from the
-application container (wired at startup) and delegate all team-membership
-logic through the port — never through global_utils directly.
+MAS owns its own auth decorators. They validate the caller via a Redis-backed
+server session (set by the Identity service at login) and delegate
+team-membership logic through the IdentityProvider port.
+
+All clients (UI, CLI) authenticate via the Flask session cookie. The
+``X-Authenticated-User`` header is no longer accepted.
 """
+import logging
 from functools import wraps
 from typing import Optional, Tuple
 
-from flask import current_app, jsonify, request
+from flask import current_app, g, jsonify, request, session
 
+from global_utils.flask.decorators import _validate_session
 from mas.core.identity import Identity, IdentityType, resolve_identity
 from mas.core.identity.ports import IdentityProvider
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -24,6 +31,37 @@ def _identity_provider() -> IdentityProvider:
     The provider is wired at startup in the container and attached to the app.
     """
     return current_app.container.identity_provider
+
+
+def _get_redis_store():
+    return current_app.container.redis_kv_store
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Session-based authentication
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _resolve_authenticated_user() -> Tuple[Optional[str], Optional[tuple]]:
+    """Resolve the authenticated username from the Redis session.
+
+    Returns ``(username, None)`` on success or ``(None, error_response)``
+    on failure.
+    """
+    get_sid = lambda: session.get("session_id")
+    data, err = _validate_session(_get_redis_store, get_sid)
+
+    if data is not None and data.username:
+        g.identity_session = data
+        return data.username, None
+
+    if err:
+        msg, err_type, status = err
+        return None, (jsonify({"error": msg, "error_type": err_type}), status)
+
+    return None, (jsonify({
+        "error": "Not authenticated",
+        "error_type": "AUTHENTICATION_REQUIRED",
+    }), 401)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -77,21 +115,16 @@ def _resolve_identity_or_error(kwargs: dict) -> Tuple[Optional[Identity], Option
 # ──────────────────────────────────────────────────────────────────────────────
 
 def with_authenticated_user(f):
-    """Extract and validate the ``X-Authenticated-User`` header.
+    """Validate the caller's Redis session and inject ``authenticated_user``.
 
-    When the provider requires authentication, requests without the header
-    receive 401. In permissive mode the header is optional (empty string
-    is injected when absent).
+    Validates the Flask session cookie against the Redis server session.
+    Returns 401 if no valid session is found.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        provider = _identity_provider()
-        authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
-        if not authenticated_user and provider.requires_authentication:
-            return jsonify({
-                "error": "Missing authenticated user",
-                "error_type": "AUTHENTICATION_REQUIRED",
-            }), 401
+        authenticated_user, err = _resolve_authenticated_user()
+        if err:
+            return err
         kwargs["authenticated_user"] = authenticated_user
         return f(*args, **kwargs)
     return decorated
@@ -115,12 +148,11 @@ def with_identity(f):
 
 
 def with_require_identity_authorization(f):
-    """Validate caller authorization AND resolve ``Identity`` in one step.
+    """Validate caller session AND authorize + resolve ``Identity`` in one step.
 
-    1. Reads ``X-Authenticated-User`` from the request header.
-       - If the provider requires authentication and header is missing → 401.
+    1. Validates the Redis session → 401 if invalid/expired.
     2. Validates the claimed identity:
-       - **user** identity: ``userId`` must match the header value → 403.
+       - **user** identity: ``userId`` must match the authenticated user → 403.
        - **team** identity: the authenticated user must be a member → 403.
     3. Resolves ``Identity`` and injects it as ``identity`` kwarg → 400 on invalid.
     """
@@ -130,26 +162,22 @@ def with_require_identity_authorization(f):
         user_id, identity_type_raw, _ = _parse_identity_params(kwargs)
 
         # ── Authentication ────────────────────────────────────────────
-        authenticated_user = request.headers.get("X-Authenticated-User", "").strip()
-        if not authenticated_user:
-            if provider.requires_authentication:
+        authenticated_user, err = _resolve_authenticated_user()
+        if err:
+            return err
+
+        # ── Authorization ─────────────────────────────────────────────
+        if identity_type_raw == "team":
+            if user_id and not provider.is_member(authenticated_user, user_id):
                 return jsonify({
-                    "error": "Missing authenticated user",
-                    "error_type": "AUTHENTICATION_REQUIRED",
-                }), 401
-        else:
-            # ── Authorization ─────────────────────────────────────────
-            if identity_type_raw == "team":
-                if user_id and not provider.is_member(authenticated_user, user_id):
-                    return jsonify({
-                        "error": "Access denied: you are not a member of this team",
-                        "error_type": "TEAM_ACCESS_DENIED",
-                    }), 403
-            elif user_id and user_id.casefold() != authenticated_user.casefold():
-                return jsonify({
-                    "error": "Access denied: userId does not match authenticated user",
-                    "error_type": "USER_ACCESS_DENIED",
+                    "error": "Access denied: you are not a member of this team",
+                    "error_type": "TEAM_ACCESS_DENIED",
                 }), 403
+        elif user_id and user_id.casefold() != authenticated_user.casefold():
+            return jsonify({
+                "error": "Access denied: userId does not match authenticated user",
+                "error_type": "USER_ACCESS_DENIED",
+            }), 403
 
         # ── Identity resolution ───────────────────────────────────────
         identity, err = _resolve_identity_or_error(kwargs)
