@@ -10,8 +10,8 @@ class GoogleGenAIConfig(BaseModel):
     type: Literal[Identifier.TYPE] = Identifier.TYPE
 
     model_name: str = Field(
-        default="gemini-2.0-flash",
-        description="The Gemini model ID to use (e.g., gemini-2.0-flash, gemini-2.5-pro)"
+        default="gemini-3.5-flash",
+        description="The Gemini model ID to use (e.g., gemini-3.5-flash, gemini-2.5-pro)"
     )
 
     api_key: str = Field(
