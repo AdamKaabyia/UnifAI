@@ -15,7 +15,7 @@ from openai.types.chat import ChatCompletionToolParam
 
 from ..common.base_llm import BaseLLM
 from ..common.chat.message import ChatMessage, Role
-from ...tools.common.base_tool import BaseTool
+from ...tools.common.tool_definition import ToolDefinition
 from .message_converter import OpenAIMessageConverter
 from .tools_converter import OpenAIToolsConverter
 from .stream_aggregator import StreamToolCallAggregator
@@ -85,7 +85,7 @@ class OpenAILLM(BaseLLM):
                 tool_calls=aggregator.build(),
             )
 
-    def bind_tools(self, tools: List[BaseTool]) -> OpenAILLM:
+    def bind_tools(self, tools: List[ToolDefinition]) -> OpenAILLM:
         clone = copy.copy(self)
         clone._tools = OpenAIToolsConverter.to_openai(tools)
         return clone

@@ -59,6 +59,7 @@ class UserSessionManager:
         session_meta = metadata or SessionMeta()
         run_id = str(uuid.uuid4())
         ctx = ExecutionContext(
+            session_id=run_id,
             user_id=user_id,
             engine_name=self._factory.engine_name,
         )

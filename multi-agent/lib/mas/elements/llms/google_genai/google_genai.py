@@ -14,7 +14,7 @@ from google.genai import types
 
 from ..common.base_llm import BaseLLM
 from ..common.chat.message import ChatMessage
-from ...tools.common.base_tool import BaseTool
+from ...tools.common.tool_definition import ToolDefinition
 from .message_converter import GoogleGenAIMessageConverter
 from .tools_converter import GoogleGenAIToolsConverter
 
@@ -94,7 +94,7 @@ class GoogleGenAILLM(BaseLLM):
                 collected_parts, accumulated_text,
             )
 
-    def bind_tools(self, tools: List[BaseTool]) -> GoogleGenAILLM:
+    def bind_tools(self, tools: List[ToolDefinition]) -> GoogleGenAILLM:
         clone = copy.copy(self)
         clone._tools = GoogleGenAIToolsConverter.to_genai(tools)
         return clone

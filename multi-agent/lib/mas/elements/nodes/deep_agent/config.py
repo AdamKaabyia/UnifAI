@@ -1,9 +1,9 @@
 from mas.elements.nodes.common.base_config import NodeBaseConfig
 from pydantic import Field
-from typing import Optional, List, Literal
+from typing import Dict, Optional, List, Literal
 from .identifiers import Identifier
 from mas.core.ref.models import LLMRef, RetrieverRef, ToolRef, ProviderRef
-from mas.core.field_hints import ApiHint, HintType, SelectionType
+from mas.core.field_hints import ApiHint, HiddenHint, HintType, SelectionType
 
 
 class DeepAgentNodeConfig(NodeBaseConfig):
@@ -54,4 +54,22 @@ class DeepAgentNodeConfig(NodeBaseConfig):
     system_message: str = Field(
         "",
         description="System prompt for the Deep Agent"
+    )
+
+    # --- Backend / Environment ---
+
+    cwd: Optional[str] = Field(
+        default=None,
+        description="Working directory override (defaults to shared_storage/{session}/{node})",
+        json_schema_extra=HiddenHint(
+            reason="Advanced: override working directory"
+        ).to_hints()
+    )
+
+    env_vars: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional environment variables for the deep agent session",
+        json_schema_extra=HiddenHint(
+            reason="Advanced: custom environment variables"
+        ).to_hints()
     )

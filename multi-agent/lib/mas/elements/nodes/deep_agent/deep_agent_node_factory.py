@@ -13,12 +13,21 @@ class DeepAgentNodeFactory(BaseFactory[DeepAgentNodeConfig, DeepAgentNode]):
 
     def create(self, cfg: DeepAgentNodeConfig, **deps) -> DeepAgentNode:
         try:
+            element_deps = deps.pop("deps", None)
+            execution_holder = element_deps.execution_ctx if element_deps else None
+            platform = element_deps.platform_config if element_deps else None
+            shared_storage = platform.shared_storage if platform else "/app/shared"
+
             return DeepAgentNode(
                 llm=deps.pop("llm"),
                 retriever=deps.pop("retriever"),
                 tools=deps.pop("tools"),
                 mcp_providers=deps.pop("providers"),
                 system_message=cfg.system_message,
+                cwd=cfg.cwd,
+                env_vars=cfg.env_vars,
+                execution_holder=execution_holder,
+                shared_storage=shared_storage,
                 retries=cfg.retries,
             )
         except Exception as e:

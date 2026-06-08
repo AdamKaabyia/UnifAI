@@ -15,6 +15,7 @@ class ExecutionContext(BaseModel):
     metadata, logged_in_user).
     """
 
+    session_id: str = ""
     user_id: str = ""
     scope: str = "public"
     engine_name: str = ""

@@ -2,7 +2,7 @@ from typing import Iterator, List, Union
 
 from ..common.base_llm import BaseLLM
 from ..common.chat.message import ChatMessage, Role
-from ...tools.common.base_tool import BaseTool
+from ...tools.common.tool_definition import ToolDefinition
 
 
 class MockLLM(BaseLLM):
@@ -18,7 +18,7 @@ class MockLLM(BaseLLM):
         response = self.chat(messages)
         yield response.content
 
-    def bind_tools(self, tools: List[BaseTool]) -> "MockLLM":
+    def bind_tools(self, tools: List[ToolDefinition]) -> "MockLLM":
         return MockLLM()
 
     @property

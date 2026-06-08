@@ -28,52 +28,23 @@ from pydantic import ConfigDict
 from ..common.base_llm import BaseLLM
 from ..common.chat.converter import LangChainConverter
 from ..common.chat.message import ChatMessage
-from ...tools.common.base_tool import BaseTool
+from ...tools.common.tool_definition import ToolDefinition
+
+_EMPTY_PARAMS: Dict[str, Any] = {"type": "object", "properties": {}}
 
 
-# ---------------------------------------------------------------------------
-# Schema-only domain tool (LangChain → domain bridge for bind_tools)
-# ---------------------------------------------------------------------------
-
-class _SchemaOnlyTool(BaseTool):
-    """Lightweight domain tool carrying only the schema extracted from a LangChain tool.
-
-    Used exclusively by ``BaseLLMChatModelAdapter.bind_tools()`` to forward
-    tool definitions to the underlying ``BaseLLM``.  Execution never goes
-    through this class — LangChain's agent loop handles tool execution.
-    """
-
-    def __init__(self, name: str, description: str, parameters: Dict[str, Any]) -> None:
-        self.name = name
-        self.description = description
-        self._parameters = parameters
-
-    def run(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError(
-            f"Tool '{self.name}' is schema-only and cannot be executed directly. "
-            "Tool execution is handled by the LangChain agent loop."
-        )
-
-    def get_args_schema_json(self) -> Dict[str, Any]:
-        return self._parameters
-
-
-def _to_domain_tool(
+def _lc_tool_to_definition(
     tool: Union[Dict[str, Any], type, Callable, LangChainBaseTool],
-) -> _SchemaOnlyTool:
-    """Convert any LangChain-accepted tool format to a domain ``_SchemaOnlyTool``."""
+) -> ToolDefinition:
+    """Convert any LangChain-accepted tool format to a provider-agnostic ``ToolDefinition``."""
     openai_schema = convert_to_openai_tool(tool)
     func = openai_schema.get("function", openai_schema)
-    return _SchemaOnlyTool(
+    return ToolDefinition(
         name=func["name"],
         description=func.get("description", ""),
-        parameters=func.get("parameters", {"type": "object", "properties": {}}),
+        parameters=func.get("parameters", _EMPTY_PARAMS),
     )
 
-
-# ---------------------------------------------------------------------------
-# The adapter
-# ---------------------------------------------------------------------------
 
 class BaseLLMChatModelAdapter(BaseChatModel):
     """Wraps any domain ``BaseLLM`` as a LangChain ``BaseChatModel``.
@@ -144,12 +115,12 @@ class BaseLLMChatModelAdapter(BaseChatModel):
         tool_choice: Optional[str] = None,
         **kwargs: Any,
     ) -> BaseLLMChatModelAdapter:
-        """Bind LangChain-format tools to the underlying ``BaseLLM``.
+        """Bind LangChain-format tools to the underlying domain ``BaseLLM``.
 
-        Converts each tool to a domain schema via ``convert_to_openai_tool``,
+        Converts each tool to a ``ToolDefinition`` via ``convert_to_openai_tool``,
         delegates to ``BaseLLM.bind_tools()``, and returns a new adapter
         wrapping the tool-bound LLM.
         """
-        domain_tools: List[BaseTool] = [_to_domain_tool(t) for t in tools]
-        bound_llm = self.llm.bind_tools(domain_tools)
+        definitions: List[ToolDefinition] = [_lc_tool_to_definition(t) for t in tools]
+        bound_llm = self.llm.bind_tools(definitions)
         return BaseLLMChatModelAdapter(llm=bound_llm)

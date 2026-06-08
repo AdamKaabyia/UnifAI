@@ -21,7 +21,7 @@ import pytest
 
 from mas.elements.llms.common.base_llm import BaseLLM
 from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
-from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.tool_definition import ToolDefinition
 from mas.elements.nodes.common.workload import Task, WorkPlan, WorkItem
 from mas.core.iem.packets import TaskPacket
 from mas.core.iem.models import ElementAddress
@@ -148,9 +148,8 @@ class PredictableLLM(BaseLLM):
         yield response.content
         yield response
     
-    def bind_tools(self, tools: List[BaseTool]) -> "PredictableLLM":
+    def bind_tools(self, tools: List[ToolDefinition]) -> "PredictableLLM":
         """Return a copy of the LLM with tools bound that shares call tracking."""
-        # Create new instance that shares the same state for call tracking
         return PredictableLLM(shared_state=self._shared_state)
     
     @property 

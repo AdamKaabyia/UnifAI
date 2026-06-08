@@ -14,7 +14,7 @@ from mas.elements.llms.common.chat.message import ChatMessage, Role, ToolCall
 from .utils import ensure_tool_call_id
 
 
-def _normalise_content(content: Union[str, list, Any]) -> str:
+def normalise_content(content: Union[str, list, Any]) -> str:
     """Normalise LangChain message content to a plain string.
 
     LangChain messages may carry ``content`` as:
@@ -99,7 +99,7 @@ class LangChainConverter:
 
     @staticmethod
     def from_lc_message(m: BaseMessage) -> ChatMessage:
-        text = _normalise_content(m.content)
+        text = normalise_content(m.content)
 
         if isinstance(m, SystemMessage):
             return ChatMessage(role=Role.SYSTEM, content=text)

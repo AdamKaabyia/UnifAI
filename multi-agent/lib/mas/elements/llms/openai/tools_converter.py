@@ -1,5 +1,5 @@
 """
-Converter from domain BaseTool to OpenAI-native tool definitions.
+Converter from ``ToolDefinition`` to OpenAI-native tool definitions.
 
 Uses the SDK's own ``ChatCompletionToolParam`` and ``FunctionDefinition``
 TypedDicts so the output is type-checked against the API spec — misspelled
@@ -8,36 +8,28 @@ keys or wrong value types are caught by the type checker, not at runtime.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from openai.types.chat import ChatCompletionToolParam
 from openai.types.shared_params import FunctionDefinition
 
-from ...tools.common.base_tool import BaseTool
-
-_EMPTY_PARAMETERS: Dict[str, Any] = {"type": "object", "properties": {}}
+from ...tools.common.tool_definition import ToolDefinition
 
 
 class OpenAIToolsConverter:
-    """Converts domain ``BaseTool`` instances into OpenAI ``ChatCompletionToolParam`` dicts."""
+    """Converts ``ToolDefinition`` instances into OpenAI ``ChatCompletionToolParam`` dicts."""
 
     @staticmethod
-    def to_openai(tools: Optional[List[BaseTool]]) -> Optional[List[ChatCompletionToolParam]]:
+    def to_openai(tools: Optional[List[ToolDefinition]]) -> Optional[List[ChatCompletionToolParam]]:
         if not tools:
             return None
         return [OpenAIToolsConverter._convert(t) for t in tools]
 
     @staticmethod
-    def _convert(tool: BaseTool) -> ChatCompletionToolParam:
-        parameters = tool.get_args_schema_json()
-
+    def _convert(tool: ToolDefinition) -> ChatCompletionToolParam:
         function: FunctionDefinition = {
             "name": tool.name,
             "description": tool.description,
-            "parameters": parameters if parameters is not None else _EMPTY_PARAMETERS,
+            "parameters": tool.parameters,
         }
-
-        return ChatCompletionToolParam(
-            type="function",
-            function=function,
-        )
+        return ChatCompletionToolParam(type="function", function=function)

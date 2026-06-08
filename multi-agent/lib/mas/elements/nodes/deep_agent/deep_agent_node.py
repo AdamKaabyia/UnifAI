@@ -14,15 +14,21 @@ require network initialization that isn't available at ``__init__`` time.
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Optional, Set, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import BaseTool as LangChainBaseTool
 
+from deepagents import create_deep_agent
+from deepagents.backends import LocalShellBackend
+
+from mas.core.execution_context import ExecutionContextHolder
 from mas.elements.llms.common.base_llm import BaseLLM
-from mas.elements.llms.common.chat.converter import LangChainConverter
+from mas.elements.llms.common.chat.converter import LangChainConverter, normalise_content
 from mas.elements.llms.common.chat.message import ChatMessage, Role
 from mas.elements.llms.common.langchain_adapter import BaseLLMChatModelAdapter
 from mas.elements.nodes.common.base_node import BaseNode
@@ -32,8 +38,7 @@ from mas.elements.nodes.common.capabilities.workload_capable import WorkloadCapa
 from mas.elements.nodes.common.workload import AgentResult, Task
 from mas.elements.providers.mcp_server_client.mcp_provider import McpProvider
 from mas.elements.tools.common.base_tool import BaseTool
-from .tool_bridge import domain_tools_to_langchain
-from deepagents import create_deep_agent
+from mas.elements.tools.common.converter import LangChainToolsConverter
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +49,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ExecutionResult:
-    """Immutable result from a Deep Agent invocation.
-
-    Replaces raw ``Dict[str, Any]`` to give the internal pipeline a
-    typed contract between invocation and result-creation steps.
-    """
+    """Immutable result from a Deep Agent invocation."""
 
     output: str = ""
     success: bool = True
@@ -56,32 +57,6 @@ class ExecutionResult:
     reasoning: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
     metrics: Dict[str, Any] = field(default_factory=dict)
-
-
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
-
-def _normalise_content(content: Union[str, list, Any]) -> str:
-    """Collapse LangChain message content (str | list-of-blocks) into a plain string."""
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        parts: List[str] = []
-        for block in content:
-            if isinstance(block, str):
-                parts.append(block)
-            elif isinstance(block, dict) and block.get("type") == "text":
-                parts.append(block.get("text", ""))
-        return "".join(parts)
-
-    return str(content)
-
-
-def _extract_text(message: BaseMessage) -> str:
-    """Shorthand for normalising a ``BaseMessage``'s content field."""
-    return _normalise_content(message.content)
 
 
 # ------------------------------------------------------------------
@@ -96,17 +71,11 @@ class DeepAgentNode(
 ):
     """Agent node that delegates to a LangChain Deep Agent for execution.
 
-    SOLID Design:
-    - Single Responsibility: context building + Deep Agent delegation + routing
-    - Open/Closed: extensible via tools, MCP providers, and retriever
-    - Liskov Substitution: can replace CustomAgent / A2AAgent in workflows
-    - Interface Segregation: only uses needed mixins (no LLM/Agent)
-    - Dependency Inversion: depends on ``BaseLLM`` abstraction, not concrete LLM
-
     Architecture:
     - Wraps a LangChain Deep Agent graph (``create_deep_agent``)
     - Lazily compiles the graph on first ``run()`` (MCP tools need network init)
-    - Bridges domain ``BaseTool`` → LangChain ``StructuredTool``
+    - Uses ``LocalBackend`` for session-scoped filesystem access
+    - Bridges domain ``BaseTool`` → LangChain tools via ``LangChainToolsConverter``
     - Supports streaming: forwards ``llm_token`` and ``tool_calling`` events
     - Same routing logic as CustomAgent / A2AAgent (``should_respond``)
     """
@@ -122,6 +91,10 @@ class DeepAgentNode(
         mcp_providers: Optional[List[McpProvider]] = None,
         system_message: str = "",
         retriever: Any = None,
+        cwd: Optional[str] = None,
+        env_vars: Optional[Dict[str, str]] = None,
+        execution_holder: Optional[ExecutionContextHolder] = None,
+        shared_storage: str = "/app/shared",
         **kwargs: Any,
     ) -> None:
         super().__init__(retriever=retriever, **kwargs)
@@ -130,8 +103,26 @@ class DeepAgentNode(
         self._domain_tools: List[BaseTool] = tools or []
         self._mcp_providers: List[McpProvider] = mcp_providers or []
         self._system_message = system_message
+        self._cwd = cwd
+        self._env_vars: Dict[str, str] = env_vars or {}
+        self._execution_holder = execution_holder
+        self._shared_storage = shared_storage
 
         self._compiled_agent: Any = None
+
+    # ==================================================================
+    # Session context
+    # ==================================================================
+
+    @property
+    def session_id(self) -> str:
+        """Get session_id from execution context (filled at runtime by the runner)."""
+        if self._execution_holder is None:
+            return ""
+        try:
+            return self._execution_holder.context.session_id
+        except (RuntimeError, AttributeError):
+            return ""
 
     # ==================================================================
     # Graph lifecycle
@@ -152,24 +143,60 @@ class DeepAgentNode(
         self._compiled_agent = self._build_deep_agent(langchain_tools)
         logger.info("DeepAgent %s: compiled graph with %d tools", self.uid, len(langchain_tools))
 
-    def _collect_langchain_tools(self) -> List[StructuredTool]:
+    def _collect_langchain_tools(self) -> List[LangChainBaseTool]:
         """Gather all tools (domain + MCP) and convert to LangChain format."""
         all_domain_tools: List[BaseTool] = list(self._domain_tools)
 
         for provider in self._mcp_providers:
             all_domain_tools.extend(provider.get_tools())
 
-        return domain_tools_to_langchain(all_domain_tools)
+        return LangChainToolsConverter.to_lc(all_domain_tools)
 
-    def _build_deep_agent(self, tools: List[StructuredTool]) -> Any:
-        """Compile a Deep Agent graph from the adapter, tools, and config."""
+    def _build_deep_agent(self, tools: List[LangChainBaseTool]) -> Any:
+        """Compile a Deep Agent graph with LocalShellBackend for filesystem access."""
         adapter = BaseLLMChatModelAdapter(llm=self._llm)
+        backend = self._build_backend()
 
         return create_deep_agent(
             model=adapter,
             tools=tools or None,
             system_prompt=self._system_message or None,
+            backend=backend,
         )
+
+    # ==================================================================
+    # Backend / working directory
+    # ==================================================================
+
+    def _build_backend(self) -> LocalShellBackend:
+        """Create a LocalShellBackend rooted at the session working directory."""
+        root_dir = self._prepare_working_directory()
+        env = self._build_env()
+        return LocalShellBackend(root_dir=root_dir, virtual_mode=True, env=env)
+
+    def _prepare_working_directory(self) -> str:
+        """Derive a session-scoped working directory.
+
+        Priority:
+        1. Explicit ``cwd`` override from config
+        2. ``{shared_storage}/{session_id}/{node_uid}/`` for session persistence
+        3. Temp directory as last resort
+        """
+        if self._cwd:
+            work_dir = self._cwd
+        elif self.session_id:
+            work_dir = os.path.join(self._shared_storage, self.session_id, self.uid)
+        else:
+            work_dir = tempfile.mkdtemp(prefix="deep_agent_")
+
+        os.makedirs(work_dir, exist_ok=True)
+        return work_dir
+
+    def _build_env(self) -> Optional[Dict[str, str]]:
+        """Build environment variables dict for the backend, or None if empty."""
+        if not self._env_vars:
+            return None
+        return dict(self._env_vars)
 
     # ==================================================================
     # Task processing (IEM contract)
@@ -180,32 +207,32 @@ class DeepAgentNode(
         task = packet.extract_task()
         task.mark_processed(self.uid)
 
-        # try:
-        if task.thread_id:
-            self.workspaces.add_task(task.thread_id, task)
+        try:
+            if task.thread_id:
+                self.workspaces.add_task(task.thread_id, task)
 
-        conversation_context = self._build_conversation_context(task)
-        execution_result = self._invoke(conversation_context)
-        agent_result = self._to_agent_result(execution_result)
+            conversation_context = self._build_conversation_context(task)
+            execution_result = self._invoke(conversation_context)
+            agent_result = self._to_agent_result(execution_result)
 
-        if task.thread_id:
-            self.workspaces.add_result(task.thread_id, agent_result)
+            if task.thread_id:
+                self.workspaces.add_result(task.thread_id, agent_result)
 
-        self._route_response(task, agent_result, packet)
-        logger.info("DeepAgent %s: processed task successfully", self.uid)
+            self._route_response(task, agent_result, packet)
+            logger.info("DeepAgent %s: processed task successfully", self.uid)
 
-        # except Exception as exc:
-            # logger.error("DeepAgent %s: error processing task: %s", self.uid, exc)
-            # error_result = AgentResult(
-            #     content=f"Error processing task: {exc}",
-            #     agent_id=self.uid,
-            #     agent_name=self.display_name,
-            #     success=False,
-            #     error=str(exc),
-            # )
-            # if task.thread_id:
-            #     self.workspaces.add_result(task.thread_id, error_result)
-            # self._route_response(task, error_result, packet)
+        except Exception as exc:
+            logger.error("DeepAgent %s: error processing task: %s", self.uid, exc)
+            error_result = AgentResult(
+                content=f"Error processing task: {exc}",
+                agent_id=self.uid,
+                agent_name=self.display_name,
+                success=False,
+                error=str(exc),
+            )
+            if task.thread_id:
+                self.workspaces.add_result(task.thread_id, error_result)
+            self._route_response(task, error_result, packet)
 
     # ==================================================================
     # Context building
@@ -221,7 +248,6 @@ class DeepAgentNode(
 
         if (
             context_messages
-            and hasattr(context_messages[-1], "role")
             and context_messages[-1].role == Role.USER
             and context_messages[-1].content == task.content
         ):
@@ -272,7 +298,7 @@ class DeepAgentNode(
         )
 
         return ExecutionResult(
-            output=_extract_text(last_ai) if last_ai else "",
+            output=normalise_content(last_ai.content) if last_ai else "",
         )
 
     def _invoke_streaming(self, lc_messages: List[BaseMessage]) -> ExecutionResult:
@@ -280,14 +306,6 @@ class DeepAgentNode(
 
         Uses ``stream_mode="messages"`` with ``subgraphs=True`` so that
         events from the general-purpose subagent are also forwarded.
-
-        Emitted event types match ``AgentCapableMixin`` and ``A2AAgentNode``:
-        - ``{"type": "llm_token",    "chunk": "…"}``
-        - ``{"type": "tool_calling", "tool": "…", "call_id": "…", "args": {…}}``
-
-        Tool call chunks arrive incrementally (args streamed as JSON string
-        fragments).  We wait for the fully-aggregated ``AIMessage`` with
-        parsed ``tool_calls`` before emitting a ``tool_calling`` event.
         """
         accumulated_text = ""
         emitted_tool_call_ids: Set[str] = set()
@@ -303,18 +321,15 @@ class DeepAgentNode(
 
             token, _metadata = chunk["data"]
 
-            # Fully-formed tool calls on aggregated AIMessage
             if getattr(token, "tool_calls", None) and isinstance(token, AIMessage):
                 self._emit_tool_calls(token.tool_calls, emitted_tool_call_ids)
                 continue
 
-            # Partial tool_call_chunks — skip, wait for aggregated form
             if getattr(token, "tool_call_chunks", None):
                 continue
 
-            # AI text tokens (AIMessageChunk is a subclass of AIMessage)
             if isinstance(token, AIMessage):
-                text = _normalise_content(token.content)
+                text = normalise_content(token.content)
                 if text:
                     accumulated_text += text
                     self._stream({"type": "llm_token", "chunk": text})
