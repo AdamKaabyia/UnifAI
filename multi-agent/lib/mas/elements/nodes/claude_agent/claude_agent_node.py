@@ -235,13 +235,20 @@ class ClaudeAgentNode(
         Execute Claude Agent SDK session synchronously.
 
         Uses AsyncBridge to run the async query() generator.
-        Streams text blocks as llm_token events if streaming is active.
+        Changes the process working directory to the configured cwd
+        so that the SDK subprocess inherits it for all file/git operations.
         """
-        with get_async_bridge() as bridge:
-            return bridge.run(self._async_execute(prompt))
+        work_dir = self._prepare_working_directory()
+        original_cwd = os.getcwd()
+        os.chdir(work_dir)
+        try:
+            with get_async_bridge() as bridge:
+                return bridge.run(self._async_execute(prompt, work_dir))
+        finally:
+            os.chdir(original_cwd)
 
     async def _async_execute(
-        self, prompt: str
+        self, prompt: str, work_dir: str
     ) -> tuple[str, Dict[str, Any]]:
         """Async execution of Claude Agent SDK query."""
         from claude_agent_sdk import (
@@ -249,7 +256,7 @@ class ClaudeAgentNode(
             AssistantMessage, ResultMessage, TextBlock,
         )
 
-        options = self._build_options()
+        options = self._build_options(work_dir)
         accumulated_text = ""
         execution_metadata: Dict[str, Any] = {}
 
@@ -291,12 +298,11 @@ class ClaudeAgentNode(
 
         return accumulated_text, execution_metadata
 
-    def _build_options(self) -> "ClaudeAgentOptions":
+    def _build_options(self, work_dir: str) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
         from claude_agent_sdk import ClaudeAgentOptions
 
         env = self._build_env()
-        work_dir = self._prepare_working_directory()
 
         kwargs: Dict[str, Any] = {
             "model": self._model,
