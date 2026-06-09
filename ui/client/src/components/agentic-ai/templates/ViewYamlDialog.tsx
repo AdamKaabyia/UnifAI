@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import yaml from 'js-yaml';
 import {
   Dialog,
@@ -26,6 +26,13 @@ export const ViewYamlDialog: React.FC<ViewYamlDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const [copied, setCopied] = React.useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const yamlContent = useMemo(() => {
     if (!draft) return '';
@@ -41,7 +48,8 @@ export const ViewYamlDialog: React.FC<ViewYamlDialogProps> = ({
       await navigator.clipboard.writeText(yamlContent);
       setCopied(true);
       toast({ title: 'Copied', description: 'YAML copied to clipboard.' });
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: 'Error', description: 'Failed to copy.', variant: 'destructive' });
     }
