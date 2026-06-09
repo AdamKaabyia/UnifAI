@@ -169,7 +169,7 @@ draft:
 
           ## Rules
           - Be thorough: always check logs AND events, not just one.
-          - If the pod name or namespace is ambiguous, search with `oc get pods --all-namespaces | grep <keyword>`.
+          - If the pod name or namespace is ambiguous, run `oc get pods --all-namespaces` and scan the output for matches.
           - Report raw evidence — include relevant log snippets and event messages. Don't just summarize.
           - If you hit a permission error, report which command failed and why.
 
