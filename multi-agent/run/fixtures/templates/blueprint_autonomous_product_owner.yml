@@ -31,7 +31,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_ATLASSIAN_PAT
-        mcp_url: https://PLACEHOLDER_ATLASSIAN_MCP_URL/mcp
+        mcp_url: https://mcp-atlassian-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com/mcp
         tool_names:
           - confluence_search
           - confluence_get_page
@@ -44,7 +44,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_JIRA_PAT
-        mcp_url: https://PLACEHOLDER_JIRA_MCP_URL/mcp
+        mcp_url: https://mcp-atlassian-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com/mcp
         tool_names:
           - jira_create_issue
           - jira_search
@@ -59,7 +59,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_GIT_PAT
-        mcp_url: https://PLACEHOLDER_GIT_MCP_URL/mcp
+        mcp_url: https://api.githubcopilot.com/mcp/
         tool_names:
           - list_repository_files
           - get_file_content

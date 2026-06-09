@@ -30,7 +30,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_GIT_PAT
-        mcp_url: https://PLACEHOLDER_GIT_MCP_URL/mcp
+        mcp_url: https://api.githubcopilot.com/mcp/
         tool_names:
           - list_pull_requests
           - get_pull_request
@@ -46,7 +46,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_GOOGLE_PAT
-        mcp_url: https://PLACEHOLDER_GOOGLE_MCP_URL/mcp
+        mcp_url: https://workspace-mcp-omri-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com/mcp
         tool_names:
           - google_docs_get_document
           - google_docs_search
