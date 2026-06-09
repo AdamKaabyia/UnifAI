@@ -53,7 +53,7 @@ def seed_templates(repository: TemplateRepository) -> int:
                 logger.warning("Skipping %s — missing 'template_id' at top level.", path.name)
                 continue
 
-            if repository.exists(template_id):
+            if repository.exists(template_id, include_deleted=True):
                 logger.debug("Template '%s' already exists — skipping.", template_id)
                 continue
 

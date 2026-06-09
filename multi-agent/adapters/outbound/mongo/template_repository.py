@@ -70,7 +70,7 @@ class MongoTemplateRepository(TemplateRepository):
     def delete(self, template_id: str) -> bool:
         """Soft-delete a template (set deleted=True so seeder won't re-insert)."""
         res = self._col.update_one(
-            {"template_id": template_id},
+            {"template_id": template_id, "deleted": {"$ne": True}},
             {"$set": {"deleted": True, "updated_at": datetime.now(timezone.utc)}},
         )
         return res.modified_count == 1
@@ -83,9 +83,17 @@ class MongoTemplateRepository(TemplateRepository):
             raise KeyError(f"Template not found: {template_id}")
         return self._doc_to_template(doc)
 
-    def exists(self, template_id: str) -> bool:
-        """Check if a template exists (including soft-deleted — used by seeder)."""
-        return self._col.count_documents({"template_id": template_id}, limit=1) == 1
+    def exists(self, template_id: str, *, include_deleted: bool = False) -> bool:
+        """Check if a template exists.
+
+        By default only active (non-deleted) templates are considered.
+        Pass ``include_deleted=True`` to also match soft-deleted rows
+        (used by the fixture seeder).
+        """
+        query: dict = {"template_id": template_id}
+        if not include_deleted:
+            query["deleted"] = {"$ne": True}
+        return self._col.count_documents(query, limit=1) == 1
 
     # ────────────────────────────── Listings ────────────────────────────
     def list_templates(

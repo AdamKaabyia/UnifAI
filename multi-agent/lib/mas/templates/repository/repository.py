@@ -57,8 +57,15 @@ class TemplateRepository(ABC):
         """
 
     @abstractmethod
-    def exists(self, template_id: str) -> bool:
-        """Check if a template exists."""
+    def exists(self, template_id: str, *, include_deleted: bool = False) -> bool:
+        """Check if a template exists.
+
+        Args:
+            template_id: The template identifier.
+            include_deleted: If ``True``, soft-deleted templates are
+                counted as existing (used by the fixture seeder to
+                avoid re-inserting admin-deleted templates).
+        """
 
     # ────────────────────────────── Listings ────────────────────────────
     @abstractmethod
