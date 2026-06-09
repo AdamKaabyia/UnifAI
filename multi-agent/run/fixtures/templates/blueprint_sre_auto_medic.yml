@@ -28,7 +28,7 @@ draft:
       config:
         type: mcp_server
         bearer_token: PLACEHOLDER_JIRA_PAT
-        mcp_url: https://jira-mcp-tag-ai--runtime-int.apps.stc-ai-e1-pp.imap.p1.openshiftapps.com/mcp
+        mcp_url: PLACEHOLDER_JIRA_MCP_URL
         tool_names:
           - jira_create_issue
           - jira_search
@@ -479,10 +479,14 @@ placeholders:
       resources:
         - rid: jira_mcp_rid
           placeholders:
+            - field_path: mcp_url
+              required: true
+              label: Jira MCP Server URL
+              hint: "URL of your Jira MCP server endpoint"
             - field_path: bearer_token
               required: true
               label: Jira PAT Token
-              hint: "Your Jira Personal Access Token (base64-encoded username:token)"
+              hint: "Your Jira Personal Access Token for API access"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Metadata

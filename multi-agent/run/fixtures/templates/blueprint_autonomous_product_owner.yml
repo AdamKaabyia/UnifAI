@@ -518,7 +518,7 @@ placeholders:
             - field_path: bearer_token
               required: true
               label: Jira PAT Token
-              hint: "Your Jira Personal Access Token (base64-encoded username:token)"
+              hint: "Your Jira Personal Access Token for API access"
         - rid: git_mcp_rid
           placeholders:
             - field_path: mcp_url
