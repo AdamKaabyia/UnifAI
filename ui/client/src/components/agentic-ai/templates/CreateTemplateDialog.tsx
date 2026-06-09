@@ -99,19 +99,29 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
     await onSubmit({ draft, placeholders, metadata });
   };
 
+  const resetForm = () => {
+    setDraftYaml('');
+    setPlaceholdersJson('{\n  "categories": []\n}');
+    setAuthor('');
+    setCategory('');
+    setVersion('1.0.0');
+    setTagInput('');
+    setTags([]);
+    setCapabilityInput('');
+    setCapabilities([]);
+    setParseError(null);
+  };
+
   const handleClose = () => {
     if (!isSubmitting) {
-      setDraftYaml('');
-      setPlaceholdersJson('{\n  "categories": []\n}');
-      setAuthor('');
-      setCategory('');
-      setVersion('1.0.0');
-      setTags([]);
-      setCapabilities([]);
-      setParseError(null);
+      resetForm();
       onOpenChange(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!open) resetForm();
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
