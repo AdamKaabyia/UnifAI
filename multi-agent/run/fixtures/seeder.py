@@ -58,7 +58,7 @@ def seed_templates(repository: TemplateRepository) -> int:
                 continue
 
             if repository.exists(template_id, include_deleted=True):
-                logger.debug("Template '%s' already exists — skipping.", template_id)
+                logger.info("Template '%s' already exists — skipping.", template_id)
                 continue
 
             now = datetime.now(timezone.utc)
