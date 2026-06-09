@@ -48,6 +48,10 @@ def seed_templates(repository: TemplateRepository) -> int:
             with open(path, "r") as f:
                 raw = yaml.safe_load(f)
 
+            if not isinstance(raw, dict):
+                logger.warning("Skipping %s — top-level YAML must be a mapping.", path.name)
+                continue
+
             template_id = raw.get("template_id")
             if not template_id:
                 logger.warning("Skipping %s — missing 'template_id' at top level.", path.name)
