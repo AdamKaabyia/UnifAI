@@ -6,19 +6,20 @@ Follows the same pattern as
 a per-user key with a TTL), but lives in ``global_utils`` so any Flask
 service can leverage it via ``IdentityClient``.
 
-Keys: ``unifai:user_teams:{username}``
+Keys: ``identity:user_teams:{username}``
 Value: JSON-encoded ``list[str]`` of team IDs.
 """
 import json
 import logging
 from typing import List, Optional
 
+from global_utils.redis.constants import IDENTITY_USER_TEAMS_PREFIX
 from global_utils.redis.redis_kv_store import RedisKVStore
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TTL = 300  # 5 minutes
-KEY_PREFIX = "unifai:user_teams:"
+KEY_PREFIX = f"{IDENTITY_USER_TEAMS_PREFIX}:"
 
 
 class TeamMembershipCache:

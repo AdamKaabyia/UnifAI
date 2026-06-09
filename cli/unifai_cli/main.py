@@ -44,8 +44,8 @@ def interactive(
     from unifai_cli.commands.workflow import run_workflow_interactive
     from unifai_cli.display.formatting import console
 
-    user_id = resolve_user_id(user)
-    client = build_client(mas_url, user_id=user_id)
+    user_id, session_cookie = resolve_user_id(user)
+    client = build_client(mas_url, user_id=user_id, session_cookie=session_cookie)
 
     console.print(f"\n[bold]Welcome to UnifAI CLI[/bold]  (user: [cyan]{user_id}[/cyan], server: [dim]{client.base_url}[/dim])\n")
 

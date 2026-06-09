@@ -32,8 +32,8 @@ def run_cmd(
     from unifai_cli.bootstrap import build_client, resolve_user_id
     from unifai_cli.display.formatting import console
 
-    user_id = resolve_user_id(user)
-    client = build_client(mas_url, user_id=user_id)
+    user_id, session_cookie = resolve_user_id(user)
+    client = build_client(mas_url, user_id=user_id, session_cookie=session_cookie)
 
     bp_id = _resolve_blueprint(client, user_id, blueprint_id, blueprint_name)
     if bp_id is None:

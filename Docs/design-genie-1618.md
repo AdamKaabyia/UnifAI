@@ -90,7 +90,7 @@ Rover/LDAP groups → cached in Redis (UserGroupsCache, 1h TTL)
 class TeamMembershipCache:
     """Redis-backed cache for user team memberships (follows UserGroupsCache pattern)."""
 
-    KEY_PREFIX = "unifai:user_teams:"
+    KEY_PREFIX = "identity:user_teams:"
 
     def __init__(self, store: RedisKVStore, ttl: int = 300):
         self._store = store
@@ -547,13 +547,13 @@ Request to team-scoped endpoint with identityType=team, userId=team-x:
     1. Redis HGETALL identity:session:{id} → UserSessionData (username = "alice")
     2. team_membership_checker("alice", "team-x")
        → IdentityClient.is_member("alice", "team-x")
-         → Redis GET unifai:user_teams:alice → cache hit? Check list → return
+         → Redis GET identity:user_teams:alice → cache hit? Check list → return
          → Redis cache miss?
            → HTTP GET Identity /api/teams/teams.list?userId=alice
              → Identity queries MongoDB teams collection
              → (Rover group resolution uses UserGroupsCache in Redis)
              → Returns team list
-           → Redis SET unifai:user_teams:alice (5 min TTL)
+           → Redis SET identity:user_teams:alice (5 min TTL)
            → team-x in list? True/False
          → team-x not in cached list?
            → Invalidate Redis cache → retry with fresh HTTP call

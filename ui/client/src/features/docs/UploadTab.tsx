@@ -310,7 +310,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({
             setUploadProgress(60);
             
             // Pass skip_validation=true since files were pre-validated
-            const res = await embedDocs(docs, user?.username || 'default', true);
+            const res = await embedDocs(docs, true);
             
             const issues = res?.registration?.issues || [];
             if (issues.length > 0) {
