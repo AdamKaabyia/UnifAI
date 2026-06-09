@@ -170,7 +170,7 @@ draft:
           ## Rules
           - Be thorough: always check logs AND events, not just one.
           - If the pod name or namespace is ambiguous, run `oc get pods --all-namespaces` and scan the output for matches.
-          - Report raw evidence — include relevant log snippets and event messages. Don't just summarize.
+          - Summarize the relevant evidence. Only quote short excerpts when necessary, and redact tokens, passwords, and sensitive data.
           - If you hit a permission error, report which command failed and why.
 
     - rid: rhel_sre_agent_rid
@@ -263,7 +263,7 @@ draft:
           ## Rules
           - Before creating a new ticket, search Jira for recent tickets about the same pod/service to avoid duplicates.
           - If a related ticket already exists, update it with new findings instead of creating a duplicate.
-          - Always include raw evidence (log snippets, metrics) — not just summaries.
+          - Include summarized evidence with only minimal redacted excerpts when needed for triage.
           - Set appropriate priority based on impact (Blocker/Critical for production services, Major for staging).
 
     - rid: reporter_agent_rid
