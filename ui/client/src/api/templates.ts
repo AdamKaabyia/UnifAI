@@ -66,8 +66,10 @@ export interface CreateTemplateResponse {
  * Create a new template (admin only)
  * POST /templates/template.create
  */
-export async function createTemplate(params: CreateTemplateParams): Promise<CreateTemplateResponse> {
-  const response = await axios.post<CreateTemplateResponse>('/templates/template.create', params);
+export async function createTemplate(params: CreateTemplateParams, userId: string): Promise<CreateTemplateResponse> {
+  const response = await axios.post<CreateTemplateResponse>('/templates/template.create', params, {
+    params: { userId },
+  });
   return response.data;
 }
 
@@ -80,9 +82,9 @@ export interface DeleteTemplateResponse {
  * Delete a template by ID (admin only)
  * DELETE /templates/template.delete
  */
-export async function deleteTemplate(templateId: string): Promise<DeleteTemplateResponse> {
+export async function deleteTemplate(templateId: string, userId: string): Promise<DeleteTemplateResponse> {
   const response = await axios.delete<DeleteTemplateResponse>('/templates/template.delete', {
-    params: { templateId }
+    params: { templateId, userId }
   });
   return response.data;
 }

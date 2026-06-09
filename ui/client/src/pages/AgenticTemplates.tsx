@@ -150,7 +150,7 @@ export default function AgenticTemplates() {
     if (!templateToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteTemplate(templateToDelete.template_id);
+      await deleteTemplate(templateToDelete.template_id, user!.username);
       toast({ title: 'Deleted', description: `Template "${templateToDelete.name}" deleted.` });
       setShowDeleteConfirm(false);
       setTemplateToDelete(null);
@@ -174,7 +174,7 @@ export default function AgenticTemplates() {
   }) => {
     setIsCreatingTemplate(true);
     try {
-      const result = await createTemplate(data);
+      const result = await createTemplate(data, user!.username);
       toast({ title: 'Created', description: `Template created (${result.template_id}).` });
       setShowCreateDialog(false);
       fetchTemplates();
