@@ -2,7 +2,6 @@
 Claude Agent Node Factory
 """
 
-from config.app_config import AppConfig
 from mas.elements.common.base_factory import BaseFactory
 from mas.elements.common.exceptions import PluginConfigurationError
 from .config import ClaudeAgentNodeConfig
@@ -25,7 +24,8 @@ class ClaudeAgentNodeFactory(BaseFactory[ClaudeAgentNodeConfig, ClaudeAgentNode]
         try:
             element_deps = deps.pop("deps", None)
             execution_holder = element_deps.execution_ctx if element_deps else None
-            shared_storage = AppConfig.get("shared_storage")
+            platform = element_deps.platform_config if element_deps else None
+            shared_storage = platform.shared_storage if platform else "/app/shared"
 
             return ClaudeAgentNode(
                 # Auth (Vertex AI)

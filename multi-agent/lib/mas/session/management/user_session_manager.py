@@ -4,7 +4,7 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
-from config.app_config import AppConfig
+from mas.core.platform_config import PlatformConfig
 from mas.session.repository.repository import SessionRepository
 from mas.session.building.workflow_session_factory import WorkflowSessionFactory
 from mas.session.domain.workflow_session import WorkflowSession
@@ -32,10 +32,12 @@ class UserSessionManager:
             repository: SessionRepository,
             session_factory: WorkflowSessionFactory,
             blueprint_service: BlueprintService,
+            platform_config: Optional[PlatformConfig] = None,
     ):
         self._repo = repository
         self._factory = session_factory
         self._bp_service = blueprint_service
+        self._platform_config = platform_config or PlatformConfig()
 
     def blueprint_exists(self, blueprint_id: str) -> bool:
         """Check if blueprint exists without loading it."""
@@ -122,10 +124,9 @@ class UserSessionManager:
             self._cleanup_session_storage(run_id)
         return deleted
 
-    @staticmethod
-    def _cleanup_session_storage(run_id: str) -> None:
+    def _cleanup_session_storage(self, run_id: str) -> None:
         """Remove the shared storage folder created for this session."""
-        session_dir = os.path.join(AppConfig.get("shared_storage"), run_id)
+        session_dir = os.path.join(self._platform_config.shared_storage, run_id)
         if os.path.isdir(session_dir):
             shutil.rmtree(session_dir, ignore_errors=True)
             logger.info("Cleaned up session storage: %s", session_dir)

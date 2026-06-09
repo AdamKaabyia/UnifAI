@@ -46,6 +46,7 @@ from mas.actions.providers.mcp.validate_connection.validate_connection import Va
 from mas.actions.providers.mcp.get_tools_names.get_tools_names import GetToolsNamesAction
 
 from config.app_config import AppConfig
+from mas.core.platform_config import PlatformConfig
 
 from outbound.mongo import (
     MongoBlueprintRepository,
@@ -213,11 +214,17 @@ class AppContainer(metaclass=SingletonMeta):
             auth_service=self.auth_service,
         ))
 
+        # ── Platform config (domain-layer projection of AppConfig) ────
+        self.platform_config = PlatformConfig(
+            shared_storage=cfg.shared_storage,
+        )
+
         # ── Session factory ───────────────────────────────────────────
         self.session_factory = WorkflowSessionFactory(
             element_registry=self.element_registry,
             engine_name=cfg.engine_name,
             auth_service=self.auth_service,
+            platform_config=self.platform_config,
         )
         self.session_repo = MongoSessionRepository(
             mongodb_port=cfg.mongodb_port,
@@ -228,7 +235,8 @@ class AppContainer(metaclass=SingletonMeta):
         self.session_manager = UserSessionManager(
             repository=self.session_repo,
             session_factory=self.session_factory,
-            blueprint_service=self.blueprint_service
+            blueprint_service=self.blueprint_service,
+            platform_config=self.platform_config,
         )
 
         self.session_lifecycle = SessionLifecycle(repository=self.session_repo)
