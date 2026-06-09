@@ -286,6 +286,6 @@ export default function AgenticTemplates() {
         onCancel={() => { setShowDeleteConfirm(false); setTemplateToDelete(null); }}
         loading={isDeleting}
       />
-    </div>
+    </>
   );
 }
