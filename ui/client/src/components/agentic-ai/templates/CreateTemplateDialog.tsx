@@ -191,7 +191,7 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
                   {tags.map((tag) => (
                     <Badge key={tag} variant="secondary" className="text-xs bg-primary/10 text-primary">
                       #{tag}
-                      <button onClick={() => setTags(tags.filter(t => t !== tag))} className="ml-1 hover:text-white">
+                      <button aria-label={`Remove tag ${tag}`} onClick={() => setTags(tags.filter(t => t !== tag))} className="ml-1 hover:text-white">
                         <X className="h-2.5 w-2.5" />
                       </button>
                     </Badge>
@@ -219,7 +219,7 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
                   {capabilities.map((cap) => (
                     <Badge key={cap} variant="secondary" className="text-xs bg-primary/10 text-primary">
                       {cap}
-                      <button onClick={() => setCapabilities(capabilities.filter(c => c !== cap))} className="ml-1 hover:text-white">
+                      <button aria-label={`Remove capability ${cap}`} onClick={() => setCapabilities(capabilities.filter(c => c !== cap))} className="ml-1 hover:text-white">
                         <X className="h-2.5 w-2.5" />
                       </button>
                     </Badge>

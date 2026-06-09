@@ -57,6 +57,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
                   size="sm"
                   className="h-8 w-8 p-0 text-gray-400 hover:text-primary"
                   title="View YAML"
+                  aria-label="View YAML"
                   onClick={(e) => {
                     e.stopPropagation();
                     onViewYaml?.(template);
@@ -69,6 +70,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
                   size="sm"
                   className="h-8 w-8 p-0 text-gray-400 hover:text-red-400"
                   title="Delete template"
+                  aria-label="Delete template"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete?.(template);
