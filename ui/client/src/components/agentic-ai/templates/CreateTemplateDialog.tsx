@@ -44,21 +44,21 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
   const [capabilities, setCapabilities] = useState<string[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const handleAddTag = () => {
-    const trimmed = tagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setTagInput('');
+  const handleAddItem = (
+    value: string,
+    list: string[],
+    setList: React.Dispatch<React.SetStateAction<string[]>>,
+    setInput: React.Dispatch<React.SetStateAction<string>>,
+  ) => {
+    const trimmed = value.trim();
+    if (trimmed && !list.includes(trimmed)) {
+      setList([...list, trimmed]);
+      setInput('');
     }
   };
 
-  const handleAddCapability = () => {
-    const trimmed = capabilityInput.trim();
-    if (trimmed && !capabilities.includes(trimmed)) {
-      setCapabilities([...capabilities, trimmed]);
-      setCapabilityInput('');
-    }
-  };
+  const handleAddTag = () => handleAddItem(tagInput, tags, setTags, setTagInput);
+  const handleAddCapability = () => handleAddItem(capabilityInput, capabilities, setCapabilities, setCapabilityInput);
 
   const handleSubmit = async () => {
     setParseError(null);

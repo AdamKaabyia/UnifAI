@@ -303,7 +303,6 @@ class AppContainer(metaclass=SingletonMeta):
 
     def _seed_templates(self):
         """Load YAML template fixtures into the database if not already present."""
-        import logging
         from run.fixtures.seeder import seed_templates
         logger = logging.getLogger(__name__)
         try:
