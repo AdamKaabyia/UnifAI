@@ -78,6 +78,10 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
     let placeholders: Record<string, any>;
     try {
       placeholders = JSON.parse(placeholdersJson);
+      if (!placeholders || typeof placeholders !== 'object' || Array.isArray(placeholders)) {
+        setParseError('Placeholders JSON must be a JSON object.');
+        return;
+      }
     } catch (e: any) {
       setParseError(`Placeholders JSON parse error: ${e.message}`);
       return;
