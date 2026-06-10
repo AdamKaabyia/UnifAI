@@ -234,7 +234,6 @@ class AuthManager:
 
                     # Build a signed session cookie so the CLI can send it
                     # as-is without needing the SECRET_KEY.
-                    from flask import current_app
                     si = current_app.session_interface
                     fake_session = si.session_class(
                         {"_permanent": True, "session_id": session_id}
