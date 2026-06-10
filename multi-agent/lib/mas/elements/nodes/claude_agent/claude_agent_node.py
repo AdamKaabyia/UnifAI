@@ -12,6 +12,10 @@ import shutil
 import subprocess
 import tempfile
 
+from claude_agent_sdk import (
+    query, ClaudeAgentOptions,
+    AssistantMessage, ResultMessage, TextBlock,
+)
 from global_utils.utils.async_bridge import get_async_bridge
 from mas.graph.state.state_view import StateView
 from mas.elements.llms.common.chat.message import ChatMessage, Role
@@ -239,23 +243,13 @@ class ClaudeAgentNode(
         so that the SDK subprocess inherits it for all file/git operations.
         """
         work_dir = self._prepare_working_directory()
-        original_cwd = os.getcwd()
-        os.chdir(work_dir)
-        try:
-            with get_async_bridge() as bridge:
-                return bridge.run(self._async_execute(prompt, work_dir))
-        finally:
-            os.chdir(original_cwd)
+        with get_async_bridge() as bridge:
+            return bridge.run(self._async_execute(prompt, work_dir))
 
     async def _async_execute(
         self, prompt: str, work_dir: str
     ) -> tuple[str, Dict[str, Any]]:
         """Async execution of Claude Agent SDK query."""
-        from claude_agent_sdk import (
-            query, ClaudeAgentOptions,
-            AssistantMessage, ResultMessage, TextBlock,
-        )
-
         options = self._build_options(work_dir)
         accumulated_text = ""
         execution_metadata: Dict[str, Any] = {}
@@ -300,8 +294,6 @@ class ClaudeAgentNode(
 
     def _build_options(self, work_dir: str) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
-        from claude_agent_sdk import ClaudeAgentOptions
-
         env = self._build_env()
 
         kwargs: Dict[str, Any] = {
@@ -366,6 +358,9 @@ class ClaudeAgentNode(
         os.makedirs(skills_dir, exist_ok=True)
 
         for skill_path, repo_url in self._skills_repos.items():
+            skill_name = os.path.basename(skill_path.rstrip(os.sep))
+            if os.path.isdir(os.path.join(skills_dir, skill_name)):
+                continue
             try:
                 self._install_skill(repo_url, skill_path, skills_dir)
             except Exception as e:

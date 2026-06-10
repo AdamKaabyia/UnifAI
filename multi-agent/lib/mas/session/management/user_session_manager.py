@@ -127,9 +127,16 @@ class UserSessionManager:
     def _cleanup_session_storage(self, run_id: str) -> None:
         """Remove the shared storage folder created for this session."""
         session_dir = os.path.join(self._platform_config.shared_storage, run_id)
-        if os.path.isdir(session_dir):
-            shutil.rmtree(session_dir, ignore_errors=True)
+        if not os.path.isdir(session_dir):
+            return
+        try:
+            shutil.rmtree(session_dir)
             logger.info("Cleaned up session storage: %s", session_dir)
+        except Exception:
+            logger.warning(
+                "Failed to fully clean up session storage: %s",
+                session_dir, exc_info=True,
+            )
 
     # ---------- statistics ----------
 
