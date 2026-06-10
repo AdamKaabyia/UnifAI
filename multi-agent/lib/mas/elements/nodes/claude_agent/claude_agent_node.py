@@ -239,18 +239,16 @@ class ClaudeAgentNode(
         Execute Claude Agent SDK session synchronously.
 
         Uses AsyncBridge to run the async query() generator.
-        Changes the process working directory to the configured cwd
-        so that the SDK subprocess inherits it for all file/git operations.
+        Streams text blocks as llm_token events if streaming is active.
         """
-        work_dir = self._prepare_working_directory()
         with get_async_bridge() as bridge:
-            return bridge.run(self._async_execute(prompt, work_dir))
+            return bridge.run(self._async_execute(prompt))
 
     async def _async_execute(
-        self, prompt: str, work_dir: str
+        self, prompt: str
     ) -> tuple[str, Dict[str, Any]]:
         """Async execution of Claude Agent SDK query."""
-        options = self._build_options(work_dir)
+        options = self._build_options()
         accumulated_text = ""
         execution_metadata: Dict[str, Any] = {}
 
@@ -292,9 +290,10 @@ class ClaudeAgentNode(
 
         return accumulated_text, execution_metadata
 
-    def _build_options(self, work_dir: str) -> "ClaudeAgentOptions":
+    def _build_options(self) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
         env = self._build_env()
+        work_dir = self._prepare_working_directory()
 
         kwargs: Dict[str, Any] = {
             "model": self._model,
