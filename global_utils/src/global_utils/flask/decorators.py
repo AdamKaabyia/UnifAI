@@ -13,6 +13,7 @@ from functools import wraps
 from typing import Any, Callable, Optional, Tuple
 
 from flask import g, jsonify, request, session
+from werkzeug.exceptions import HTTPException
 
 from global_utils.redis import get_identity_session, get_identity_username
 from global_utils.redis.session_model import UserSessionData
@@ -79,6 +80,8 @@ def require_identity_session(
                     return jsonify({"error": msg, "error_type": err_type}), status
                 setattr(g, G_IDENTITY_SESSION, data)
                 return f(*args, **kwargs)
+            except HTTPException:
+                raise
             except Exception as e:
                 return (
                     jsonify({
@@ -137,6 +140,8 @@ def require_team_session(
                         setattr(g, G_TEAM_ID, team_id)
 
                 return f(*args, **kwargs)
+            except HTTPException:
+                raise
             except Exception as e:
                 return (
                     jsonify({
