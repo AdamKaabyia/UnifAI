@@ -1,11 +1,10 @@
 import logging
-import os
-import shutil
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 from mas.core.platform_config import PlatformConfig
 from mas.session.repository.repository import SessionRepository
+from mas.session.storage.ports import SessionStorageCleaner
 from mas.session.building.workflow_session_factory import WorkflowSessionFactory
 from mas.session.domain.workflow_session import WorkflowSession
 from mas.session.domain.session_record import SessionRecord
@@ -33,11 +32,13 @@ class UserSessionManager:
             session_factory: WorkflowSessionFactory,
             blueprint_service: BlueprintService,
             platform_config: Optional[PlatformConfig] = None,
+            storage_cleaner: Optional[SessionStorageCleaner] = None,
     ):
         self._repo = repository
         self._factory = session_factory
         self._bp_service = blueprint_service
         self._platform_config = platform_config or PlatformConfig()
+        self._storage_cleaner = storage_cleaner
 
     def blueprint_exists(self, blueprint_id: str) -> bool:
         """Check if blueprint exists without loading it."""
@@ -125,18 +126,9 @@ class UserSessionManager:
         return deleted
 
     def _cleanup_session_storage(self, run_id: str) -> None:
-        """Remove the shared storage folder created for this session."""
-        session_dir = os.path.join(self._platform_config.shared_storage, run_id)
-        if not os.path.isdir(session_dir):
-            return
-        try:
-            shutil.rmtree(session_dir)
-            logger.info("Cleaned up session storage: %s", session_dir)
-        except Exception:
-            logger.warning(
-                "Failed to fully clean up session storage: %s",
-                session_dir, exc_info=True,
-            )
+        """Delegate storage cleanup to the injected adapter."""
+        if self._storage_cleaner:
+            self._storage_cleaner.cleanup(run_id)
 
     # ---------- statistics ----------
 
