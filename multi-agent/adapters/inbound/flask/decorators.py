@@ -5,8 +5,9 @@ MAS owns its own auth decorators. They validate the caller via a Redis-backed
 server session (set by the Identity service at login) and delegate
 team-membership logic through the IdentityProvider port.
 
-All clients (UI, CLI) authenticate via the Flask session cookie. The
-``X-Authenticated-User`` header is no longer accepted.
+UI and CLI authenticate via the Flask session cookie.
+Headless scripts/CI may fall back to the ``X-Authenticated-User`` header
+until API-token support is implemented.
 """
 import logging
 from functools import wraps
@@ -41,8 +42,16 @@ def _get_redis_store():
 # Session-based authentication
 # ──────────────────────────────────────────────────────────────────────────────
 
+_AUTH_HEADER = "X-Authenticated-User"
+
+
 def _resolve_authenticated_user() -> Tuple[Optional[str], Optional[tuple]]:
-    """Resolve the authenticated username from the Redis session.
+    """Resolve the authenticated username.
+
+    Tries the Redis session cookie first.  Falls back to the legacy
+    ``X-Authenticated-User`` header for headless scripts/CI that cannot
+    perform browser SSO.  The header fallback will be removed once
+    API-token support is available.
 
     Returns ``(username, None)`` on success or ``(None, error_response)``
     on failure.
@@ -53,6 +62,12 @@ def _resolve_authenticated_user() -> Tuple[Optional[str], Optional[tuple]]:
     if data is not None and data.username:
         g.identity_session = data
         return data.username, None
+
+    # Fallback: legacy header for headless scripts/CI
+    header_user = request.headers.get(_AUTH_HEADER, "").strip()
+    if header_user:
+        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, header_user)
+        return header_user, None
 
     if err:
         msg, err_type, status = err
