@@ -12,6 +12,7 @@ with identity's ``is_authenticated`` (username + access_token present).
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,5 +93,4 @@ class UserSessionData(BaseModel):
         """True when ``session_expires_at`` is set and in the past."""
         if self.session_expires_at is None:
             return False
-        from datetime import datetime
         return datetime.now().timestamp() >= self.session_expires_at

@@ -3,7 +3,7 @@
 Validates the Flask session cookie against the Redis server session.
 Endpoints read the authenticated username from ``g.identity_session.username``.
 """
-from flask import current_app, session
+from flask import current_app
 
 from global_utils.flask.decorators import require_identity_session
 

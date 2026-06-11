@@ -24,10 +24,12 @@ def create_app(container, config: AppConfig = None) -> Flask:
         'SESSION_COOKIE_SAMESITE': config.session_cookie_samesite,
     })
 
-    CORS(app, resources={r"/api/*": {"origins": "*",
-                                     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                                     "allow_headers": ["Content-Type", "Authorization", "X-Authenticated-User"],
-                                     "supports_credentials": True}})
+    CORS(app, resources={r"/api/*": {
+        "origins": os.environ.get("FRONTEND_URL", "http://localhost:5000"),
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+    }})
 
     app.container = container
     register_all_endpoints(app)

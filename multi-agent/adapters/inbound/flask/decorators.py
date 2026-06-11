@@ -15,7 +15,7 @@ from typing import Optional, Tuple
 
 from flask import current_app, g, jsonify, request, session
 
-from global_utils.flask.decorators import _validate_session
+from global_utils.flask.decorators import validate_session
 from mas.core.identity import Identity, IdentityType, resolve_identity
 from mas.core.identity.ports import IdentityProvider
 
@@ -57,7 +57,7 @@ def _resolve_authenticated_user() -> Tuple[Optional[str], Optional[tuple]]:
     on failure.
     """
     get_sid = lambda: session.get("session_id")
-    data, err = _validate_session(_get_redis_store, get_sid)
+    data, err = validate_session(_get_redis_store, get_sid)
 
     if data is not None and data.username:
         g.identity_session = data

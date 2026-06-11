@@ -28,7 +28,7 @@ _SESSION_EXPIRED = ("Session expired", "SESSION_EXPIRED", 401)
 _TEAM_DENIED = ("Access denied: not a member of this team", "TEAM_ACCESS_DENIED", 403)
 
 
-def _validate_session(
+def validate_session(
     get_redis_store: Callable[[], Any],
     get_session_id: Callable[[], str | None],
 ) -> Tuple[Optional[UserSessionData], Optional[tuple]]:
@@ -74,7 +74,7 @@ def require_identity_session(
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
-                data, err = _validate_session(get_redis_store, get_sid)
+                data, err = validate_session(get_redis_store, get_sid)
                 if err:
                     msg, err_type, status = err
                     return jsonify({"error": msg, "error_type": err_type}), status
@@ -123,7 +123,7 @@ def require_team_session(
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
-                data, err = _validate_session(get_redis_store, get_sid)
+                data, err = validate_session(get_redis_store, get_sid)
                 if err:
                     msg, err_type, status = err
                     return jsonify({"error": msg, "error_type": err_type}), status
