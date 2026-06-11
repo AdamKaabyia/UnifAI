@@ -47,6 +47,7 @@ from mas.actions.providers.mcp.get_tools_names.get_tools_names import GetToolsNa
 
 from config.app_config import AppConfig
 from mas.core.platform_config import PlatformConfig
+from outbound.storage import LocalSessionStorageCleaner
 
 from outbound.mongo import (
     MongoBlueprintRepository,
@@ -232,10 +233,15 @@ class AppContainer(metaclass=SingletonMeta):
             db_name=cfg.mongo_db,
             collection_name=cfg.session_coll
         )
+        self.session_storage_cleaner = LocalSessionStorageCleaner(
+            base_path=cfg.shared_storage,
+        )
         self.session_manager = UserSessionManager(
             repository=self.session_repo,
             session_factory=self.session_factory,
-            blueprint_service=self.blueprint_service
+            blueprint_service=self.blueprint_service,
+            platform_config=self.platform_config,
+            storage_cleaner=self.session_storage_cleaner,
         )
 
         self.session_lifecycle = SessionLifecycle(repository=self.session_repo)
