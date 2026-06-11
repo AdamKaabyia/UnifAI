@@ -50,7 +50,6 @@ class SessionsAPI(MASClient):
             "sessions",
             "user.session.create",
             json=body,
-            user_id=uid,
         )
 
     def submit_session(self, session_id: str, inputs: dict,
@@ -65,7 +64,7 @@ class SessionsAPI(MASClient):
             "sessionType": session_type,
             **self._identity_body(uid),
         }
-        return self._post("sessions", "user.session.submit", json=body, user_id=uid)
+        return self._post("sessions", "user.session.submit", json=body)
 
     def execute_session(self, session_id: str, inputs: dict,
                         stream: bool = False, scope: str = "public",
@@ -84,9 +83,9 @@ class SessionsAPI(MASClient):
         }
         if stream:
             return self._post_stream(
-                "sessions", "user.session.execute", json=body, user_id=uid,
+                "sessions", "user.session.execute", json=body,
             )
-        return self._post("sessions", "user.session.execute", json=body, user_id=uid)
+        return self._post("sessions", "user.session.execute", json=body)
 
     def run_session_turn(self, session_id: str, inputs: dict,
                          scope: str = "public", user_id: Optional[str] = None):

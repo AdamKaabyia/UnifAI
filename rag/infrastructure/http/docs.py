@@ -85,7 +85,7 @@ def validate_files(files, check_duplicates):
         - Full validation will be performed during registration
     """
     try:
-        service = file_validation_service(username=g.identity_session.username)
+        service = file_validation_service(username=g.user_id)
         result = service.validate(files, check_duplicates=check_duplicates)
         return jsonify(result.to_dict()), 200
     except Exception as e:
@@ -189,7 +189,7 @@ def query_match(query, top_k_results, scope, doc_ids, tags):
             query=query,
             limit=top_k_results,
             scope=scope,
-            user=g.identity_session.username,
+            user=g.user_id,
             doc_ids=doc_ids,
             tags=tags,
         )

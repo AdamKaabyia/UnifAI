@@ -14,7 +14,6 @@ class BlueprintsAPI(MASClient):
             "blueprints",
             "available.blueprints.summary.get",
             params={"userId": user_id},
-            user_id=user_id,
         )
 
     def get_blueprint(self, blueprint_id: str) -> dict:

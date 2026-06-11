@@ -124,7 +124,7 @@ def query_match(query, top_k_results, scope):
             query=query,
             limit=top_k_results,
             scope=scope,
-            user=g.identity_session.username,
+            user=g.user_id,
         )
         
         return jsonify({"search_results": results}), 200

@@ -172,6 +172,11 @@ class AuthManager:
                 # server-side Redis session identical to the GUI flow.  The
                 # session_id is returned to the CLI so it can send it as a
                 # cookie on subsequent API requests.
+                #
+                # TODO: The session-creation logic below duplicates the GUI
+                # flow.  Extract a shared ``_create_server_session(token,
+                # userinfo)`` helper once API-token support lands (design §7)
+                # so both paths use a single code path.
                 code = request.args.get('code', '')
                 kc_error = request.args.get('error', '')
                 if kc_error or not code:
@@ -293,9 +298,6 @@ class AuthManager:
                 )
                 self.redis_store.hset(identity_session_key(session_id), session_data, ttl_seconds=ttl_seconds)
                 
-                logger.info(f"User {userinfo.get('preferred_username')} authenticated successfully")
-
-
                 logger.info(
                     "User %s authenticated successfully",
                     userinfo.get('preferred_username'),

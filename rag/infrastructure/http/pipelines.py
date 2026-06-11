@@ -29,7 +29,7 @@ def start_pipeline(data, source_type, skip_validation):
         result = pipeline_dispatch_service().start_pipeline(
             data=data,
             source_type=source_type,
-            upload_by=g.identity_session.username,
+            upload_by=g.user_id,
             skip_validation=skip_validation,
         )
         

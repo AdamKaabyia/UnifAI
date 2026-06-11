@@ -38,8 +38,7 @@ class MASClient:
     def _url(self, parent: str, route: str) -> str:
         return f"{self.base_url}{self.api_prefix}/{parent}/{route}"
 
-    def _get(self, parent: str, route: str, params: dict = None,
-             user_id: Optional[str] = None) -> Any:
+    def _get(self, parent: str, route: str, params: dict = None) -> Any:
         resp = self.session.get(
             self._url(parent, route),
             params=params,
@@ -47,8 +46,7 @@ class MASClient:
         resp.raise_for_status()
         return resp.json()
 
-    def _post(self, parent: str, route: str, json: dict = None,
-              user_id: Optional[str] = None) -> Any:
+    def _post(self, parent: str, route: str, json: dict = None) -> Any:
         resp = self.session.post(
             self._url(parent, route),
             json=json,
@@ -56,8 +54,7 @@ class MASClient:
         resp.raise_for_status()
         return resp.json()
 
-    def _post_stream(self, parent: str, route: str, json: dict = None,
-                     user_id: Optional[str] = None):
+    def _post_stream(self, parent: str, route: str, json: dict = None):
         """POST with NDJSON streaming response."""
         resp = self.session.post(
             self._url(parent, route),
@@ -67,8 +64,7 @@ class MASClient:
         resp.raise_for_status()
         return resp
 
-    def _get_stream(self, parent: str, route: str, params: dict = None,
-                    user_id: Optional[str] = None):
+    def _get_stream(self, parent: str, route: str, params: dict = None):
         """GET with NDJSON streaming response."""
         resp = self.session.get(
             self._url(parent, route),
@@ -78,8 +74,7 @@ class MASClient:
         resp.raise_for_status()
         return resp
 
-    def _delete(self, parent: str, route: str, params: dict = None,
-                user_id: Optional[str] = None) -> Any:
+    def _delete(self, parent: str, route: str, params: dict = None) -> Any:
         resp = self.session.delete(
             self._url(parent, route),
             params=params,

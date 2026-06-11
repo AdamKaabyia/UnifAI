@@ -7,7 +7,11 @@ team-membership logic through the IdentityProvider port.
 
 UI and CLI authenticate via the Flask session cookie.
 Headless scripts/CI may fall back to the ``X-Authenticated-User`` header
-until API-token support is implemented.
+until API-token support is implemented (see design-genie-1618.md §7).
+
+The header fallback is injected via the ``get_fallback_user`` callback on
+``require_team_session`` from ``global_utils`` — one removal point when
+API tokens land.
 """
 import logging
 from functools import wraps
@@ -15,7 +19,10 @@ from typing import Optional, Tuple
 
 from flask import current_app, g, jsonify, request, session
 
-from global_utils.flask.decorators import validate_session
+from global_utils.flask.decorators import (
+    G_USER_ID,
+    require_team_session,
+)
 from mas.core.identity import Identity, IdentityType, resolve_identity
 from mas.core.identity.ports import IdentityProvider
 
@@ -39,44 +46,56 @@ def _get_redis_store():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Session-based authentication
+# Session callbacks (plugged into global_utils decorators)
 # ──────────────────────────────────────────────────────────────────────────────
 
 _AUTH_HEADER = "X-Authenticated-User"
 
 
-def _resolve_authenticated_user() -> Tuple[Optional[str], Optional[tuple]]:
-    """Resolve the authenticated username.
+def _get_fallback_user() -> str | None:
+    """Legacy fallback: read ``X-Authenticated-User`` header.
 
-    Tries the Redis session cookie first.  Falls back to the legacy
-    ``X-Authenticated-User`` header for headless scripts/CI that cannot
-    perform browser SSO.  The header fallback will be removed once
-    API-token support is available.
-
-    Returns ``(username, None)`` on success or ``(None, error_response)``
-    on failure.
+    Used by headless CI/CD scripts that cannot perform browser SSO
+    (e.g. ``scripts/execution_workflow.py``).  Will be removed when
+    API-token auth is implemented (design §7).
     """
-    get_sid = lambda: session.get("session_id")
-    data, err = validate_session(_get_redis_store, get_sid)
+    user = request.headers.get(_AUTH_HEADER, "").strip()
+    if user:
+        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, user)
+    return user or None
 
-    if data is not None and data.username:
-        g.identity_session = data
-        return data.username, None
 
-    # Fallback: legacy header for headless scripts/CI
-    header_user = request.headers.get(_AUTH_HEADER, "").strip()
-    if header_user:
-        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, header_user)
-        return header_user, None
+def _get_team_id() -> str | None:
+    """Return the team id from the request when identityType is ``team``."""
+    body = request.get_json(silent=True) or {}
+    identity_type = (
+        request.args.get("identityType")
+        or body.get("identityType")
+        or "user"
+    ).strip().lower()
+    if identity_type == "team":
+        return (request.args.get("userId") or body.get("userId") or "").strip() or None
+    return None
 
-    if err:
-        msg, err_type, status = err
-        return None, (jsonify({"error": msg, "error_type": err_type}), status)
 
-    return None, (jsonify({
-        "error": "Not authenticated",
-        "error_type": "AUTHENTICATION_REQUIRED",
-    }), 401)
+def _check_team_membership(username: str, team_id: str) -> bool:
+    return _identity_provider().is_member(username, team_id)
+
+
+# Pre-built decorators — see design-genie-1618.md §3.7c
+_mas_session = require_team_session(
+    get_redis_store=_get_redis_store,
+    get_session_id=lambda: session.get("session_id"),
+    get_fallback_user=_get_fallback_user,
+)
+
+_mas_team_session = require_team_session(
+    get_redis_store=_get_redis_store,
+    get_session_id=lambda: session.get("session_id"),
+    get_team_id=_get_team_id,
+    team_membership_checker=_check_team_membership,
+    get_fallback_user=_get_fallback_user,
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -130,19 +149,17 @@ def _resolve_identity_or_error(kwargs: dict) -> Tuple[Optional[Identity], Option
 # ──────────────────────────────────────────────────────────────────────────────
 
 def with_authenticated_user(f):
-    """Validate the caller's Redis session and inject ``authenticated_user``.
+    """Validate the caller's session and inject ``authenticated_user``.
 
-    Validates the Flask session cookie against the Redis server session.
-    Returns 401 if no valid session is found.
+    Delegates to ``require_team_session`` from ``global_utils`` (with the
+    header-fallback callback).  After validation, ``g.user_id`` is bridged
+    into the ``authenticated_user`` kwarg that endpoints expect.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        authenticated_user, err = _resolve_authenticated_user()
-        if err:
-            return err
-        kwargs["authenticated_user"] = authenticated_user
+        kwargs["authenticated_user"] = getattr(g, G_USER_ID, "")
         return f(*args, **kwargs)
-    return decorated
+    return _mas_session(decorated)
 
 
 def with_identity(f):
@@ -163,45 +180,34 @@ def with_identity(f):
 
 
 def with_require_identity_authorization(f):
-    """Validate caller session AND authorize + resolve ``Identity`` in one step.
+    """Validate caller session, authorize, and resolve ``Identity``.
 
-    1. Validates the Redis session → 401 if invalid/expired.
-    2. Validates the claimed identity:
-       - **user** identity: ``userId`` must match the authenticated user → 403.
-       - **team** identity: the authenticated user must be a member → 403.
+    Delegates to ``require_team_session`` from ``global_utils`` (with
+    header-fallback and team-membership callbacks).
+
+    1. Session validation + team membership → handled by ``_mas_team_session``.
+    2. **user** identity: ``userId`` must match ``g.user_id`` → 403.
     3. Resolves ``Identity`` and injects it as ``identity`` kwarg → 400 on invalid.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        provider = _identity_provider()
+        authenticated_user = getattr(g, G_USER_ID, "")
         user_id, identity_type_raw, _ = _parse_identity_params(kwargs)
 
-        # ── Authentication ────────────────────────────────────────────
-        authenticated_user, err = _resolve_authenticated_user()
-        if err:
-            return err
-
-        # ── Authorization ─────────────────────────────────────────────
-        if identity_type_raw == "team":
-            if user_id and not provider.is_member(authenticated_user, user_id):
+        if identity_type_raw != "team":
+            if user_id and user_id.casefold() != authenticated_user.casefold():
                 return jsonify({
-                    "error": "Access denied: you are not a member of this team",
-                    "error_type": "TEAM_ACCESS_DENIED",
+                    "error": "Access denied: userId does not match authenticated user",
+                    "error_type": "USER_ACCESS_DENIED",
                 }), 403
-        elif user_id and user_id.casefold() != authenticated_user.casefold():
-            return jsonify({
-                "error": "Access denied: userId does not match authenticated user",
-                "error_type": "USER_ACCESS_DENIED",
-            }), 403
 
-        # ── Identity resolution ───────────────────────────────────────
         identity, err = _resolve_identity_or_error(kwargs)
         if err:
             return err
         kwargs["identity"] = identity
         return f(*args, **kwargs)
 
-    return decorated
+    return _mas_team_session(decorated)
 
 
 def require_admin_access(f):

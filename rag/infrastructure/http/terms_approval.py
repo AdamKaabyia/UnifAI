@@ -18,7 +18,7 @@ def check_user_approval():
         JSON response indicating if user is approved
     """
     try:
-        result = terms_approval_service().check_approval_status(g.identity_session.username)
+        result = terms_approval_service().check_approval_status(g.user_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Failed to check user approval: {str(e)}")
@@ -35,7 +35,7 @@ def approve_user():
         JSON response indicating success
     """
     try:
-        username = g.identity_session.username
+        username = g.user_id
         result = terms_approval_service().record_approval(username)
         return jsonify({
             "status": "success",

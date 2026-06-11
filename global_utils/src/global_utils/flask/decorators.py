@@ -31,26 +31,46 @@ _TEAM_DENIED = ("Access denied: not a member of this team", "TEAM_ACCESS_DENIED"
 def validate_session(
     get_redis_store: Callable[[], Any],
     get_session_id: Callable[[], str | None],
+    get_fallback_user: Callable[[], str | None] | None = None,
 ) -> Tuple[Optional[UserSessionData], Optional[tuple]]:
     """Validate the Redis-backed server session.
 
     Returns ``(data, None)`` on success or ``(None, error_tuple)`` on failure.
     The error tuple is ``(message, error_type, status_code)``.
+
+    When *get_fallback_user* is provided and session validation fails (missing
+    or invalid session), the callback is tried before returning 401.  If it
+    returns a non-empty username, a minimal :class:`UserSessionData` is
+    synthesised.  This supports legacy CI/CD scripts that send
+    ``X-Authenticated-User`` until API-token auth is available.
     """
     sid = get_session_id()
     if not sid:
-        return None, _AUTH_REQUIRED
+        return _try_fallback_or_fail(get_fallback_user, _AUTH_REQUIRED)
     data = get_identity_session(get_redis_store(), sid)
     if data is None or not data.has_auth_credentials():
-        return None, _AUTH_REQUIRED
+        return _try_fallback_or_fail(get_fallback_user, _AUTH_REQUIRED)
     if data.is_session_expired():
         return None, _SESSION_EXPIRED
     return data, None
 
 
+def _try_fallback_or_fail(
+    get_fallback_user: Callable[[], str | None] | None,
+    error: tuple,
+) -> Tuple[Optional[UserSessionData], Optional[tuple]]:
+    """Try the fallback callback; return its result or the original error."""
+    if get_fallback_user is not None:
+        username = get_fallback_user()
+        if username:
+            return UserSessionData(username=username), None
+    return None, error
+
+
 def require_identity_session(
     get_redis_store: Callable[[], Any],
     get_session_id: Callable[[], str | None] | None = None,
+    get_fallback_user: Callable[[], str | None] | None = None,
 ) -> Callable:
     """
     Decorator factory: require a valid identity server session in Redis.
@@ -64,6 +84,9 @@ def require_identity_session(
         (e.g. :class:`global_utils.redis.RedisKVStore`)
       - ``get_session_id()`` -> str | None
         (optional; default: ``session.get("session_id")``)
+      - ``get_fallback_user()`` -> str | None
+        (optional; called when session validation fails, returns a
+        fallback username or ``None``)
 
     On success: sets ``g.identity_session`` to a :class:`UserSessionData`.
     On failure: 401 with JSON; unexpected errors: 500 with ``error_type``.
@@ -74,7 +97,7 @@ def require_identity_session(
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
-                data, err = validate_session(get_redis_store, get_sid)
+                data, err = validate_session(get_redis_store, get_sid, get_fallback_user)
                 if err:
                     msg, err_type, status = err
                     return jsonify({"error": msg, "error_type": err_type}), status
@@ -99,6 +122,7 @@ def require_team_session(
     get_session_id: Callable[[], str | None] | None = None,
     get_team_id: Callable[[], str | None] | None = None,
     team_membership_checker: Callable[[str, str], bool] | None = None,
+    get_fallback_user: Callable[[], str | None] | None = None,
 ) -> Callable:
     """
     Decorator factory: require a valid identity session + optional team authorization.
@@ -113,6 +137,9 @@ def require_team_session(
       - ``get_team_id()``    -> str | None  (default: ``None`` — no team check)
       - ``team_membership_checker(username, team_id) -> bool``
         (e.g. ``IdentityClient.is_member``)
+      - ``get_fallback_user()`` -> str | None
+        (optional; called when session validation fails, returns a
+        fallback username or ``None``)
 
     On success: sets ``g.identity_session``, ``g.user_id``, and optionally ``g.team_id``.
     On failure: 401 / 403 / 500 with JSON error payload.
@@ -123,7 +150,7 @@ def require_team_session(
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
-                data, err = validate_session(get_redis_store, get_sid)
+                data, err = validate_session(get_redis_store, get_sid, get_fallback_user)
                 if err:
                     msg, err_type, status = err
                     return jsonify({"error": msg, "error_type": err_type}), status
