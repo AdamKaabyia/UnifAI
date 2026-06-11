@@ -37,6 +37,11 @@ def create_app() -> Flask:
     # Application config
     app.secret_key = config.get("secret_key", os.urandom(24))
     app.version = config.get("version", "1.0.0")
+    app.config.update({
+        'SESSION_COOKIE_SECURE': config.session_cookie_secure,
+        'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,
+        'SESSION_COOKIE_SAMESITE': config.session_cookie_samesite,
+    })
     
     # CORS
     CORS(

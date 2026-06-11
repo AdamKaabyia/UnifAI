@@ -35,6 +35,11 @@ class AppConfig(SharedConfig):
     version: str = "1.0.0"
     secret_key: str = ""
 
+    # Session cookie — must match Identity so Flask never re-signs with different attributes
+    session_cookie_secure: bool = True
+    session_cookie_http_only: bool = True
+    session_cookie_samesite: str = "None"
+
     # Umami Configuration
     umami_url: str = "0.0.0.0"
     umami_website_name: str = "unifai"
