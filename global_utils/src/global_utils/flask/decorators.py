@@ -9,6 +9,7 @@ a Redis-backed server session written by the Identity service after
 Keycloak login.  These are generic (no MAS/domain concepts) and can be
 consumed by any Flask-based service.
 """
+import logging
 from functools import wraps
 from typing import Any, Callable, Optional, Tuple
 
@@ -17,6 +18,8 @@ from werkzeug.exceptions import HTTPException
 
 from global_utils.redis import get_identity_session, get_identity_username
 from global_utils.redis.session_model import UserSessionData
+
+logger = logging.getLogger(__name__)
 
 G_IDENTITY_SESSION = "identity_session"
 G_IDENTITY_USERNAME = "identity_username"
@@ -106,9 +109,10 @@ def require_identity_session(
             except HTTPException:
                 raise
             except Exception as e:
+                logger.exception("Session validation failed unexpectedly")
                 return (
                     jsonify({
-                        "error": f"Access control error: {e!s}",
+                        "error": "Internal server error",
                         "error_type": "ACCESS_CONTROL_ERROR",
                     }),
                     500,
@@ -170,9 +174,10 @@ def require_team_session(
             except HTTPException:
                 raise
             except Exception as e:
+                logger.exception("Team session validation failed unexpectedly")
                 return (
                     jsonify({
-                        "error": f"Access control error: {e!s}",
+                        "error": "Internal server error",
                         "error_type": "ACCESS_CONTROL_ERROR",
                     }),
                     500,
@@ -212,9 +217,10 @@ def require_identity_username(
                 setattr(g, G_IDENTITY_USERNAME, username)
                 return f(*args, **kwargs)
             except Exception as e:
+                logger.exception("Username validation failed unexpectedly")
                 return (
                     jsonify({
-                        "error": f"Access control error: {e!s}",
+                        "error": "Internal server error",
                         "error_type": "ACCESS_CONTROL_ERROR",
                     }),
                     500,
@@ -255,8 +261,9 @@ def require_admin_access(get_current_user, is_admin):
                     }), 403
                 return f(*args, **kwargs)
             except Exception as e:
+                logger.exception("Admin access check failed unexpectedly")
                 return jsonify({
-                    "error": f"Access control error: {str(e)}",
+                    "error": "Internal server error",
                     "error_type": "ACCESS_CONTROL_ERROR",
                 }), 500
         return decorated_function
