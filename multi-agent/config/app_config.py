@@ -16,9 +16,9 @@ class AppConfig(SharedConfig):
     secret_key: str = ""
 
     # Session cookie — must match Identity so Flask never re-signs with different attributes
-    session_cookie_secure: bool = True
+    session_cookie_secure: bool = False
     session_cookie_http_only: bool = True
-    session_cookie_samesite: str = "None"
+    session_cookie_samesite: str = "Lax"
 
     # Storage
     shared_storage: str = "/app/shared"
