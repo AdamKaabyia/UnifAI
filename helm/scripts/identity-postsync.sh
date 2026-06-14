@@ -11,4 +11,4 @@ IDENTITY_IP=$(wait_for_service_name identity) || exit 1
 create_or_update_configmap identity-svc-config \
   --from-literal=IDENTITY_SVC_ADDR="$IDENTITY_ADDR" \
   --from-literal=IDENTITY_SVC_PORT="$IDENTITY_PORT" \
-  --from-literal=IDENTITY_SVC_IP="$IDENTITY_IP"
+  --from-literal=IDENTITY_SVC_IP="$IDENTITY_IP" || exit 1
