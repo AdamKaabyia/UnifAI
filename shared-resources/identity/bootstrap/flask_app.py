@@ -75,7 +75,6 @@ def create_app() -> Flask:
     )
 
     team_membership_cache = TeamMembershipCache(redis_store)
-    app.extensions['team_membership_cache'] = team_membership_cache
 
     app.extensions['team_service'] = build_team_service(
         config,
