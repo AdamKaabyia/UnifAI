@@ -33,6 +33,7 @@ def _is_admin(user_id):
 # ─────────────────────────────────────────────────────────────────────────────
 @admin_config_bp.route("/config.get", methods=["GET"])
 @_backend_require_session
+@require_admin_access(_get_current_user, _is_admin)
 def get_config():
     """
     Return the full admin config template merged with stored values.
