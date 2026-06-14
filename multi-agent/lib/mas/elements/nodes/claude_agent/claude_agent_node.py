@@ -67,6 +67,8 @@ class ClaudeAgentNode(
             cwd: Optional[str] = None,
             # Advanced
             env_vars: Optional[Dict[str, str]] = None,
+            # Integration
+            mcp_providers: Optional[List[Any]] = None,
             # Runtime context
             execution_holder: Any = None,
             shared_storage: str = "/app/shared",
@@ -90,6 +92,7 @@ class ClaudeAgentNode(
         self._skills_repos = skills_repos or {}
         self._cwd = cwd
         self._env_vars = env_vars or {}
+        self._mcp_providers = mcp_providers or []
         self._execution_holder = execution_holder
         self._shared_storage = shared_storage
 
@@ -241,14 +244,14 @@ class ClaudeAgentNode(
         Uses AsyncBridge to run the async query() generator.
         Streams text blocks as llm_token events if streaming is active.
         """
+        options = self._build_options()
         with get_async_bridge() as bridge:
-            return bridge.run(self._async_execute(prompt))
+            return bridge.run(self._async_execute(prompt, options))
 
     async def _async_execute(
-        self, prompt: str
+        self, prompt: str, options: "ClaudeAgentOptions"
     ) -> tuple[str, Dict[str, Any]]:
         """Async execution of Claude Agent SDK query."""
-        options = self._build_options()
         accumulated_text = ""
         execution_metadata: Dict[str, Any] = {}
 
@@ -292,6 +295,8 @@ class ClaudeAgentNode(
 
     def _build_options(self) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
+        from .mcp_converter import convert_providers
+
         env = self._build_env()
         work_dir = self._prepare_working_directory()
 
@@ -307,6 +312,9 @@ class ClaudeAgentNode(
 
         if self._system_prompt:
             kwargs["system_prompt"] = self._system_prompt
+
+        if self._mcp_providers:
+            kwargs["mcp_servers"] = convert_providers(self._mcp_providers)
 
         return ClaudeAgentOptions(**kwargs)
 
