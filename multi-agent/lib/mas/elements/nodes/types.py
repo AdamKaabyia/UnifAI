@@ -17,7 +17,7 @@ NodeSpec = Annotated[
     Union[
         CustomAgentNodeConfig,
         MockAgentNodeConfig,
-        MergerLLMNodeConfig,
+        # MergerLLMNodeConfig,
         FinalAnswerNodeConfig,
         UserQuestionNodeConfig,
         BranchChooserNodeConfig,
