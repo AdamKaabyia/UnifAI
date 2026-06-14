@@ -254,7 +254,7 @@ class AuthManager:
                         'sub': userinfo.get('sub'),
                         'session_cookie': cookie_value,
                     }
-                    logger.info(f"CLI user '{user_data['username']}' authenticated successfully (session={session_id})")
+                    logger.info(f"CLI user '{user_data['username']}' authenticated successfully")
                     user_b64 = (
                         base64.urlsafe_b64encode(json.dumps(user_data).encode())
                         .decode()
