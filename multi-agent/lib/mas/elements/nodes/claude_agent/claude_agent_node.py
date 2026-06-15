@@ -283,31 +283,31 @@ class ClaudeAgentNode(
                                     "args": block.input,
                                 })
 
-                    elif isinstance(block, ToolResultBlock):
-                        if self.is_streaming():
-                            self._stream({
-                                "type": "tool_result",
-                                "tool": tool_id_to_name.get(
-                                    block.tool_use_id, "unknown"
-                                ),
-                                "call_id": block.tool_use_id,
-                                "output": self._extract_tool_result_text(
-                                    block.content
-                                ),
-                            })
+                    # elif isinstance(block, ToolResultBlock):
+                    #     if self.is_streaming():
+                    #         self._stream({
+                    #             "type": "tool_result",
+                    #             "tool": tool_id_to_name.get(
+                    #                 block.tool_use_id, "unknown"
+                    #             ),
+                    #             "call_id": block.tool_use_id,
+                    #             "output": self._extract_tool_result_text(
+                    #                 block.content
+                    #             ),
+                    #         })
 
-                    elif isinstance(block, ServerToolResultBlock):
-                        if self.is_streaming():
-                            self._stream({
-                                "type": "tool_result",
-                                "tool": tool_id_to_name.get(
-                                    block.tool_use_id, "unknown"
-                                ),
-                                "call_id": block.tool_use_id,
-                                "output": self._extract_tool_result_text(
-                                    block.content
-                                ),
-                            })
+                    # elif isinstance(block, ServerToolResultBlock):
+                    #     if self.is_streaming():
+                    #         self._stream({
+                    #             "type": "tool_result",
+                    #             "tool": tool_id_to_name.get(
+                    #                 block.tool_use_id, "unknown"
+                    #             ),
+                    #             "call_id": block.tool_use_id,
+                    #             "output": self._extract_tool_result_text(
+                    #                 block.content
+                    #             ),
+                    #         })
 
             elif isinstance(message, UserMessage):
                 if isinstance(message.content, list):
