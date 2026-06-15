@@ -8,6 +8,20 @@ from config.app_config import AppConfig
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_mongo_url
 
+from slack_commands.clients.multiagent import MultiagentClient
+from slack_commands.commands.ask import AskCommand
+from slack_commands.commands.cancel import CancelCommand
+from slack_commands.commands.delete import DeleteCommand
+from slack_commands.commands.health import HealthCommand
+from slack_commands.commands.help import HelpCommand
+from slack_commands.commands.history import HistoryCommand
+from slack_commands.commands.list_blueprints import ListBlueprintsCommand
+from slack_commands.commands.list_sessions import ListSessionsCommand
+from slack_commands.commands.status import StatusCommand
+from slack_commands.commands.whoami import WhoamiCommand
+from slack_commands.execution.session_executor import SessionExecutor
+from slack_commands.service import SlackCommandsService
+
 
 class AppContainer(metaclass=SingletonMeta):
     """
@@ -17,6 +31,7 @@ class AppContainer(metaclass=SingletonMeta):
       - owns the shared MongoClient (single connection pool)
       - reads collection names from AppConfig
       - owns the ActionDispatcher for server-side side-effects
+      - owns the SlackCommandsService for slash command handling
     """
 
     def __init__(self, cfg: AppConfig):
@@ -26,6 +41,7 @@ class AppContainer(metaclass=SingletonMeta):
         mongo_client = MongoClient(get_mongo_url())
         db = mongo_client[cfg.mongo_db]
 
+        # ── Admin Config ─────────────────────────────────────────────
         self.admin_config_repo = MongoAdminConfigRepository(
             collection=db[cfg.admin_config_coll],
         )
@@ -38,6 +54,25 @@ class AppContainer(metaclass=SingletonMeta):
             repository=self.admin_config_repo,
             template=ADMIN_CONFIG_TEMPLATE,
             action_dispatcher=self.action_dispatcher,
+        )
+
+        # ── Slack Commands ───────────────────────────────────────────
+        multiagent_client = MultiagentClient(base_url=cfg.multiagent_url)
+        session_executor = SessionExecutor(client=multiagent_client)
+
+        self.slack_commands_service = SlackCommandsService(
+            handlers={
+                "help": HelpCommand(),
+                "health": HealthCommand(),
+                "whoami": WhoamiCommand(),
+                "list": ListSessionsCommand(client=multiagent_client),
+                "blueprints": ListBlueprintsCommand(client=multiagent_client),
+                "ask": AskCommand(client=multiagent_client, executor=session_executor),
+                "status": StatusCommand(client=multiagent_client),
+                "cancel": CancelCommand(client=multiagent_client),
+                "delete": DeleteCommand(client=multiagent_client),
+                "history": HistoryCommand(client=multiagent_client),
+            }
         )
 
         self._initialized = True
