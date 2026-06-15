@@ -15,6 +15,9 @@ import tempfile
 from claude_agent_sdk import (
     query, ClaudeAgentOptions,
     AssistantMessage, ResultMessage, TextBlock,
+    ToolUseBlock, ToolResultBlock,
+    ServerToolUseBlock, ServerToolResultBlock,
+    UserMessage,
 )
 from global_utils.utils.async_bridge import get_async_bridge
 from mas.graph.state.state_view import StateView
@@ -254,6 +257,8 @@ class ClaudeAgentNode(
         """Async execution of Claude Agent SDK query."""
         accumulated_text = ""
         execution_metadata: Dict[str, Any] = {}
+        emitted_tool_call_ids: set[str] = set()
+        tool_id_to_name: Dict[str, str] = {}
 
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, AssistantMessage):
@@ -265,6 +270,60 @@ class ClaudeAgentNode(
                                 "type": "llm_token",
                                 "chunk": block.text,
                             })
+
+                    elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                        tool_id_to_name[block.id] = block.name
+                        if block.id not in emitted_tool_call_ids:
+                            emitted_tool_call_ids.add(block.id)
+                            if self.is_streaming():
+                                self._stream({
+                                    "type": "tool_calling",
+                                    "tool": block.name,
+                                    "call_id": block.id,
+                                    "args": block.input,
+                                })
+
+                    elif isinstance(block, ToolResultBlock):
+                        if self.is_streaming():
+                            self._stream({
+                                "type": "tool_result",
+                                "tool": tool_id_to_name.get(
+                                    block.tool_use_id, "unknown"
+                                ),
+                                "call_id": block.tool_use_id,
+                                "output": self._extract_tool_result_text(
+                                    block.content
+                                ),
+                            })
+
+                    elif isinstance(block, ServerToolResultBlock):
+                        if self.is_streaming():
+                            self._stream({
+                                "type": "tool_result",
+                                "tool": tool_id_to_name.get(
+                                    block.tool_use_id, "unknown"
+                                ),
+                                "call_id": block.tool_use_id,
+                                "output": self._extract_tool_result_text(
+                                    block.content
+                                ),
+                            })
+
+            elif isinstance(message, UserMessage):
+                if isinstance(message.content, list):
+                    for block in message.content:
+                        if isinstance(block, ToolResultBlock):
+                            if self.is_streaming():
+                                self._stream({
+                                    "type": "tool_result",
+                                    "tool": tool_id_to_name.get(
+                                        block.tool_use_id, "unknown"
+                                    ),
+                                    "call_id": block.tool_use_id,
+                                    "output": self._extract_tool_result_text(
+                                        block.content
+                                    ),
+                                })
 
             elif isinstance(message, ResultMessage):
                 execution_metadata = {
@@ -292,6 +351,28 @@ class ClaudeAgentNode(
                     accumulated_text = result_text
 
         return accumulated_text, execution_metadata
+
+    @staticmethod
+    def _extract_tool_result_text(
+        content: "str | list[Dict[str, Any]] | Dict[str, Any] | None",
+    ) -> str:
+        """Extract displayable text from tool result content, truncated to 500 chars."""
+        max_len = 500
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content[:max_len]
+        if isinstance(content, dict):
+            text = str(content)
+            return text[:max_len]
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    parts.append(item.get("text", ""))
+            text = "\n".join(parts) if parts else str(content)
+            return text[:max_len]
+        return str(content)[:max_len]
 
     def _build_options(self) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
