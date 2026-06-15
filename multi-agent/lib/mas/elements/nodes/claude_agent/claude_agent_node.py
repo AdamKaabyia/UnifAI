@@ -5,6 +5,7 @@ Delegates work to a Claude Agent SDK session configured with
 model, tools, skills, and authentication credentials.
 """
 
+from multi-agent.lib.mas.elements.tools.common.base_tool import BaseTool
 from typing import Optional, Any, List, ClassVar, Dict
 from copy import deepcopy
 import os
@@ -13,7 +14,7 @@ import subprocess
 import tempfile
 
 from claude_agent_sdk import (
-    query, ClaudeAgentOptions,
+    query, ClaudeAgentOptions, create_sdk_mcp_server,
     AssistantMessage, ResultMessage, TextBlock,
     ToolUseBlock, ToolResultBlock,
     ServerToolUseBlock, ServerToolResultBlock,
@@ -27,6 +28,8 @@ from mas.elements.nodes.common.capabilities.iem_capable import IEMCapableMixin
 from mas.elements.nodes.common.capabilities.retriever_capable import RetrieverCapableMixin
 from mas.elements.nodes.common.capabilities.workload_capable import WorkloadCapableMixin
 from mas.elements.nodes.common.workload import Task, AgentResult
+from mas.elements.tools.common.base_tool import BaseTool
+from mas.elements.tools.common.claude_sdk_converter import ClaudeSDKConverter
 
 
 class ClaudeAgentNode(
@@ -71,6 +74,7 @@ class ClaudeAgentNode(
             # Advanced
             env_vars: Optional[Dict[str, str]] = None,
             # Integration
+            tools: Optional[List[BaseTool]] = None,
             mcp_providers: Optional[List[Any]] = None,
             # Runtime context
             execution_holder: Any = None,
@@ -95,6 +99,7 @@ class ClaudeAgentNode(
         self._skills_repos = skills_repos or {}
         self._cwd = cwd
         self._env_vars = env_vars or {}
+        self._domain_tools: List[BaseTool] = tools or []
         self._mcp_providers = mcp_providers or []
         self._execution_holder = execution_holder
         self._shared_storage = shared_storage
@@ -374,10 +379,17 @@ class ClaudeAgentNode(
             return text[:max_len]
         return str(content)[:max_len]
 
+    def _collect_tools(self) -> List[BaseTool]:
+        """Gather all tools (domain + MCP providers)."""
+        all_tools: List[BaseTool] = list[BaseTool](self._domain_tools)
+
+        for provider in self._mcp_providers:
+            all_tools.extend(provider.get_tools())
+
+        return all_tools
+
     def _build_options(self) -> "ClaudeAgentOptions":
         """Build ClaudeAgentOptions from node configuration."""
-        from .mcp_converter import convert_providers
-
         env = self._build_env()
         work_dir = self._prepare_working_directory()
 
@@ -394,8 +406,13 @@ class ClaudeAgentNode(
         if self._system_prompt:
             kwargs["system_prompt"] = self._system_prompt
 
-        if self._mcp_providers:
-            kwargs["mcp_servers"] = convert_providers(self._mcp_providers)
+        sdk_tools = ClaudeSDKConverter.to_sdk(self._collect_tools())
+        if sdk_tools:
+            kwargs["mcp_servers"] = {
+                "mas-tools": create_sdk_mcp_server(
+                    "mas-tools", tools=sdk_tools
+                ),
+            }
 
         return ClaudeAgentOptions(**kwargs)
 

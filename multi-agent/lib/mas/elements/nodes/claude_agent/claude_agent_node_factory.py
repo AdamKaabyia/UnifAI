@@ -49,6 +49,7 @@ class ClaudeAgentNodeFactory(BaseFactory[ClaudeAgentNodeConfig, ClaudeAgentNode]
                 execution_holder=execution_holder,
                 shared_storage=shared_storage,
                 # Integration
+                tools=deps.pop("tools"),
                 mcp_providers=deps.pop("providers"),
                 retriever=deps.pop("retriever"),
                 retries=cfg.retries,
