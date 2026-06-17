@@ -4,10 +4,10 @@ USER root
 
 RUN dnf update -y && dnf install -y gettext && dnf clean all
 
-COPY entrypoint.sh /entrypoint.sh
+COPY slack-proxy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY slack-proxy/nginx.conf.template /etc/nginx/nginx.conf.template
 
 RUN mkdir -p /tmp/client_body_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
     chmod -R 777 /tmp/client_body_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
