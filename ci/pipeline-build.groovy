@@ -11,6 +11,7 @@ properties([
         booleanParam(name: 'build_rag_backend', defaultValue: false, description: 'Create image for rag backend'),
         booleanParam(name: 'build_multiagent_backend', defaultValue: false, description: 'Create image for multiagent backend'),
         booleanParam(name: 'build_backend', defaultValue: false, description: 'Create image for platform backend'),
+        booleanParam(name: 'build_slack_proxy', defaultValue: false, description: 'Create image for slack proxy (nginx LoadBalancer)'),
         booleanParam(name: 'set_image_candidate', defaultValue: false, description: 'Set images with latest tag'),
         
         // 🚀 Deployment Parameters
@@ -244,6 +245,23 @@ pipeline {
                         }
                     }
                 }
+                stage('build_slack_proxy_image') {
+                    when { expression { params.build_slack_proxy } }
+                    steps {
+                        script {
+                            def component = "slack-proxy"
+                            dir("${buildParams.DevRoot}/${params.BRANCH}/") {
+                                cleanWorkspace(component)
+                                if (buildDockerImage(component)) {
+                                    tagAndPushImageToRegistry(buildParams, component)
+                                    cleanWorkspace(component)
+                                } else {
+                                    error("Terminating process for ${component}: Build failed")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -258,6 +276,7 @@ pipeline {
                     if (params.build_rag_backend) modules << 'rag'
                     if (params.build_multiagent_backend) modules << 'multiagent'
                     if (params.build_backend) modules << 'backend'
+                    if (params.build_slack_proxy) modules << 'slack-proxy'
                     if (params.build_gui) modules << 'ui'
                     def modulesToDeploy = modules.join(',')
 

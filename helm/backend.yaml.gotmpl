@@ -28,3 +28,7 @@ releases:
         command: bash
         args:
           - "./scripts/backend-postsync.sh"
+
+  - name: slack-proxy
+    chart: ./backend/slack-proxy
+    wait: true

@@ -319,6 +319,10 @@ pipeline {
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/ui-values.yaml", version)
                                         deployModules('ui')
                                         break
+
+                                    case 'slack-proxy':
+                                        deployModules('backend')
+                                        break
                                 }
                             }
                             echo("Deploy successfully completed")
