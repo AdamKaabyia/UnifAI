@@ -243,16 +243,8 @@ class AuthManager:
                     fake_session = si.session_class(
                         {"_permanent": True, "session_id": session_id}
                     )
-                    signing_serializer = si.get_signing_serializer(current_app)
-                    logger.debug(
-                        f"CLI cookie generation: session_id={session_id}, "
-                        f"signing_serializer={'present' if signing_serializer else 'NONE'}, "
-                        f"SECRET_KEY set={bool(current_app.secret_key)}"
-                    )
-                    cookie_value = signing_serializer.dumps(dict(fake_session))
-                    logger.debug(
-                        f"CLI cookie generated: length={len(cookie_value)}, "
-                        f"value={cookie_value[:40]}..."
+                    cookie_value = si.get_signing_serializer(current_app).dumps(
+                        dict(fake_session)
                     )
 
                     user_data = {
@@ -262,10 +254,7 @@ class AuthManager:
                         'sub': userinfo.get('sub'),
                         'session_cookie': cookie_value,
                     }
-                    logger.info(
-                        f"CLI user '{user_data['username']}' authenticated successfully, "
-                        f"session_cookie_length={len(cookie_value)}"
-                    )
+                    logger.info(f"CLI user '{user_data['username']}' authenticated successfully")
                     user_b64 = (
                         base64.urlsafe_b64encode(json.dumps(user_data).encode())
                         .decode()

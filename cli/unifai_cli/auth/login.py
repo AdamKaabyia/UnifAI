@@ -100,11 +100,6 @@ def _make_handler(result: dict, done: threading.Event) -> type:
                     # Restore padding stripped by the SSO backend before decoding
                     padded = user_b64 + "=" * (-len(user_b64) % 4)
                     user_data = json.loads(base64.urlsafe_b64decode(padded).decode())
-                    _console.print(f"[dim]Callback received user_data keys: {list(user_data.keys())}[/dim]")
-                    _console.print(
-                        f"[dim]session_cookie present: {bool(user_data.get('session_cookie'))}, "
-                        f"length: {len(user_data.get('session_cookie', ''))}[/dim]"
-                    )
                     result["user"] = user_data
                     body = (
                         b"<html><body style='font-family:sans-serif;text-align:center;"
