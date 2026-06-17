@@ -1,5 +1,6 @@
 """Pipeline endpoints - driving adapter."""
 from flask import Blueprint, g, jsonify
+from flask.wrappers import Response
 from webargs import fields
 
 from bootstrap.app_container import pipeline_dispatch_service
@@ -17,7 +18,7 @@ pipelines_bp = Blueprint("pipelines", __name__)
     "source_type": fields.Str(required=True),
     "skip_validation": fields.Bool(required=False, load_default=False),
 })
-def start_pipeline(data, source_type, skip_validation):
+def start_pipeline(data: list[dict], source_type: str, skip_validation: bool) -> tuple[Response, int]:
     """
     Register sources and dispatch pipeline tasks.
     
