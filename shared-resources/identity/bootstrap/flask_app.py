@@ -50,7 +50,9 @@ def create_app() -> Flask:
     app = Flask(config.app_name)
         
     # Application config
-    app.secret_key = config.get("secret_key", os.urandom(24)) # this key is crucial to code and decode all cookies. and it should be taken from env.
+    if not config.secret_key:
+        raise RuntimeError("secret_key is not configured. Set the SECRET_KEY environment variable.")
+    app.secret_key = config.secret_key
     app.version = config.get("version", "1.0.0")
     
     # CORS

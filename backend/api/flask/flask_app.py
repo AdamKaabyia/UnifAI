@@ -25,7 +25,9 @@ def create_app(config: AppConfig = None) -> Flask:
 
     # Application config
     app.version = config.get("version", "1.0.0")
-    app.secret_key = config.get("secret_key", os.urandom(24))
+    if not config.secret_key:
+        raise RuntimeError("secret_key is not configured. Set the SECRET_KEY environment variable.")
+    app.secret_key = config.secret_key
     app.config.update({
         'SESSION_COOKIE_SECURE': config.session_cookie_secure,
         'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,

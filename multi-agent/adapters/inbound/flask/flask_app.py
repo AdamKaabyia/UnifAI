@@ -16,7 +16,9 @@ def create_app(container, config: AppConfig = None) -> Flask:
     config = config or AppConfig.get_instance()
     app = Flask(__name__)
     app.version = config.get("version", "1.0.0")
-    app.secret_key = config.get("secret_key", os.urandom(24))
+    if not config.secret_key:
+        raise RuntimeError("secret_key is not configured. Set the SECRET_KEY environment variable.")
+    app.secret_key = config.secret_key
     app.config["admin_allowed_users"] = config.admin_allowed_users
     app.config.update({
         'SESSION_COOKIE_SECURE': config.session_cookie_secure,
