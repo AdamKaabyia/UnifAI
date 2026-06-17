@@ -79,3 +79,7 @@ releases:
         command: bash
         args:
         - "./scripts/shared-resources-postsync.sh"
+
+  - name: slack-proxy
+    chart: ./shared-resources/slack-proxy
+    wait: true

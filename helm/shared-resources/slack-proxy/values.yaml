@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: images.paas.redhat.com/unifai/slack-proxy-nginx
+  repository: images.paas.redhat.com/unifai/slackproxy
   pullPolicy: Always
   tag: "latest"
 

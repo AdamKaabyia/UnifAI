@@ -321,7 +321,7 @@ pipeline {
                                         break
 
                                     case 'slack-proxy':
-                                        deployModules('slack-proxy')
+                                        deployModules('shared-resources')
                                         break
                                 }
                             }
