@@ -321,7 +321,7 @@ pipeline {
                                         break
 
                                     case 'slack-proxy':
-                                        deployModules('backend')
+                                        deployModules('slack-proxy')
                                         break
                                 }
                             }
