@@ -205,20 +205,9 @@ class PlaceholderAnalyzer:
         self,
         original: FieldInfo,
         placeholder: PlaceholderPointer,
-        use_placeholder_required: bool = False,
     ) -> FieldInfo:
-        """
-        Create FieldInfo with placeholder overrides for title/description.
-        
-        Args:
-            use_placeholder_required: If True, use placeholder.required.
-                If False (default), use original schema's required status.
-        """
-        # Determine required status
-        is_required = (
-            placeholder.required if use_placeholder_required
-            else original.default is PydanticUndefined
-        )
+        """Create FieldInfo with placeholder overrides for title/description."""
+        is_required = placeholder.required
         
         # Determine default value
         if is_required:
