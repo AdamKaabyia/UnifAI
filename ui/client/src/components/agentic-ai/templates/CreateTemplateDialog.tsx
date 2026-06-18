@@ -306,8 +306,8 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
                 {isValidatingYaml ? <LoaderCircle className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
                 {isValidatingYaml ? 'Validating...' : 'Validate YAML'}
               </Button>
-              {yamlValidationResult && (
-                <span className={`text-xs ${yamlValidationResult.valid ? 'text-green-500' : 'text-destructive'}`}>
+              {yamlValidationResult?.valid && (
+                <span className="text-xs text-green-500">
                   {yamlValidationResult.message}
                 </span>
               )}
@@ -340,13 +340,24 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !draftYaml.trim()}>
-            {isSubmitting ? 'Creating...' : 'Create Template'}
-          </Button>
+        <DialogFooter className="flex items-center gap-3 sm:justify-between">
+          <span className="text-xs text-muted-foreground">
+            {!draftYaml.trim()
+              ? 'Paste a blueprint YAML to get started.'
+              : yamlValidationResult === null
+                ? 'Validate your YAML before creating.'
+                : yamlValidationResult.valid
+                  ? ''
+                  : <span className="text-destructive">{yamlValidationResult.message}</span>}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting || !draftYaml.trim() || yamlValidationResult?.valid !== true}>
+              {isSubmitting ? 'Creating...' : 'Create Template'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
