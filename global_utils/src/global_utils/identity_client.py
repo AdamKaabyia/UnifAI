@@ -11,12 +11,11 @@ this module never touches LDAP directly — it only speaks HTTP to the pod.
 import logging
 import time
 from threading import Lock
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import requests as http_requests
 
-if TYPE_CHECKING:
-    from global_utils.redis.team_cache import TeamMembershipCache
+from global_utils.redis.team_cache import TeamMembershipCache
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class IdentityClient:
         self,
         base_url: str,
         timeout: int = 5,
-        team_cache: Optional["TeamMembershipCache"] = None,
+        team_cache: Optional[TeamMembershipCache] = None,
     ):
         self._base = (base_url or "").rstrip("/")
         self._timeout = timeout
