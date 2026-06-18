@@ -1,32 +1,36 @@
 """
-Flask decorators for identity resolution and authorization.
+Flask decorator for identity resolution and authorization.
 
-MAS owns its own auth decorators. They validate the caller via a Redis-backed
-server session (set by the Identity service at login) and delegate
-team-membership logic through the IdentityProvider port.
+Validates the caller via a Redis-backed server session (set by the Identity
+service at login) and resolves the workspace identity:
 
-UI and CLI authenticate via the Flask session cookie.
+- **User identity:** Derived from the session cookie. No client-supplied
+  ``userId`` is needed.
+- **Team identity:** The client sends ``teamId`` (query param, JSON body, or
+  URL kwarg). Its presence triggers team mode; the decorator validates
+  membership before proceeding.
+
 Headless scripts/CI may fall back to the ``X-Authenticated-User`` header
 until API-token support is implemented (see design-genie-1618.md §7).
 
-The header fallback is injected via the ``get_fallback_user`` callback on
-``require_team_session`` from ``global_utils`` — one removal point when
-API tokens land.
+Backward compatibility: The decorator still accepts legacy ``userId`` +
+``identityType`` params from older UI/CLI clients. These are mapped to the
+new model transparently and will be removed in a follow-up PR.
 """
 import logging
 from functools import wraps
-from typing import Optional, Tuple
+from typing import Any, Callable
 
 from flask import current_app, g, jsonify, request, session
 
-from global_utils.flask.decorators import (
-    G_USER_ID,
-    require_team_session,
-)
-from mas.core.identity import Identity, IdentityType, resolve_identity
+from global_utils.flask.decorators import validate_session, G_IDENTITY_SESSION
+from mas.core.identity import resolve_identity
 from mas.core.identity.ports import IdentityProvider
 
 logger = logging.getLogger(__name__)
+
+G_IDENTITY = "identity"
+G_IDENTITY_USERNAME = "identity_username"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -34,10 +38,6 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _identity_provider() -> IdentityProvider:
-    """Single access point for the identity provider.
-
-    The provider is wired at startup in the container and attached to the app.
-    """
     return current_app.container.identity_provider
 
 
@@ -46,7 +46,7 @@ def _get_redis_store():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Session callbacks (plugged into global_utils decorators)
+# Session callbacks
 # ──────────────────────────────────────────────────────────────────────────────
 
 _AUTH_HEADER = "X-Authenticated-User"
@@ -57,7 +57,7 @@ def _get_fallback_user() -> str | None:
 
     Used by headless CI/CD scripts that cannot perform browser SSO
     (e.g. ``scripts/execution_workflow.py``).  Will be removed when
-    API-token auth is implemented (design §7).
+    API-token auth is implemented.
     """
     user = request.headers.get(_AUTH_HEADER, "").strip()
     if user:
@@ -65,193 +65,199 @@ def _get_fallback_user() -> str | None:
     return user or None
 
 
-def _get_team_id() -> str | None:
-    """Return the team id from the request when identityType is ``team``."""
-    body = request.get_json(silent=True) or {}
-    identity_type = (
-        request.args.get("identityType")
-        or body.get("identityType")
-        or "user"
-    ).strip().lower()
-    if identity_type == "team":
-        return (request.args.get("userId") or body.get("userId") or "").strip() or None
-    return None
-
-
-def _check_team_membership(username: str, team_id: str) -> bool:
-    return _identity_provider().is_member(username, team_id)
-
-
-# Pre-built decorators — see design-genie-1618.md §3.7c
-_mas_session = require_team_session(
-    get_redis_store=_get_redis_store,
-    get_session_id=lambda: session.get("session_id"),
-    get_fallback_user=_get_fallback_user,
-)
-
-_mas_team_session = require_team_session(
-    get_redis_store=_get_redis_store,
-    get_session_id=lambda: session.get("session_id"),
-    get_team_id=_get_team_id,
-    team_membership_checker=_check_team_membership,
-    get_fallback_user=_get_fallback_user,
-)
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Request parameter extraction
+# Team ID extraction
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _parse_identity_params(kwargs: dict) -> Tuple[str, str, str]:
-    """Extract ``(user_id, identity_type, display_name)`` from the request.
+def _extract_team_id(kwargs: dict) -> str:
+    """Extract team_id from the request.
 
-    Reads from query parameters first, then JSON body, then *kwargs*
-    (injected by ``@from_body`` / ``@from_query``).
+    Priority:
+      1. ``teamId`` query param / JSON body / URL kwarg (new contract)
+      2. Legacy: ``identityType=team`` + ``userId`` as the team id
+      3. Empty string → user mode
     """
     body = request.get_json(silent=True) or {}
-    user_id = (
-        request.args.get("userId")
-        or body.get("userId")
-        or kwargs.get("userId")
-        or kwargs.get("user_id")
+
+    # New contract: explicit teamId
+    team_id = str(
+        request.args.get("teamId")
+        or body.get("teamId")
+        or kwargs.get("teamId")
+        or kwargs.get("team_id")
         or ""
-    )
+    ).strip()
+
+    if team_id:
+        return team_id
+
+    # Backward compat: legacy identityType + userId
     identity_type = (
         request.args.get("identityType")
         or body.get("identityType")
         or kwargs.get("identityType")
         or kwargs.get("identity_type")
         or "user"
-    )
-    display_name = (
-        request.args.get("displayName")
-        or body.get("displayName")
-        or kwargs.get("displayName")
-        or kwargs.get("display_name")
-        or ""
-    )
-    return str(user_id).strip(), str(identity_type).strip().lower() or "user", str(display_name)
+    ).strip().lower()
 
+    if identity_type == "team":
+        legacy_id = str(
+            request.args.get("userId")
+            or body.get("userId")
+            or kwargs.get("userId")
+            or kwargs.get("user_id")
+            or ""
+        ).strip()
+        return legacy_id
 
-def _resolve_identity_or_error(kwargs: dict) -> Tuple[Optional[Identity], Optional[tuple]]:
-    """Parse identity params and resolve, returning ``(identity, None)`` or ``(None, error_response)``."""
-    user_id, identity_type, display_name = _parse_identity_params(kwargs)
-    if not user_id:
-        return None, (jsonify({"error": "userId is required"}), 400)
-    try:
-        return resolve_identity(user_id, identity_type, display_name), None
-    except ValueError as e:
-        return None, (jsonify({"error": str(e)}), 400)
+    return ""
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Decorators
+# Unified decorator
 # ──────────────────────────────────────────────────────────────────────────────
 
-def with_authenticated_user(f):
-    """Validate the caller's session and inject ``authenticated_user``.
+def require_session_identity(f: Callable) -> Callable:
+    """Validate session and resolve workspace identity.
 
-    Delegates to ``require_team_session`` from ``global_utils`` (with the
-    header-fallback callback).  After validation, ``g.user_id`` is bridged
-    into the ``authenticated_user`` kwarg that endpoints expect.
+    This is the single auth decorator for all MAS endpoints. It:
+
+    1. Validates the Redis-backed server session (cookie or fallback header).
+    2. Resolves the workspace identity:
+       - If ``teamId`` is present → team identity (membership validated).
+       - Otherwise → user identity derived from the session username.
+    3. Injects ``identity`` keyword argument into the endpoint.
+    4. Sets ``g.identity_session``, ``g.identity_username``, ``g.identity``.
+
+    Endpoints that need the raw human username (e.g. collaboration locks,
+    presence) should read ``g.identity_username``.
     """
     @wraps(f)
-    def decorated(*args, **kwargs):
-        kwargs["authenticated_user"] = getattr(g, G_USER_ID, "")
-        return f(*args, **kwargs)
-    return _mas_session(decorated)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            # 1. Session validation
+            data, err = validate_session(
+                _get_redis_store,
+                lambda: session.get("session_id"),
+                _get_fallback_user,
+            )
+            if err:
+                msg, err_type, status = err
+                return jsonify({"error": msg, "error_type": err_type}), status
+
+            username = str(data.username).strip()
+            setattr(g, G_IDENTITY_SESSION, data)
+            setattr(g, G_IDENTITY_USERNAME, username)
+
+            # 2. Resolve identity
+            team_id = _extract_team_id(kwargs)
+
+            if team_id:
+                if not _identity_provider().is_member(username, team_id):
+                    return jsonify({
+                        "error": "Access denied: you are not a member of this team",
+                        "error_type": "TEAM_ACCESS_DENIED",
+                    }), 403
+                display_name = _identity_provider().resolve_team_display_name(username, team_id)
+                identity = resolve_identity(team_id, "team", display_name)
+            else:
+                identity = resolve_identity(username, "user")
+
+            # 3. Set context and inject
+            setattr(g, G_IDENTITY, identity)
+            kwargs["identity"] = identity
+            return f(*args, **kwargs)
+
+        except ValueError as e:
+            return jsonify({"error": str(e), "error_type": "INVALID_IDENTITY"}), 400
+        except Exception:
+            logger.exception("Identity resolution failed unexpectedly")
+            return jsonify({
+                "error": "Internal server error",
+                "error_type": "ACCESS_CONTROL_ERROR",
+            }), 500
+
+    return wrapped
 
 
-def with_identity(f):
-    """Resolve ``Identity`` from the incoming request.
+# ──────────────────────────────────────────────────────────────────────────────
+# Legacy aliases (backward compat for endpoints not yet migrated)
+# ──────────────────────────────────────────────────────────────────────────────
 
-    Reads ``userId``, ``identityType``, and ``displayName`` from query
-    parameters or JSON body and passes the resulting ``Identity`` as
-    the ``identity`` keyword argument. Returns 400 on invalid input.
+def with_authenticated_user(f: Callable) -> Callable:
+    """Legacy wrapper: validates session, injects ``authenticated_user`` kwarg.
+
+    Delegates to :func:`require_session_identity`, then bridges ``identity``
+    into the ``authenticated_user`` string that old endpoints expect.
     """
     @wraps(f)
-    def decorated(*args, **kwargs):
-        identity, err = _resolve_identity_or_error(kwargs)
-        if err:
-            return err
-        kwargs["identity"] = identity
+    def bridge(*args: Any, **kwargs: Any) -> Any:
+        identity = kwargs.pop("identity", None)
+        kwargs["authenticated_user"] = getattr(g, G_IDENTITY_USERNAME, "")
         return f(*args, **kwargs)
-    return decorated
+    return require_session_identity(bridge)
 
 
-def with_require_identity_authorization(f):
-    """Validate caller session, authorize, and resolve ``Identity``.
+def with_require_identity_authorization(f: Callable) -> Callable:
+    """Legacy wrapper: validates session + resolves identity.
 
-    Delegates to ``require_team_session`` from ``global_utils`` (with
-    header-fallback and team-membership callbacks).
-
-    1. Session validation + team membership → handled by ``_mas_team_session``.
-    2. **user** identity: ``userId`` must match ``g.user_id`` → 403.
-    3. Resolves ``Identity`` and injects it as ``identity`` kwarg → 400 on invalid.
+    Same as :func:`require_session_identity` — kept as an alias so existing
+    endpoint decorators don't break. The ``identity`` kwarg is passed through.
     """
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        authenticated_user = getattr(g, G_USER_ID, "")
-        user_id, identity_type_raw, _ = _parse_identity_params(kwargs)
+    return require_session_identity(f)
 
-        if identity_type_raw != "team":
-            if user_id and user_id.casefold() != authenticated_user.casefold():
-                return jsonify({
-                    "error": "Access denied: userId does not match authenticated user",
-                    "error_type": "USER_ACCESS_DENIED",
-                }), 403
 
-        identity, err = _resolve_identity_or_error(kwargs)
-        if err:
-            return err
-        kwargs["identity"] = identity
-        return f(*args, **kwargs)
+def with_identity(f: Callable) -> Callable:
+    """Legacy wrapper: resolves identity without full session validation.
 
-    return _mas_team_session(decorated)
+    Now equivalent to :func:`require_session_identity` (session is always
+    validated). Kept for backward compat.
+    """
+    return require_session_identity(f)
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Admin access (unchanged)
+# ──────────────────────────────────────────────────────────────────────────────
 
 def require_admin_access(f):
     """Gate an endpoint to users listed in ``admin_allowed_users``.
 
-    Reads ``userId`` from kwargs (injected by ``@from_query``) or from the
-    ``userId`` / ``user_id`` query parameter.
+    Reads the authenticated username from the session (via
+    :func:`require_session_identity`) and checks it against the app config.
+    Does NOT inject ``identity`` into the wrapped function's kwargs.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            admin_allowed_users = current_app.config.get("admin_allowed_users", [])
+            kwargs.pop("identity", None)
 
+            admin_allowed_users = current_app.config.get("admin_allowed_users", [])
             if not admin_allowed_users:
                 return jsonify({
                     "error": "Access denied: Analytics is not enabled",
                     "error_type": "FEATURE_DISABLED",
                 }), 403
 
-            user_id = (
-                kwargs.get("user_id")
-                or kwargs.get("userId")
-                or request.args.get("user_id")
-                or request.args.get("userId")
-            )
-
-            if not user_id:
+            username = getattr(g, G_IDENTITY_USERNAME, "")
+            if not username:
                 return jsonify({
-                    "error": "Access denied: user_id is required",
+                    "error": "Access denied: user identification is required",
                     "error_type": "AUTHENTICATION_REQUIRED",
                 }), 401
 
-            if user_id not in admin_allowed_users:
+            if username not in admin_allowed_users:
                 return jsonify({
                     "error": "Access denied: insufficient permissions",
                     "error_type": "ACCESS_DENIED",
                 }), 403
 
             return f(*args, **kwargs)
-
-        except Exception as e:
+        except Exception:
+            logger.exception("Admin access check failed unexpectedly")
             return jsonify({
-                "error": f"Access control error: {str(e)}",
+                "error": "Internal server error",
                 "error_type": "ACCESS_CONTROL_ERROR",
             }), 500
 
-    return decorated_function
+    return require_session_identity(decorated_function)
