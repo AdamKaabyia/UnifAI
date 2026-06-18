@@ -21,7 +21,7 @@ _backend_require_session = require_identity_session(
 )
 
 
-def _get_current_user(req):
+def _get_current_user(_req) -> str | None:
     """Current user from the validated Redis session."""
     return getattr(g, "identity_session", None) and g.identity_session.username
 
