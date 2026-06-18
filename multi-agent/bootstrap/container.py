@@ -310,18 +310,7 @@ class AppContainer(metaclass=SingletonMeta):
             cfg, self.session_repo, self.identity_provider
         )
 
-        self._seed_templates()
-
         self._initialized = True
-
-    def _seed_templates(self):
-        """Load YAML template fixtures into the database if not already present."""
-        from run.fixtures.seeder import seed_templates
-        logger = logging.getLogger(__name__)
-        try:
-            seed_templates(self.template_repo)
-        except Exception:
-            logger.exception("Template seeding failed — continuing startup.")
 
     @staticmethod
     def _create_channel_factory(cfg: AppConfig):

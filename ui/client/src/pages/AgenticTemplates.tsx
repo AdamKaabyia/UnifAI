@@ -147,10 +147,10 @@ export default function AgenticTemplates() {
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!templateToDelete) return;
+    if (!templateToDelete || !user) return;
     setIsDeleting(true);
     try {
-      await deleteTemplate(templateToDelete.template_id, user!.username);
+      await deleteTemplate(templateToDelete.template_id, user.username);
       toast({ title: 'Deleted', description: `Template "${templateToDelete.name}" deleted.` });
       setShowDeleteConfirm(false);
       setTemplateToDelete(null);
@@ -165,16 +165,17 @@ export default function AgenticTemplates() {
     } finally {
       setIsDeleting(false);
     }
-  }, [templateToDelete, fetchTemplates, toast]);
+  }, [templateToDelete, fetchTemplates, toast, user]);
 
   const handleCreateTemplate = useCallback(async (data: {
     draft: Record<string, any>;
     placeholders: Record<string, any>;
     metadata: Record<string, any>;
   }) => {
+    if (!user) return;
     setIsCreatingTemplate(true);
     try {
-      const result = await createTemplate(data, user!.username);
+      const result = await createTemplate(data, user.username);
       toast({ title: 'Created', description: `Template created (${result.template_id}).` });
       setShowCreateDialog(false);
       fetchTemplates();
@@ -184,7 +185,7 @@ export default function AgenticTemplates() {
     } finally {
       setIsCreatingTemplate(false);
     }
-  }, [fetchTemplates, toast]);
+  }, [fetchTemplates, toast, user]);
 
   const categories = getCategories();
 
@@ -214,7 +215,7 @@ export default function AgenticTemplates() {
                   <h1 className="text-3xl font-heading font-bold mb-2">
                     Workflow Templates
                   </h1>
-                  <p className="text-gray-400">
+                  <p className="text-muted-foreground">
                     Choose a template to create production-ready agentic workflows in minutes.
                     Each template provides a complete solution that you can customize to your needs.
                   </p>

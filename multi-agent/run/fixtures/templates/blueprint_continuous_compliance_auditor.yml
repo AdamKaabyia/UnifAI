@@ -460,20 +460,12 @@ placeholders:
       resources:
         - rid: git_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Git MCP Server URL
-              hint: "URL of your Git/GitHub MCP server endpoint"
             - field_path: bearer_token
               required: true
               label: Git Personal Access Token
               hint: "Your Git/GitHub PAT with repo and pull request read permissions"
         - rid: google_workspace_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Google Workspace MCP Server URL
-              hint: "URL of your Google Workspace MCP server endpoint"
             - field_path: bearer_token
               required: true
               label: Google Workspace Auth Token

@@ -479,10 +479,6 @@ placeholders:
       resources:
         - rid: jira_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Jira MCP Server URL
-              hint: "URL of your Jira MCP server endpoint"
             - field_path: bearer_token
               required: true
               label: Jira PAT Token

@@ -501,30 +501,18 @@ placeholders:
       resources:
         - rid: confluence_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Confluence MCP Server URL
-              hint: "URL of your Atlassian MCP server endpoint (e.g. https://mcp-atlassian.example.com/mcp)"
             - field_path: bearer_token
               required: true
               label: Confluence PAT Token
               hint: "Your Atlassian Personal Access Token for Confluence access"
         - rid: jira_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Jira MCP Server URL
-              hint: "URL of your Jira MCP server endpoint (e.g. https://mcp-atlassian.example.com/mcp)"
             - field_path: bearer_token
               required: true
               label: Jira PAT Token
               hint: "Your Jira Personal Access Token for API access"
         - rid: git_mcp_rid
           placeholders:
-            - field_path: mcp_url
-              required: true
-              label: Git MCP Server URL
-              hint: "URL of your Git/GitHub MCP server endpoint"
             - field_path: bearer_token
               required: true
               label: Git Personal Access Token

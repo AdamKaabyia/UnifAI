@@ -1,13 +1,12 @@
 """
-Template seeder — loads YAML fixtures into MongoDB on startup.
+Template seeder — loads YAML fixtures into MongoDB.
 
 Scan all YAML files in run/fixtures/templates/. For each file:
   - If template_id is NOT already in MongoDB → insert.
   - If it EXISTS (including soft-deleted) → skip (preserves admin edits/deletions).
 
-Called once during AppContainer initialization.
+Run via:  python scripts/seed_templates.py
 """
-import os
 import logging
 from pathlib import Path
 from datetime import datetime, timezone

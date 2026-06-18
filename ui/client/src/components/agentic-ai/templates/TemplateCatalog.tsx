@@ -65,12 +65,12 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search templates..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 input-dark-theme bg-background-card border-gray-800 focus:border-primary"
+            className="pl-10 bg-card border-border focus:border-primary"
           />
         </div>
         
@@ -89,7 +89,7 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
             variant={viewMode === 'grid' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('grid')}
-            className={viewMode === 'grid' ? 'bg-primary hover:bg-primary/90' : 'border-gray-700'}
+            className={viewMode === 'grid' ? 'bg-primary hover:bg-primary/90' : 'border-border'}
           >
             <Grid3X3 className="h-4 w-4" />
           </Button>
@@ -97,7 +97,7 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
             variant={viewMode === 'list' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('list')}
-            className={viewMode === 'list' ? 'bg-primary hover:bg-primary/90' : 'border-gray-700'}
+            className={viewMode === 'list' ? 'bg-primary hover:bg-primary/90' : 'border-border'}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -109,7 +109,7 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
           variant={selectedCategory === null ? 'default' : 'outline'}
           size="sm"
           onClick={() => setSelectedCategory(null)}
-          className={selectedCategory === null ? 'bg-primary hover:bg-primary/90' : 'border-gray-700'}
+          className={selectedCategory === null ? 'bg-primary hover:bg-primary/90' : 'border-border'}
         >
           <Filter className="h-3 w-3 mr-1" />
           All
@@ -123,7 +123,7 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
             variant={selectedCategory === category.name ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSelectedCategory(category.name)}
-            className={selectedCategory === category.name ? 'bg-primary hover:bg-primary/90' : 'border-gray-700'}
+            className={selectedCategory === category.name ? 'bg-primary hover:bg-primary/90' : 'border-border'}
           >
             {category.name}
             <Badge variant="secondary" className="ml-2 bg-white/10">
@@ -137,7 +137,7 @@ export const TemplateCatalog: React.FC<TemplateCatalogProps> = ({
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center h-64 text-gray-400"
+          className="flex flex-col items-center justify-center h-64 text-muted-foreground"
         >
           <FolderOpen className="h-12 w-12 mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">No templates found</h3>

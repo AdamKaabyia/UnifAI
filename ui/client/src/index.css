@@ -121,7 +121,7 @@
 
   .dark-mode input,
   .dark-mode textarea {
-    color: #111827 !important;
+    color: hsl(var(--foreground)) !important;
     border-color: var(--border) !important;
   }
 
@@ -136,10 +136,9 @@
     color: rgba(0, 0, 0, 0.5) !important;
   }
 
-  /* Dark mode inputs have light/white backgrounds, so placeholders need dark color */
   .dark-mode input::placeholder, 
   .dark-mode textarea::placeholder {
-    color: rgba(0, 0, 0, 0.4) !important;
+    color: hsl(var(--muted-foreground)) !important;
   }
 
   /* Ensure text is visible in all form components */
