@@ -57,7 +57,7 @@ export const ViewYamlDialog: React.FC<ViewYamlDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="dark-surface max-w-4xl max-h-[85vh] flex flex-col bg-background border-border">
+      <DialogContent className="dark-inputs max-w-4xl max-h-[85vh] flex flex-col bg-background border-border">
         <DialogHeader>
           <DialogTitle className="text-lg font-heading">
             Blueprint YAML — {templateName}

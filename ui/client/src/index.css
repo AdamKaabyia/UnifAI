@@ -130,13 +130,14 @@
     color: #ffffff !important;
   }
 
-  /* Dark-background dialogs: override the global dark-text rule */
-  .dark-mode .dark-surface input,
-  .dark-mode .dark-surface textarea {
+  /* Opt-in for inputs on dark backgrounds — add "dark-inputs" to a parent */
+  .dark-inputs input,
+  .dark-inputs textarea,
+  .dark-inputs select {
     color: hsl(var(--foreground)) !important;
   }
-  .dark-mode .dark-surface input::placeholder,
-  .dark-mode .dark-surface textarea::placeholder {
+  .dark-inputs input::placeholder,
+  .dark-inputs textarea::placeholder {
     color: hsl(var(--muted-foreground)) !important;
   }
 

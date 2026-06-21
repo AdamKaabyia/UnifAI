@@ -183,7 +183,7 @@ export const CreateTemplateDialog: React.FC<CreateTemplateDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="dark-surface max-w-4xl max-h-[90vh] flex flex-col bg-background text-foreground border-border">
+      <DialogContent className="dark-inputs max-w-4xl max-h-[90vh] flex flex-col bg-background text-foreground border-border">
         <DialogHeader>
           <DialogTitle className="text-lg font-heading">Add Template</DialogTitle>
           <DialogDescription className="text-muted-foreground">
