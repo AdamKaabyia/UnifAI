@@ -1,5 +1,5 @@
 """
-CLI bootstrap — build the API client and resolve the user identity.
+CLI bootstrap — build the API client and resolve the session.
 
 Configuration lives in ``unifai_cli.config.app_config``.
 API methods live in ``unifai_cli.api``.
@@ -23,45 +23,39 @@ class _UnifAIClient(BlueprintsAPI, ResourcesAPI, SessionsAPI):
 
 def build_client(
     mas_url: Optional[str] = None,
-    user_id: Optional[str] = None,
     session_cookie: Optional[str] = None,
 ) -> MASClient:
     """Build a MAS API client from URL flag or environment.
 
-    When *session_cookie* is provided the client sends it with every
-    request so MAS can validate the caller via the Redis session store.
+    The client authenticates via the session cookie — MAS validates
+    the caller server-side using the Redis session store.
     """
     config = AppConfig.get_instance()
     url = mas_url or os.environ.get("MAS_URL", config.mas_url)
     client = _UnifAIClient(url)
-    if user_id:
-        client.set_authenticated_user(user_id)
     if session_cookie:
         client.set_session_cookie(session_cookie)
     return client
 
 
-def resolve_user_id(user_option: Optional[str] = None) -> tuple[str, Optional[str]]:
-    """Resolve the authenticated user ID and session cookie.
+def resolve_session() -> str:
+    """Resolve the session cookie for API authentication.
 
     Returns:
-        ``(username, session_cookie)`` — *session_cookie* is ``None``
-        when the identity was provided via ``--user`` / ``UNIFAI_USER``
-        (no server session exists).
+        The session cookie string.
 
-    Priority:
-      1. Explicit ``--user`` flag (CI / scripting override — no session)
-      2. ``UNIFAI_USER`` env var (CI / scripting override — no session)
-      3. Local SSO session (``~/.unifai/session.json``, 10-hour TTL)
-      4. Browser-based SSO login (triggers automatically when no session exists)
+    Flow:
+      1. Local SSO session (``~/.unifai/session.json``, 10-hour TTL)
+      2. Browser-based SSO login (triggers automatically when no session exists)
+
+    Raises:
+        SystemExit(1) if authentication fails.
     """
-    if user_option:
-        return user_option, None
-
-    env_user = os.environ.get("UNIFAI_USER")
-    if env_user:
-        return env_user, None
-
     from unifai_cli.auth.flow import ensure_authenticated
-    user_info = ensure_authenticated()
-    return user_info["username"], user_info.get("session_cookie")
+    session = ensure_authenticated()
+    cookie = session.get("session_cookie")
+    if not cookie:
+        from rich.console import Console
+        Console().print("[red]Session cookie missing. Run [bold]unifai auth login --force[/bold] to re-authenticate.[/red]")
+        raise SystemExit(1)
+    return cookie

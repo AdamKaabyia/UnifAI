@@ -22,18 +22,11 @@ class MASClient:
         self.api_prefix = config.api_prefix
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
-        self._authenticated_user: Optional[str] = None
-
-    def set_authenticated_user(self, user_id: str) -> None:
-        """Set the display username (used for ``userId`` body params)."""
-        self._authenticated_user = user_id
 
     def set_session_cookie(self, session_cookie: str) -> None:
         """Install the pre-signed session cookie on the requests.Session."""
         self.session.cookies.set("session", session_cookie)
 
-    def _effective_user_id(self, user_id: Optional[str] = None) -> Optional[str]:
-        return user_id or self._authenticated_user
 
     def _url(self, parent: str, route: str) -> str:
         return f"{self.base_url}{self.api_prefix}/{parent}/{route}"
