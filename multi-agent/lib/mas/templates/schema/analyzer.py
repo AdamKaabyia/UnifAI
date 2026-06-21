@@ -9,6 +9,7 @@ SOLID Principles:
 - OCP: Extensible via ElementRegistry without modification
 - DIP: Depends on ElementRegistry abstraction
 """
+import logging
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Type, Iterator
 
@@ -19,6 +20,8 @@ from pydantic_core import PydanticUndefined
 from mas.catalog.element_registry import ElementRegistry
 from mas.core.enums import ResourceCategory
 from mas.templates.models.template import Template, PlaceholderPointer
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -127,13 +130,13 @@ class PlaceholderAnalyzer:
         # Find resource in draft
         resource = self._find_resource(template.draft, category, rid)
         if resource is None:
-            print(f"[PlaceholderAnalyzer] Resource not found: {category.value}/{rid}")
+            logger.warning("Resource not found: %s/%s", category.value, rid)
             return None
         
         # Get original config schema
         schema_cls = self._get_config_schema(category, resource.type)
         if schema_cls is None:
-            print(f"[PlaceholderAnalyzer] Schema not found: {category.value}/{resource.type}")
+            logger.warning("Schema not found: %s/%s", category.value, resource.type)
             return None
         
         # Extract field definitions
@@ -189,7 +192,7 @@ class PlaceholderAnalyzer:
         field_name = placeholder.field_path.split(".")[-1]
         
         if field_name not in schema_cls.model_fields:
-            print(f"[PlaceholderAnalyzer] Field '{field_name}' not found in {schema_cls.__name__}")
+            logger.warning("Field '%s' not found in %s", field_name, schema_cls.__name__)
             return None
         
         original = schema_cls.model_fields[field_name]

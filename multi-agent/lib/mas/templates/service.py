@@ -151,10 +151,10 @@ class TemplateService:
         Returns True if deleted.
         Raises TemplateNotFoundError if not found.
         """
-        try:
-            return self._repo.delete(template_id)
-        except KeyError:
+        deleted = self._repo.delete(template_id)
+        if not deleted:
             raise TemplateNotFoundError(template_id)
+        return True
 
     def exists(self, template_id: str) -> bool:
         """Check if template exists."""
