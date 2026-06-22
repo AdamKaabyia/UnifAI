@@ -61,6 +61,7 @@ class ClaudeAgentNode(
             vertex_region: str = "us-east5",
             # Model
             model: str = "claude-sonnet-4-6",
+            effort: str = "medium",
             # Agent behavior
             system_prompt: str = "",
             max_turns: Optional[int] = 200,
@@ -87,6 +88,7 @@ class ClaudeAgentNode(
         self._vertex_project_id = vertex_project_id
         self._vertex_region = vertex_region
         self._model = model
+        self._effort = effort
         self._system_prompt = system_prompt
         self._max_turns = max_turns
         self._permission_mode = permission_mode
@@ -392,8 +394,11 @@ class ClaudeAgentNode(
         env = self._build_env()
         work_dir = self._prepare_working_directory()
 
+        effort = self._effort.value if hasattr(self._effort, "value") else self._effort
+
         kwargs: Dict[str, Any] = {
             "model": self._model,
+            "effort": effort,
             "permission_mode": self._permission_mode,
             "allowed_tools": self._allowed_tools,
             "disallowed_tools": self._disallowed_tools,
@@ -521,6 +526,7 @@ class ClaudeAgentNode(
             execution_metadata={
                 "claude_agent_sdk": True,
                 "model": self._model,
+                "effort": self._effort,
                 "session_id": metadata.get("session_id"),
                 "num_turns": metadata.get("num_turns"),
                 "total_cost_usd": metadata.get("total_cost_usd"),
