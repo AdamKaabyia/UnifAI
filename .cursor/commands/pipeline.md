@@ -51,6 +51,28 @@ The user's input determines which mode to run. Parse the input as follows:
 /pipeline debug <error description or symptom>
 /pipeline debug <path-to-error-log>
 ```
+**Mode 9 — arch-review**: Run an architecture review on code changes without a design document. Evaluate changed/added files against hexagonal architecture, SOLID principles, port-adapter wiring, layer boundaries, and codebase conventions. Stop after the verdict.
+```
+/pipeline arch-review [files/folders]
+```
+
+### Mode → Phase Dispatch
+
+Use this table to determine which phase(s) to execute for each mode. This is the authoritative mapping — do NOT infer phase numbers from mode numbers or from semantic similarity between mode names and phase names.
+
+| Mode | Keyword | Phase(s) to Execute | Skill File |
+|------|---------|---------------------|------------|
+| 1 | `full` | 1 → 2 → 3 → 4 → 5 | (per phase) |
+| 2 | `design-only` | 1 | `designer.md` |
+| 3 | `design-and-review` | 1 → 2 | `designer.md` → `design-reviewer.md` |
+| 4 | `implement` | 3 → 4 → 5 | `coder.md` → `code-reviewer.md` → `qa.md` |
+| 5 | `review-only` | 2 | `design-reviewer.md` |
+| 6 | `code-review-only` | 4 | `code-reviewer.md` |
+| 7 | `qa-only` | 5 | `qa.md` |
+| 8 | `debug` | 6 | `debugger.md` |
+| 9 | `arch-review` | 9 | `arch-reviewer.md` |
+
+All skill files are under `.cursor/skills/pipeline/phases/`.
 
 ### ADR File Flag
 
@@ -78,16 +100,34 @@ After resolving the input, pass the full task context (title, description, accep
 
 ### Mode Parsing Rules
 
-1. Strip the `--adr` flag from the input if present (set an internal `adr_requested = true` flag). Then check the first word after `/pipeline` against the mode keywords: `full`, `design-only`, `design-and-review`, `implement`, `review-only`, `code-review-only`, `qa-only`, `debug`.
+1. Strip the `--adr` flag from the input if present (set an internal `adr_requested = true` flag). Then check the first word after `/pipeline` against the mode keywords: `full`, `design-only`, `design-and-review`, `implement`, `review-only`, `code-review-only`, `qa-only`, `debug`, `arch-review`.
 2. If none of the keywords match, treat the entire input as a task description and use **full** mode.
 3. For modes that accept a file path, read that file and use its contents as the input artifact for the starting phase.
 4. For **full** mode: after resolving design input (see above), if the argument is an existing file path on disk, read it as the design and start at Phase 2. Otherwise resolve it as a Jira ticket or free-text and start at Phase 1.
-5. For `design-only` and `review-only` and `code-review-only` and `qa-only` — these are single-phase runs. Execute ONLY that one phase. Do NOT continue to subsequent phases.
+5. For `design-only` and `review-only` and `code-review-only` and `qa-only` and `arch-review` — these are single-phase runs. Execute ONLY that one phase. Do NOT continue to subsequent phases.
 6. For `design-and-review` — execute Phase 1 and Phase 2 (with revision loops) only. Stop before Phase 3.
 7. For **debug** mode: check if the argument is a path to an existing file. If yes, read the file as the error log input. If not, treat the entire argument as an error description or symptom.
-8. Announce the detected mode at the start: "Pipeline mode: **<mode>** — starting at Phase <N>."
+8. Announce the detected mode at the start: "Pipeline mode: **<mode>** — starting at Phase <N>." Use the **Mode → Phase Dispatch** table to determine the correct phase number.
 
-CRITICAL RULE: When a review phase produces a verdict that is NOT approval, you MUST execute the revision loop described below. You are FORBIDDEN from proceeding to the next phase until the reviewer approves. This is non-negotiable.
+CRITICAL RULE: When a review phase produces a verdict that is NOT approval, you MUST execute the revision loop described below. You are FORBIDDEN from proceeding to the next phase until the reviewer approves. This is non-negotiable. Exception: `arch-review` is a standalone single-phase mode and does not run revision loops.
+
+### Scope Resolution for Review Modes
+
+Applies to modes: `arch-review`, `code-review-only`, `qa-only`.
+
+When determining which files to review:
+
+1. **Explicit scope provided** — if the user passed file paths or folder paths in the command (e.g., `/pipeline code-review-only src/services/`), use those as the review scope. No auto-detection needed.
+
+2. **No explicit scope provided** — auto-detect the PR diff:
+   - Determine the base branch: use the environment variable `GITHUB_BASE_REF` if available, otherwise default to `main`.
+   - Run: `git diff --name-only origin/<base>...HEAD`
+   - If the command produces a non-empty file list, use those files as the review scope. Announce: "Auto-detected PR scope: **N files** changed vs `origin/<base>`."
+   - If the command fails or produces an empty list (e.g., detached HEAD, no remote, no diff), fall back to reviewing the full workspace. Announce: "No PR diff detected — reviewing full workspace."
+
+3. **Passing scope to the review skill** — at the start of the review phase, present the scoped file list as context:
+   - "The following files are in scope for this review:" followed by the file list.
+   - The reviewer MUST focus on these files but MAY reference other files for context (e.g., checking imports, verifying interfaces exist).
 
 ## State Tracking
 
@@ -114,7 +154,7 @@ Execute the phases applicable to the selected mode, IN ORDER. Do not skip phases
 
 ### PHASE 1: DESIGN
 
-1. Read the skill file at `.cursor/skills/pipeline-designer/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/designer.md`.
 2. Adopt the Designer agent persona described in that skill.
 3. Analyze the task, explore the codebase, and produce the technical design following the skill's output format.
 4. Present the design under a `## PHASE 1: DESIGN` header.
@@ -128,7 +168,7 @@ Execute the phases applicable to the selected mode, IN ORDER. Do not skip phases
 
 ### PHASE 2: DESIGN REVIEW
 
-1. Read the skill file at `.cursor/skills/pipeline-design-reviewer/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/design-reviewer.md`.
 2. Switch persona to the Design Reviewer.
 3. Critically review the **full design produced in Phase 1** (the in-chat output), following the skill's review dimensions.
 4. Present the review under a `## PHASE 2: DESIGN REVIEW` header.
@@ -162,7 +202,7 @@ IF verdict is NEEDS REVISION or REJECT:
 
         THEN do ALL of the following steps — do NOT skip any:
 
-        Step A: Re-read `.cursor/skills/pipeline-designer/SKILL.md`.
+        Step A: Re-read `.cursor/skills/pipeline/phases/designer.md`.
         Step B: Switch back to the Designer persona.
         Step C: For EACH feedback item, explicitly state what you are changing and why.
         Step D: Produce a COMPLETE revised design (not just the changed parts).
@@ -174,9 +214,22 @@ IF verdict is NEEDS REVISION or REJECT:
 
 ---
 
+### PHASE 9: ARCHITECTURE REVIEW
+
+Used by `arch-review` mode only. This is a standalone phase — it does NOT run as part of the normal Phase 1 → 2 → 3 → 4 → 5 pipeline. It uses a DIFFERENT skill file than Phase 4 (Code Review).
+
+1. Read the skill file at `.cursor/skills/pipeline/phases/arch-reviewer.md` (NOT `code-reviewer.md`).
+2. Switch persona to the Architecture Reviewer.
+3. Resolve the review scope using the Scope Resolution rules above (git diff or explicit paths).
+4. Present the scoped file list, then critically review the changed files against hexagonal architecture, SOLID, port-adapter wiring, and codebase conventions following the skill's review dimensions.
+5. Present the review under a `## ARCHITECTURE REVIEW` header.
+6. Extract the verdict (APPROVE / NEEDS REVISION / REJECT). This is a single-phase mode — there is no revision loop. Display the final state and stop.
+
+---
+
 ### PHASE 3: IMPLEMENTATION
 
-1. Read the skill file at `.cursor/skills/pipeline-coder/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/coder.md`.
 2. Switch persona to the Coder.
 3. Implement the approved design as production-ready code, following the skill's rules.
 4. Present the implementation summary under a `## PHASE 3: IMPLEMENTATION` header.
@@ -187,7 +240,7 @@ IF verdict is NEEDS REVISION or REJECT:
 
 ### PHASE 4: CODE REVIEW
 
-1. Read the skill file at `.cursor/skills/pipeline-code-reviewer/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/code-reviewer.md`.
 2. Switch persona to the Code Reviewer.
 3. Perform a deep review of all code changes from Phase 3, following the skill's review areas.
 4. Present the review under a `## PHASE 4: CODE REVIEW` header.
@@ -220,7 +273,7 @@ IF verdict is NEEDS REFACTORING or MAJOR CLEANUP REQUIRED:
 
         THEN do ALL of the following steps — do NOT skip any:
 
-        Step A: Re-read `.cursor/skills/pipeline-coder/SKILL.md`.
+        Step A: Re-read `.cursor/skills/pipeline/phases/coder.md`.
         Step B: Switch back to the Coder persona.
         Step C: For EACH issue, explicitly state what you are fixing and why.
         Step D: Apply the actual code fixes to the files.
@@ -234,7 +287,7 @@ IF verdict is NEEDS REFACTORING or MAJOR CLEANUP REQUIRED:
 
 ### PHASE 5: QA
 
-1. Read the skill file at `.cursor/skills/pipeline-qa/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/qa.md`.
 2. Switch persona to the QA Engineer.
 3. Analyze test coverage, write missing tests, run the test suite, and evaluate quality following the skill's QA process.
 4. Present results under a `## PHASE 5: QA` header.
@@ -266,11 +319,11 @@ IF verdict is FAIL:
         List ALL failures as a numbered checklist, tagged [CODE BUG] or [TEST BUG].
 
         IF there are CODE BUGS:
-            Step A: Re-read `.cursor/skills/pipeline-coder/SKILL.md`.
+            Step A: Re-read `.cursor/skills/pipeline/phases/coder.md`.
             Step B: Switch to the Coder persona.
             Step C: Fix each CODE BUG, stating what changed and why.
             Step D: Present fixes under: "## PHASE 3: IMPLEMENTATION (QA Fix <N>)"
-            Step E: Re-read `.cursor/skills/pipeline-code-reviewer/SKILL.md`.
+            Step E: Re-read `.cursor/skills/pipeline/phases/code-reviewer.md`.
             Step F: Switch to the Code Reviewer persona.
             Step G: Review ONLY the code changes made in Step C-D (not the full codebase again).
             Step H: Present the review under: "## PHASE 4: CODE REVIEW (QA Fix <N>)"
@@ -280,7 +333,7 @@ IF verdict is FAIL:
                         Do NOT loop Code Review again here — proceed to QA re-run.
 
         THEN (whether or not there were code bugs):
-            Step J: Re-read `.cursor/skills/pipeline-qa/SKILL.md`.
+            Step J: Re-read `.cursor/skills/pipeline/phases/qa.md`.
             Step K: Switch to the QA persona.
             Step L: Fix any TEST BUGS, re-run all tests.
             Step M: Present results under: "## PHASE 5: QA (Revision <N>)"
@@ -291,7 +344,7 @@ IF verdict is FAIL:
 
 ### PHASE 6: DEBUG
 
-1. Read the skill file at `.cursor/skills/pipeline-debugger/SKILL.md`.
+1. Read the skill file at `.cursor/skills/pipeline/phases/debugger.md`.
 2. Switch persona to the Debugger.
 3. Follow the 6-step methodology defined in the skill: Gather Evidence → Reproduce → Isolate → Diagnose → Fix → Verify.
 4. Present the debug session under a `## PHASE 6: DEBUG` header (pipeline) or `## DEBUG SESSION` header (standalone).
@@ -327,7 +380,7 @@ For **multi-phase modes** (full, design-and-review, implement):
 <important architectural or implementation decisions made during the pipeline>
 ```
 
-For **single-phase modes** (design-only, review-only, code-review-only, qa-only):
+For **single-phase modes** (design-only, review-only, arch-review, code-review-only, qa-only):
 
 ```
 ## <PHASE NAME> COMPLETE
@@ -344,6 +397,18 @@ For **single-phase modes** (design-only, review-only, code-review-only, qa-only)
 ### Items Addressed in Revision Loops
 <list, or "None — approved on first pass">
 ```
+
+### Arch-Review & Code-Review Scope Expansion
+
+When running arch-review or code-review-only, before passing files to the reviewer:
+1. List all explicitly provided files/folders
+2. For each Python file, find its PORTS (ABCs it implements or depends on) by reading import statements
+3. Include the port definition files in the review scope
+4. Include the composition root wiring for those ports (`bootstrap/` or `container.py`)
+5. Pass this expanded scope as context to the reviewer
+
+The reviewer's Scope Resolution loads component `SKILL.md` files (which route to
+recipes, established patterns, and dev-guide sections) — no separate guide-index lookup needed here.
 
 ## Orchestrator Rules
 

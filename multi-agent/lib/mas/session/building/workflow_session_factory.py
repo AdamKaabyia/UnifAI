@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from mas.catalog.element_registry import ElementRegistry
 from mas.session.building.element_builder import SessionElementBuilder
@@ -15,6 +15,9 @@ from mas.core.execution_context import ExecutionContextHolder
 from mas.core.element_deps import ElementDeps
 from mas.blueprints.models.blueprint import BlueprintSpec
 from mas.core.auth.service import AuthService
+
+if TYPE_CHECKING:
+    from mas.core.platform_config import PlatformConfig
 
 
 class WorkflowSessionFactory:
@@ -32,10 +35,12 @@ class WorkflowSessionFactory:
             element_registry: ElementRegistry,
             engine_name: str,
             auth_service: Optional[AuthService] = None,
+            platform_config: Optional[PlatformConfig] = None,
     ):
         self._elements = element_registry
         self._engine_name = engine_name
         self._auth_service = auth_service
+        self._platform_config = platform_config
         self._session_builder = SessionElementBuilder(element_registry)
 
     @property
@@ -57,6 +62,7 @@ class WorkflowSessionFactory:
         deps = ElementDeps(
             execution_ctx=holder,
             auth_service=self._auth_service,
+            platform_config=self._platform_config,
         )
         logical_plan = PlanBuilder(self._elements).build(blueprint_spec)
         registry = self._session_builder.build(blueprint_spec, deps=deps)
