@@ -33,13 +33,9 @@ def load_session() -> Optional[dict]:
 
 
 def save_session(user_info: dict) -> None:
-    """Persist user info (including pre-signed session cookie) to disk with a 10-hour TTL."""
+    """Persist the session cookie to disk with a 10-hour TTL."""
     SESSION_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     data = {
-        "username": user_info.get("username", ""),
-        "email": user_info.get("email", ""),
-        "name": user_info.get("name", ""),
-        "sub": user_info.get("sub", ""),
         "session_cookie": user_info.get("session_cookie", ""),
         "expires_at": (datetime.now() + timedelta(hours=SESSION_TTL_HOURS)).timestamp(),
     }

@@ -9,6 +9,8 @@ The CLI is a thin HTTP client that talks to the MAS API server.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import typer
 
 from unifai_cli.commands.auth import auth_app
