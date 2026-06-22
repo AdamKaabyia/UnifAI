@@ -29,6 +29,7 @@ from mas.elements.nodes.common.capabilities.workload_capable import WorkloadCapa
 from mas.elements.nodes.common.workload import Task, AgentResult
 from mas.elements.tools.common.base_tool import BaseTool
 from mas.elements.tools.common.claude_sdk_converter import ClaudeSDKConverter
+from mas.elements.nodes.claude_agent.identifiers import EffortLevel
 
 
 class ClaudeAgentNode(
@@ -61,7 +62,7 @@ class ClaudeAgentNode(
             vertex_region: str = "us-east5",
             # Model
             model: str = "claude-sonnet-4-6",
-            effort: str = "medium",
+            effort: EffortLevel = EffortLevel.MEDIUM,
             # Agent behavior
             system_prompt: str = "",
             max_turns: Optional[int] = 200,
@@ -394,11 +395,9 @@ class ClaudeAgentNode(
         env = self._build_env()
         work_dir = self._prepare_working_directory()
 
-        effort = self._effort.value if hasattr(self._effort, "value") else self._effort
-
         kwargs: Dict[str, Any] = {
             "model": self._model,
-            "effort": effort,
+            "effort": self._effort.value,
             "permission_mode": self._permission_mode,
             "allowed_tools": self._allowed_tools,
             "disallowed_tools": self._disallowed_tools,
@@ -526,7 +525,7 @@ class ClaudeAgentNode(
             execution_metadata={
                 "claude_agent_sdk": True,
                 "model": self._model,
-                "effort": self._effort,
+                "effort": self._effort.value,
                 "session_id": metadata.get("session_id"),
                 "num_turns": metadata.get("num_turns"),
                 "total_cost_usd": metadata.get("total_cost_usd"),
