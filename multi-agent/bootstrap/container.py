@@ -172,13 +172,15 @@ class AppContainer(metaclass=SingletonMeta):
             coll_name=cfg.blueprint_coll
         )
 
+        self.resource_repo = MongoResourceRepository(
+            cfg.mongodb_port,
+            mongodb_ip=cfg.mongodb_ip,
+            db_name=cfg.mongo_db,
+            coll_name=cfg.resources_coll,
+        )
+
         resource_registry = ResourcesRegistry(
-            repo=MongoResourceRepository(
-                cfg.mongodb_port,
-                mongodb_ip=cfg.mongodb_ip,
-                db_name=cfg.mongo_db,
-                coll_name=cfg.resources_coll,
-            ),
+            repo=self.resource_repo,
             bp_repo=self.blueprint_repo,
         )
 
