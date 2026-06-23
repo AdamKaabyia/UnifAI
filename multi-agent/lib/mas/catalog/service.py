@@ -61,7 +61,7 @@ class CatalogService:
 
     def list_categories(self) -> List[str]:
         """List all available element categories."""
-        return [c.value for c in self.reg.list_categories()]
+        return [c.value if hasattr(c, "value") else str(c) for c in self.reg.list_categories()]
 
     def list_types(self, category: str) -> List[str]:
         """List all element types in a category"""

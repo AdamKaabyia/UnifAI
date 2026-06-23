@@ -77,7 +77,7 @@ class ValidateConnectionAction(BaseAction):
         server_id = input_data.server_identifier
 
         raw_token = input_data.credential_token
-        credential = self._auth.cipher.decrypt(raw_token) if (self._auth and self._auth.cipher and raw_token) else raw_token
+        credential = self._auth.unseal_token(raw_token) if (self._auth and raw_token) else raw_token
 
         config = McpProviderConfig(
             mcp_url=input_data.mcp_url,

@@ -116,7 +116,15 @@ class AuthService:
         self._strategies = strategy_registry
         self._configs = server_config_store
         self._detector = detector
-        self.cipher = FieldCipher(encryption_key) if encryption_key else None
+        self._cipher = FieldCipher(encryption_key) if encryption_key else None
+
+    def seal_token(self, token: Optional[str]) -> Optional[str]:
+        """Encrypt a token for transit to the browser."""
+        return self._cipher.encrypt(token) if self._cipher else token
+
+    def unseal_token(self, token: Optional[str]) -> Optional[str]:
+        """Decrypt a token received from the browser."""
+        return self._cipher.decrypt(token) if self._cipher else token
 
     # ── Credential CRUD (sync — pure DB, no external I/O) ────────────
 

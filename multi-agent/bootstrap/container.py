@@ -103,42 +103,6 @@ class AppContainer(metaclass=SingletonMeta):
             element_registry=self.element_registry
         )
 
-        self.blueprint_repo = MongoBlueprintRepository(
-            db_name=cfg.mongo_db,
-            coll_name=cfg.blueprint_coll
-        )
-
-        self.resource_repo = MongoResourceRepository(
-            cfg.mongodb_port,
-            mongodb_ip=cfg.mongodb_ip,
-            db_name=cfg.mongo_db,
-            coll_name=cfg.resources_coll,
-        )
-
-        resource_registry = ResourcesRegistry(
-            repo=self.resource_repo,
-            bp_repo=self.blueprint_repo,
-        )
-
-        self.resources_service = ResourcesService(
-            resource_registry=resource_registry,
-            element_registry=self.element_registry,
-            validation_service=self.validation_service,
-            card_service=self.card_service,
-        )
-
-        self.blueprint_resolver = BlueprintResolver(
-            resource_registry=resource_registry,
-            element_registry=self.element_registry
-        )
-
-        self.blueprint_service = BlueprintService(
-            self.blueprint_repo,
-            resolver=self.blueprint_resolver,
-            validation_service=self.validation_service,
-            card_service=self.card_service,
-        )
-
         # ── Auth layer ────────────────────────────────────────────────
 
         http_client = HttpxClient()

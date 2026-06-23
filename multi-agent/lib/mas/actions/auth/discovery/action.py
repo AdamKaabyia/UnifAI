@@ -94,7 +94,7 @@ class DiscoveryAction(BaseAction):
         # Step 2: Already authenticated?
         token = await self._auth.get_valid_token(user_id, server_id)
         if token:
-            sealed = self._auth.cipher.encrypt(token) if self._auth.cipher else token
+            sealed = self._auth.seal_token(token)
             return DiscoveryOutput(
                 success=True,
                 message="Authenticated",

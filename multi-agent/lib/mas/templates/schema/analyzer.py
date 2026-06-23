@@ -192,7 +192,7 @@ class PlaceholderAnalyzer:
         field_name = placeholder.field_path.split(".")[-1]
         
         if field_name not in schema_cls.model_fields:
-            print(f"[PlaceholderAnalyzer] Field '{field_name}' not found in {schema_cls.__name__}")
+            logger.warning("Field '%s' not found in %s", field_name, schema_cls.__name__)
             return None
         
         original = schema_cls.model_fields[field_name]
