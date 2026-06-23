@@ -1,0 +1,65 @@
+"""Slack Socket Mode adapter — connects to Slack over WebSocket.
+
+Replaces the HTTP-based Flask endpoint for receiving slash commands.
+The outbound WebSocket avoids the need for a public LoadBalancer or
+Nginx proxy; Slack sends payloads over the pre-authenticated socket.
+
+Reuses the same SlackCommandsService and command handlers as the
+Flask adapter — only the transport layer changes.
+"""
+import logging
+import os
+import sys
+
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+
+from config.app_config import AppConfig
+from core.app_container import AppContainer
+from slack_commands.models import SlackCommand
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    stream=sys.stdout,
+)
+logger = logging.getLogger(__name__)
+
+
+def _build_service():
+    cfg = AppConfig.get_instance()
+    container = AppContainer(cfg)
+    return container.slack_commands_service
+
+
+def main():
+    cfg = AppConfig.get_instance()
+
+    bot_token = cfg.slack_bot_token or os.environ.get("SLACK_BOT_TOKEN", "")
+    app_token = cfg.slack_app_token or os.environ.get("SLACK_APP_TOKEN", "")
+
+    if not bot_token:
+        logger.error("SLACK_BOT_TOKEN is not set — cannot start Socket Mode")
+        sys.exit(1)
+    if not app_token:
+        logger.error("SLACK_APP_TOKEN is not set — cannot start Socket Mode")
+        sys.exit(1)
+
+    app = App(token=bot_token)
+    service = _build_service()
+
+    @app.command("/unifai")
+    def handle_unifai(ack, body, respond):
+        ack()
+
+        command = SlackCommand.from_form(body)
+        response = service.execute(command)
+        respond(response.to_dict())
+
+    logger.info("Starting Slack Socket Mode handler...")
+    handler = SocketModeHandler(app, app_token)
+    handler.start()
+
+
+if __name__ == "__main__":
+    main()

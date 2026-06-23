@@ -11,4 +11,6 @@ class AppConfig(SharedConfig):
     rag_url: str = "http://localhost:13457"
     multiagent_url: str = "http://localhost:8002"
     slack_signing_secret: str = ""
+    slack_app_token: str = ""
+    slack_bot_token: str = ""
     secret_key: str = ""
