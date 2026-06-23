@@ -74,14 +74,14 @@ class ValidateConnectionAction(BaseAction):
     async def execute(self, input_data, context=None):
         start = time.time()
         mcp_url = str(input_data.mcp_url)
-        user_id = input_data.user_id
         server_id = input_data.server_identifier
 
-        # auth_cred = self._auth.bind(user_id, server_id) if (self._auth and user_id and server_id and not input_data.credential_token) else None
+        raw_token = input_data.credential_token
+        credential = self._auth.cipher.decrypt(raw_token) if (self._auth and self._auth.cipher and raw_token) else raw_token
 
         config = McpProviderConfig(
             mcp_url=input_data.mcp_url,
-            bearer_token=input_data.credential_token or None,
+            bearer_token=credential or None,
             transport_type=input_data.transport_type,
             additional_headers=input_data.additional_headers,
         )

@@ -198,6 +198,7 @@ class AppContainer(metaclass=SingletonMeta):
             strategy_registry=strategy_registry,
             server_config_store=self.server_config_store,
             detector=detector,
+            encryption_key=cfg.credential_encryption_key,
         )
 
         # ── Data repositories ────────────────────────────────────────

@@ -23,6 +23,7 @@ from .credentials.credential import AuthCredential
 from .ports import AuthStrategy, AuthChallenge
 from .discovery.detector import AuthDetector
 from .discovery.models import DetectionResult
+from global_utils.utils.crypto import FieldCipher
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +110,13 @@ class AuthService:
         strategy_registry: AuthStrategyRegistry,
         server_config_store: Optional[ServerConfigStore] = None,
         detector: Optional[AuthDetector] = None,
+        encryption_key: str = "",
     ):
         self._store = credential_store
         self._strategies = strategy_registry
         self._configs = server_config_store
         self._detector = detector
+        self.cipher = FieldCipher(encryption_key) if encryption_key else None
 
     # ── Credential CRUD (sync — pure DB, no external I/O) ────────────
 

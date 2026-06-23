@@ -32,7 +32,6 @@ class DiscoveryOutput(BaseActionOutput):
     authenticated: bool = False
     server_identifier: str = ""
     scheme_type: str = ""
-    credential_token: str = ""
     challenge: Optional[Dict[str, Any]] = None
     error_code: Optional[AuthErrorCode] = None
     form_updates: Dict[str, Any] = Field(default_factory=dict)
@@ -95,6 +94,7 @@ class DiscoveryAction(BaseAction):
         # Step 2: Already authenticated?
         token = await self._auth.get_valid_token(user_id, server_id)
         if token:
+            sealed = self._auth.cipher.encrypt(token) if self._auth.cipher else token
             return DiscoveryOutput(
                 success=True,
                 message="Authenticated",
@@ -102,9 +102,8 @@ class DiscoveryAction(BaseAction):
                 authenticated=True,
                 server_identifier=server_id,
                 scheme_type=scheme_type,
-                credential_token=token,
                 form_updates={
-                    "credential_token": token,
+                    "credential_token": sealed,
                     "server_identifier": server_id,
                     "scheme_type": scheme_type,
                 },
