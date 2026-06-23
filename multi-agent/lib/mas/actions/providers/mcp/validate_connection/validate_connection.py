@@ -30,6 +30,7 @@ class ValidateConnectionInput(BaseActionInput):
     user_id: str = Field(default="")
     server_identifier: str = Field(default="")
     credential_token: Optional[str] = Field(default=None)
+    auth_method: str = Field(default="")
     transport_type: McpTransportType = Field(default=McpTransportType.STREAMABLE_HTTP)
     additional_headers: Dict[str, Any] = Field(default_factory=dict)
 
@@ -40,6 +41,7 @@ class ValidateConnectionOutput(BaseActionOutput):
     status: str = ""
     server_identifier: str = ""
     response_time_ms: float = 0.0
+    form_updates: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ValidateConnectionAction(BaseAction):
@@ -79,6 +81,12 @@ class ValidateConnectionAction(BaseAction):
         raw_token = input_data.credential_token
         credential = self._auth.unseal_token(raw_token) if (self._auth and raw_token) else raw_token
 
+        # Fallback: if no token provided but we have user+server, bind stored credential
+        auth_cred = None
+        is_sign_in = input_data.auth_method == "sign_in"
+        if not credential and self._auth and input_data.user_id and server_id and is_sign_in:
+            auth_cred = self._auth.bind(input_data.user_id, server_id)
+
         config = McpProviderConfig(
             mcp_url=input_data.mcp_url,
             bearer_token=credential or None,
@@ -87,16 +95,18 @@ class ValidateConnectionAction(BaseAction):
         )
 
         try:
-            await self._factory.create_async(config)
+            await self._factory.create_async(config, auth_credential=auth_cred)
             elapsed = (time.time() - start) * 1000
+            resolved_id = server_id or mcp_url
             return ValidateConnectionOutput(
                 success=True,
                 message=f"Connected ({elapsed:.0f}ms)",
                 is_reachable=True,
-                authenticated=False,
+                authenticated=bool(credential or auth_cred),
                 status="",
-                server_identifier=server_id or mcp_url,
+                server_identifier=resolved_id,
                 response_time_ms=elapsed,
+                form_updates={"server_identifier": resolved_id},
             )
         except TimeoutError:
             return ValidateConnectionOutput(
