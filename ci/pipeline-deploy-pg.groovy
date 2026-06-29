@@ -76,13 +76,12 @@ def generateVaultSecretsEnvFile(String vaultBasePath, Map secretMap) {
 }
 
 def buildModulesList() {
-    def versions = (params.IDENTITY_VERSION, params.BACKEND_VERSION, params.RAG_VERSION, params.MA_VERSION, params.GUI_VERSION)
-    def modules = ()
-    versions.each { version ->
-        if(version) {
-            modules.add(version)
-        }
-    }
+    def modules = []
+    if (params.IDENTITY_VERSION?.trim()) modules.add('identity')
+    if (params.BACKEND_VERSION?.trim()) modules.add('backend')
+    if (params.RAG_VERSION?.trim())     modules.add('rag')
+    if (params.MA_VERSION?.trim())      modules.add('multiagent')
+    if (params.GUI_VERSION?.trim())     modules.add('ui')
     return modules
 }
 
@@ -205,11 +204,14 @@ pipeline {
                 script {
                     echo "================ Deployment Configuration ================="
                     echo "Branch            : ${params.BRANCH}"
-                    echo "Version           : ${params.VERSION}"
                     echo "Deployment Type   : ${params.deploy_type}"
                     echo "Deployment Target : ${params.deploy_namespace}"
                     echo "Debug mode        : ${params.debug_mode}"
-                    echo "Modules to deploy : ${params.MODULES_TO_DEPLOY}"
+                    echo "Identity Version  : ${params.IDENTITY_VERSION}"
+                    echo "Backend Version   : ${params.BACKEND_VERSION}"
+                    echo "RAG Version       : ${params.RAG_VERSION}"
+                    echo "Multiagent Version: ${params.MA_VERSION}"
+                    echo "UI Version        : ${params.GUI_VERSION}"
                     echo "Workspace Path:    ${buildParams.DevRoot}/${params.BRANCH}/"
                     echo "==========================================================="
                 }
@@ -274,40 +276,40 @@ pipeline {
                             for (mod in modules) {
                                 switch(mod.trim()) {
                                     case 'shared-resources':
-                                        updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/shared-resource-values.yaml", version)
+                                        updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/shared-resource-values.yaml", "")
                                         deployModules('shared-resources')
                                         break
 
                                     case 'identity':
-                                        def version = params.IDENTITY_VERSION?.trim() ?: params.VERSION?.trim()
+                                        def version = params.IDENTITY_VERSION?.trim()
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/shared-resources/identity/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/identity-values.yaml", version)
                                         deployModules('identity')
                                         break
 
                                     case 'backend':
-                                        def version = params.BACKEND_VERSION?.trim() ?: params.VERSION?.trim()
+                                        def version = params.BACKEND_VERSION?.trim()
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/backend/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/backend-resource-values.yaml", version)
                                         deployModules('backend')
                                         break
 
                                     case 'rag':
-                                        def version = params.RAG_VERSION?.trim() ?: params.VERSION?.trim()
+                                        def version = params.RAG_VERSION?.trim()
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/rag/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/rag-resource-values.yaml", version)
                                         deployModules('rag')
                                         break
 
                                     case 'multiagent':
-                                        def version = params.MA_VERSION?.trim() ?: params.VERSION?.trim()
+                                        def version = params.MA_VERSION?.trim()
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/multiagent/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/multiagent-resource-values.yaml", version)
                                         deployModules('multiagent')
                                         break
 
                                     case 'ui':
-                                        def version = params.GUI_VERSION?.trim() ?: params.VERSION?.trim()
+                                        def version = params.GUI_VERSION?.trim()
                                         updateChartVersions("${buildParams.DevRoot}/${params.BRANCH}/helm/ui/", version)
                                         updateValuesYaml("${buildParams.DevRoot}/${params.BRANCH}/helm/values/ui-values.yaml", version)
                                         deployModules('ui')
