@@ -197,7 +197,7 @@ def deleteRunningApplication(){
 
 def cleanWorkspace() {
     sh """
-        podman rm -f helmfile
+        podman rm -f helmfile || true
         sleep 5        
     """
 }
