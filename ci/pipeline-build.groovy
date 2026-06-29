@@ -268,8 +268,11 @@ pipeline {
                         string(name: 'deploy_location', value: params.deploy_location),
                         string(name: 'deploy_type', value: params.deploy_type),
                         string(name: 'BRANCH', value: params.BRANCH),
-                        string(name: 'VERSION', value: params.VERSION),
-                        string(name: 'MODULES_TO_DEPLOY', value: modulesToDeploy),
+                        string(name: 'IDENTITY_VERSION', value: params.VERSION),
+                        string(name: 'BACKEND_VERSION', value: params.VERSION),
+                        string(name: 'RAG_VERSION', value: params.VERSION),
+                        string(name: 'MA_VERSION', value: params.VERSION),
+                        string(name: 'GUI_VERSION', value: params.VERSION),
                         booleanParam(name: 'debug_mode', value: params.debug_mode),
                     ]
                 }

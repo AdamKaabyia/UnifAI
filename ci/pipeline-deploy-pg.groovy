@@ -7,13 +7,11 @@ properties([
         // 🚀 Deployment Parameters
         choice(name: 'deploy_namespace', choices: ['tag-ai--playground', 'tag-ai--playground2'], description: 'Target OpenShift namespace'),
         choice(name: 'deploy_type', choices: ['FRESH_INSTALL', 'APPLICATION_UPGRADE'], description: 'Deployment type fresh install - delete everything including shared resources, application upgrade - update only the specified modules'),
-        string(name: "VERSION", defaultValue: "", description: "DONT SET THIS VALUE!"),
         string(name: "BACKEND_VERSION", defaultValue: "", description: "Image tag for backend"),
         string(name: "RAG_VERSION", defaultValue: "", description: "Image tag for rag"),
         string(name: "MA_VERSION", defaultValue: "", description: "Image tag for multi-agent"),
         string(name: "GUI_VERSION", defaultValue: "", description: "Image tag for UI"),
         string(name: "IDENTITY_VERSION", defaultValue: "", description: "Image tag for identity"),
-        string(name: "MODULES_TO_DEPLOY", defaultValue: "", description: "Comma-separated list of modules to update (e.g. rag,multiagent,backend,ui,identity)"),
         booleanParam(name: 'debug_mode', defaultValue: false, description: 'debug the pods'),
     ])
 ])
@@ -75,6 +73,17 @@ def generateVaultSecretsEnvFile(String vaultBasePath, Map secretMap) {
     }
     echo "✅ Vault secrets env file created: ${envFilePath}"
     return envFilePath
+}
+
+def buildModulesList() {
+    def versions = (params.IDENTITY_VERSION, params.BACKEND_VERSION, params.RAG_VERSION, params.MA_VERSION, params.GUI_VERSION)
+    def modules = ()
+    versions.each { version ->
+        if(version) {
+            modules.add(version)
+        }
+    }
+    return modules
 }
 
 def updateChartVersions(rootPath, version) {
@@ -254,9 +263,9 @@ pipeline {
                             def vaultEnvFile = generateVaultSecretsEnvFile(buildParams.VaultBasePath, secret_lists)
                             def configEnvFile = "./UnifAI-secrets/staging/.env"
                             echo("Deploy Helm container")
-                            sh("podman run --replace -dt --env-file=${vaultEnvFile} --env-file=${configEnvFile} --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")
-                            
-                            def modules = params.MODULES_TO_DEPLOY.tokenize(',')
+                            sh("podman run --replace -dt --env-file=${vaultEnvFile} --env-file=${configEnvFile} --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")                           
+                            def modules = buildModulesList()
+                            // the aadding of shared resources stayed here since it saves IF inside the function and then for the deletion of the previous deployment.
                             if(params.deploy_type == 'FRESH_INSTALL') {
                                 modules.add(0,'shared-resources')
                                 deleteRunningApplication()
