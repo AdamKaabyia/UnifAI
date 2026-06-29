@@ -267,7 +267,9 @@ pipeline {
                             echo("Deploy Helm container")
                             sh("podman run --replace -dt --env-file=${vaultEnvFile} --env-file=${configEnvFile} --workdir /helm/charts -v .:/helm/charts:Z -v ~/.kube/:/helm/.kube:Z --name helmfile ghcr.io/helmfile/helmfile:latest bash")                           
                             def modules = buildModulesList()
-                            // the aadding of shared resources stayed here since it saves IF inside the function and then for the deletion of the previous deployment.
+                            if (modules.isEmpty()) {
+                                error("No application modules selected for deployment. Set at least one *_VERSION parameter.")
+                            }
                             if(params.deploy_type == 'FRESH_INSTALL') {
                                 modules.add(0,'shared-resources')
                                 deleteRunningApplication()
