@@ -318,10 +318,15 @@ pipeline {
                             }
                             echo("Deploy successfully completed")
                         }
-                        cleanWorkspace()
                     }
                 }
             }
+        }
+    }
+    post {
+        always {
+            sh "rm -f ${buildParams.DevRoot}/${params.BRANCH}/helm/vault_secrets.env"
+            cleanWorkspace()
         }
     }
 
