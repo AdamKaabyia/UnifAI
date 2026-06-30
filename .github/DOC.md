@@ -8,7 +8,7 @@ Workflows are configured to run automated tasks using GitHub Actions. For comple
 
 ### Shared Patterns
 
-- **Failure Analysis** — Three workflows (`backup-dbs`, `security-container-vulnerability-scanning`, `security-pip-auditing`) include an `analyze` job that triggers on any job failure. It uses [gha-failure-analysis](https://github.com/calebevans/gha-failure-analysis) with a Gemini LLM to automatically analyze the failure logs and produce a human-readable summary.
+- **Failure Analysis** — Three workflows (`backup-dbs.yaml`, `security-container-vulnerability-scanning.yaml`, `security-pip-auditing.yaml`) include an `analyze` job that triggers on any job failure. It uses [gha-failure-analysis](https://github.com/calebevans/gha-failure-analysis) with a Gemini LLM to automatically analyze the failure logs and produce a human-readable summary.
 - **Self-hosted runners** — Some workflows run on self-hosted `linux` runners (labeled `linux`) that have access to both GitHub and the internal company network. See [UnifAI team infrastructure](#unifai-team-infrastructure) for details.
 
 ---
@@ -333,15 +333,15 @@ gh workflow run backup-dbs.yaml \
 
 The following self-hosted runners are registered under the **applied-ai-enablement** organization runner group in GitHub. They are deployed on the CNV cluster and used for workflows that require access to the Red Hat internal network. All other workflows use GitHub-hosted runners.
 
-| Runner Name | Labels | Purpose | Location | Notes |
-|-------------|--------|---------|----------|-------|
-| cnv-runner-1 | `linux`,`unifai` | Database backups, dependency verification | CNV VM |  |
-| cnv-runner-2 | `linux`,`unifai`,`umami` | Container builds, vulnerability scanning, umami backups | CNV VM | |
+| Runner Name | Labels | Purpose | Notes |
+|-------------|--------|---------|-------|
+| cnv-runner-1 | `linux`,`unifai` | Database backups, dependency verification |  |
+| cnv-runner-2 | `linux`,`unifai`,`umami` | Container builds, vulnerability scanning, umami backups |  |
 
 the connection to Github is invoked from the gituser user in each machine.
 in addition a systemd service was created and enabled on each runner to invoke the runner upon restarts (service name: github-runner.service)
 
-> **Credentials:** Runner VM access credentials (IP, user, password) are stored in Vault under the teams space > resources > github > runners. Do not commit them to this repository. Contact the CI/CD maintainers listed in `CODEOWNERS` for access.
+> **Credentials:** Runner VM access credentials (IP, user, password) are stored in Vault under the teams space. Do not commit them to this repository. Contact the CI/CD maintainers listed in `CODEOWNERS` for access.
 
 ### Creating a Runner
 
