@@ -330,6 +330,20 @@ gh workflow run backup-dbs.yaml \
 
 ## Appendix
 
+### Runner Inventory
+
+The following self-hosted runners are registered under the **applied-ai-enablement** organization runner group in GitHub. They are deployed on the CNV cluster and used for workflows that require access to the Red Hat internal network. All other workflows use GitHub-hosted runners.
+
+| Runner Name | Labels | Purpose | Location | Notes |
+|-------------|--------|---------|----------|-------|
+| *TODO* | `linux` | Database backups, dependency verification | CNV VM | Has SSH deploy key for GitLab |
+| *TODO* | `linux` | Container builds, vulnerability scanning | CNV VM | Has access to internal registries |
+
+the connection to Github is invoked from the gituser user in each machine.
+in addition a systemd service was created and enabled on each runner to invoke the runner upon restarts (service name: github-runner.service)
+
+> **Credentials:** Runner VM access credentials (IP, user, password) are stored in Vault under the teams space > resources > github > runners. Do not commit them to this repository. Contact the CI/CD maintainers listed in `CODEOWNERS` for access.
+
 ### Creating a Runner
 
 To create a new self-hosted runner:
