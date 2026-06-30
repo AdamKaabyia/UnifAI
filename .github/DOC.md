@@ -70,7 +70,7 @@ Verifies that the self-hosted runner has the required OS and Python dependencies
 
 **Checks:**
 - OS: `kubectl` is available
-- Python: `qdrant-client` and `requests` are installed
+- Python: `qdrant-client`, `requests`, `kubernetes`, and `GitPython` are installed
 
 ---
 
