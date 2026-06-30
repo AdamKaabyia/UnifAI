@@ -321,6 +321,7 @@ The workflows use GitHub Environments to manage cluster-specific configurations:
    - `API_URL` - Kubernetes API server URL
    - `MONGO_URI` - MongoDB connection string
    - `QDRANT_URL` - Qdrant cluster URL
+   - `SKIP_VERIFY_TLS` - Set to skip TLS verification for K8s API connections (used by MongoDB backup)
 4. Add environment-specific secrets:
    - `ACCESS_TOKEN` - Kubernetes access token
    - Other sensitive credentials as needed
