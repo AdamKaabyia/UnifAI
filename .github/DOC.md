@@ -13,6 +13,24 @@ For Jenkins-based build and deployment pipelines, see [ci/README.md](../ci/READM
 - **Failure Analysis** — Three workflows (`backup-dbs.yaml`, `security-container-vulnerability-scanning.yaml`, `security-pip-auditing.yaml`) include an `analyze` job that triggers on any job failure. It uses [gha-failure-analysis](https://github.com/calebevans/gha-failure-analysis) with a Gemini LLM to automatically analyze the failure logs and produce a human-readable summary.
 - **Self-hosted runners** — Some workflows run on self-hosted `linux` runners (labeled `linux`) that have access to both GitHub and the internal company network. See [UnifAI team infrastructure](#unifai-team-infrastructure) for details.
 
+#### Failure Analysis Setup
+
+The failure analysis step requires three repository-level secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `LOG_ANALYZER_APP_ID` | GitHub App ID used to generate a scoped token for reading workflow logs |
+| `LOG_ANALYZER_PRIVATE_KEY` | Private key for the GitHub App above |
+| `GEMINI_API_KEY` | API key for Google Gemini (used by `gha-failure-analysis` to analyze logs) |
+
+To configure:
+1. Create a [GitHub App](https://docs.github.com/en/apps/creating-github-apps) with `actions: read` and `contents: read` permissions
+2. Install it on the repository
+3. Add `LOG_ANALYZER_APP_ID` and `LOG_ANALYZER_PRIVATE_KEY` as repository secrets under **Settings → Secrets and variables → Actions**
+4. Add `GEMINI_API_KEY` as a repository secret (obtain from [Google AI Studio](https://aistudio.google.com/apikey))
+
+> **Data-sharing notice:** When failure analysis runs, the workflow's job logs are sent to Google's Gemini API for LLM-based analysis. This may include environment names, error messages, stack traces, and other runtime output. Ensure this is acceptable under your organization's data handling policies before enabling these workflows. Do not log sensitive values (credentials, tokens, PII) in workflow steps — they will be included in the analysis payload.
+
 ---
 
 ## Available Workflows
