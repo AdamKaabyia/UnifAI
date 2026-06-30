@@ -195,7 +195,6 @@ Performs a MongoDB backup by connecting to a Kubernetes cluster, running `mongod
 - `API_URL` — Kubernetes API server URL
 - `ACCESS_TOKEN` — Kubernetes bearer token
 - `MONGO_URI` — MongoDB connection string
-- `SKIP_VERIFY_TLS` — Set to skip TLS verification
 
 **Standalone usage:**
 ```bash
@@ -336,8 +335,8 @@ The following self-hosted runners are registered under the **applied-ai-enableme
 
 | Runner Name | Labels | Purpose | Location | Notes |
 |-------------|--------|---------|----------|-------|
-| *TODO* | `linux` | Database backups, dependency verification | CNV VM | Has SSH deploy key for GitLab |
-| *TODO* | `linux` | Container builds, vulnerability scanning | CNV VM | Has access to internal registries |
+| cnv-runner-1 | `linux`,`unifai` | Database backups, dependency verification | CNV VM |  |
+| cnv-runner-2 | `linux`,`unifai`,`umami` | Container builds, vulnerability scanning, umami backups | CNV VM | |
 
 the connection to Github is invoked from the gituser user in each machine.
 in addition a systemd service was created and enabled on each runner to invoke the runner upon restarts (service name: github-runner.service)
