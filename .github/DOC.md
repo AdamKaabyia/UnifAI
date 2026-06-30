@@ -6,6 +6,8 @@ This folder contains all CI/automation workflows and supporting scripts for GitH
 
 Workflows are configured to run automated tasks using GitHub Actions. For complex operations, we use dedicated scripts (in `.github/scripts/`) that are invoked from the workflow files. The workflows are organized into four categories: **Backup**, **Security**, **Code Review**, and **Branch Governance**.
 
+For Jenkins-based build and deployment pipelines, see [ci/README.md](../ci/README.md).
+
 ### Shared Patterns
 
 - **Failure Analysis** — Three workflows (`backup-dbs.yaml`, `security-container-vulnerability-scanning.yaml`, `security-pip-auditing.yaml`) include an `analyze` job that triggers on any job failure. It uses [gha-failure-analysis](https://github.com/calebevans/gha-failure-analysis) with a Gemini LLM to automatically analyze the failure logs and produce a human-readable summary.
@@ -356,7 +358,7 @@ For more details, see the [GitHub documentation on self-hosted runners](https://
 
 ### Connecting to GitLab
 
-Since the GitHub runners can't reach GitLab directly, we use a VM running on CNV. To make GitLab "accessible" to this runner, we need to set a deploy token at the target repo (go to repository > deploy keys and set the VM public key as the deploy key). This allows the VM to perform actions on the target repo without needing to specify credentials.
+Since the GitHub runners can't reach GitLab directly, we use a VM running on CNV. To make GitLab "accessible" to this runner, we need to set a deploy key at the target repo (go to repository > deploy keys and set the VM public key as the deploy key). This allows the VM to perform actions on the target repo without needing to specify credentials.
 
 ### UnifAI Team Infrastructure
 
