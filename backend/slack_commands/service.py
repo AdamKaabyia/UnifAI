@@ -42,4 +42,4 @@ class SlackCommandsService:
             logger.error(
                 "Command '%s' failed: %s", command.subcommand, e, exc_info=True
             )
-            return SlackResponse(text=f":x: Command failed: {e}")
+            return SlackResponse(text=":x: Command failed. Please try again later.")

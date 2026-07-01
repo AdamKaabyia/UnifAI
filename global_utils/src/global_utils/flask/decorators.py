@@ -286,8 +286,7 @@ def require_slack_signature(get_signing_secret: Callable[[], str]) -> Callable:
 
     Each app supplies:
       - ``get_signing_secret()`` -> str
-        Return the Slack signing secret (from config/env). If empty,
-        verification is skipped (development mode).
+        Return the Slack signing secret (from config/env).
 
     Validates:
       - ``X-Slack-Request-Timestamp`` is within 5 minutes (replay protection)
@@ -301,7 +300,11 @@ def require_slack_signature(get_signing_secret: Callable[[], str]) -> Callable:
             signing_secret = get_signing_secret()
 
             if not signing_secret:
-                return f(*args, **kwargs)
+                logger.error("Slack signing secret is not configured")
+                return jsonify({
+                    "error": "Slack signing secret not configured",
+                    "error_type": "AUTHENTICATION_REQUIRED",
+                }), 401
 
             timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
             signature = request.headers.get("X-Slack-Signature", "")

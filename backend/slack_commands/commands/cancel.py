@@ -29,12 +29,12 @@ class CancelCommand(CommandHandler):
             if e.response is not None and e.response.status_code == 404:
                 return SlackResponse(text=f":x: Session `{session_id}` not found.")
             logger.error("Cancel failed: %s", e, exc_info=True)
-            return SlackResponse(text=f":x: Failed to cancel session: {e}")
+            return SlackResponse(text=":x: Failed to cancel session. Please try again later.")
         except requests.Timeout:
             return SlackResponse(text=":hourglass: Multi-agent service timed out.")
         except Exception as e:
             logger.error("Cancel failed: %s", e, exc_info=True)
-            return SlackResponse(text=f":x: Unexpected error: {e}")
+            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
 
         if cancelled:
             return SlackResponse(

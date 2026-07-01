@@ -88,16 +88,19 @@ class SessionExecutor:
             logger.error("Session HTTP error: %s %s", status_code, body, exc_info=True)
             self._post_to_slack(
                 response_url,
-                f":x: Request failed (HTTP {status_code}): {body or e}",
+                ":x: Session request failed. Please try again later.",
             )
         except TimeoutError:
             self._post_to_slack(
                 response_url,
-                f":x: Session timed out after {_POLL_TIMEOUT}s. It may still be running.",
+                ":x: Session timed out. It may still be running.",
             )
         except Exception as e:
             logger.error("Session execution failed: %s", e, exc_info=True)
-            self._post_to_slack(response_url, f":x: Error: {e}")
+            self._post_to_slack(
+                response_url,
+                ":x: An unexpected error occurred. Please try again later.",
+            )
 
     def _poll_until_terminal(self, session_id: str, user_name: str) -> str:
         elapsed = 0
@@ -152,7 +155,15 @@ class SessionExecutor:
     @staticmethod
     def _post_to_slack(response_url: str, text: str, success: bool = False) -> None:
         try:
-            requests.post(
+            from urllib.parse import urlparse
+
+            parsed = urlparse(response_url or "")
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme != "https" or not host.endswith(".slack.com"):
+                logger.error("Refusing to post to non-Slack response_url: %s", host)
+                return
+
+            resp = requests.post(
                 response_url,
                 json={
                     "response_type": "in_channel" if success else "ephemeral",
@@ -160,5 +171,6 @@ class SessionExecutor:
                 },
                 timeout=10,
             )
+            resp.raise_for_status()
         except Exception as e:
             logger.error("Failed to post deferred response to Slack: %s", e)

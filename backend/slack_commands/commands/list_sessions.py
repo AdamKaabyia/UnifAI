@@ -30,7 +30,7 @@ class ListSessionsCommand(CommandHandler):
             return SlackResponse(text=":x: Failed to reach multi-agent service.")
         except Exception as e:
             logger.error("Unexpected error listing sessions: %s", e, exc_info=True)
-            return SlackResponse(text=f":x: Unexpected error: {e}")
+            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
 
         return format_session_list(sessions, page=page, page_size=_PAGE_SIZE)
 
