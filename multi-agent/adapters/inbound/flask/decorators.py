@@ -50,25 +50,35 @@ def _get_redis_store():
 # Session callbacks
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _get_fallback_user() -> str | None:
-    """Service-to-service fallback: verify HMAC-signed request.
+_AUTH_HEADER = "X-Authenticated-User"
 
-    Internal services (e.g. the backend forwarding Slack commands) sign
-    requests with ``SERVICE_SIGNING_SECRET``.  The signature covers the
-    timestamp, user-id, and body — preventing forgery and replay.
+
+def _get_fallback_user() -> str | None:
+    """Fallback authentication for non-browser callers.
+
+    Checked in order:
+    1. HMAC-signed service request (preferred — used by the backend for
+       Slack commands).
+    2. Legacy ``X-Authenticated-User`` header (used by CI/CD scripts;
+       will be removed when scripts migrate to HMAC).
     """
     secret = current_app.config.get("SERVICE_SIGNING_SECRET", "") or ""
-    if not secret:
-        return None
+    if secret:
+        user_id = verify_request(
+            secret,
+            dict(request.headers),
+            request.get_data(cache=True),
+        )
+        if user_id:
+            logger.debug("Authenticated via service HMAC: %s", user_id)
+            return user_id
 
-    user_id = verify_request(
-        secret,
-        dict(request.headers),
-        request.get_data(cache=True),
-    )
-    if user_id:
-        logger.debug("Authenticated via service HMAC: %s", user_id)
-    return user_id
+    user = request.headers.get(_AUTH_HEADER, "").strip()
+    if user:
+        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, user)
+        return user
+
+    return None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
