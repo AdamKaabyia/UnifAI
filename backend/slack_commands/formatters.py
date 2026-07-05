@@ -1,15 +1,10 @@
 """Slack response formatters — convert domain data to Slack-friendly output."""
-from __future__ import annotations
-
 import math
-from typing import TYPE_CHECKING, List, Union
+from typing import List
 
 from slack_commands.models import SlackResponse
 
-if TYPE_CHECKING:
-    from slack_commands.clients.multiagent import BlueprintSummary
-
-_STATUS_EMOJI = {
+STATUS_EMOJI = {
     "COMPLETED": ":white_check_mark:",
     "RUNNING": ":arrows_counterclockwise:",
     "QUEUED": ":hourglass:",
@@ -18,6 +13,15 @@ _STATUS_EMOJI = {
     "CANCELLED": ":no_entry_sign:",
     "LOCKED": ":lock:",
     "IN_USE": ":arrows_counterclockwise:",
+}
+
+ROLE_EMOJI = {
+    "user": ":bust_in_silhouette:",
+    "human": ":bust_in_silhouette:",
+    "assistant": ":robot_face:",
+    "ai": ":robot_face:",
+    "system": ":gear:",
+    "tool": ":wrench:",
 }
 
 
@@ -30,7 +34,7 @@ def format_session_list(
 
     total = len(sessions)
     total_pages = math.ceil(total / page_size)
-    page = min(page, total_pages)
+    page = max(1, min(page, total_pages))
 
     start = (page - 1) * page_size
     end = start + page_size
@@ -40,7 +44,7 @@ def format_session_list(
 
     for session in page_sessions:
         session_id = session.get("session_id") or session.get("run_id") or "?"
-        status = session.get("status", "unknown")
+        status = str(session.get("status") or "unknown")
         blueprint_id = session.get("blueprint_id", "")
         title = (
             session.get("title")
@@ -48,7 +52,7 @@ def format_session_list(
             or ""
         )
 
-        emoji = _STATUS_EMOJI.get(status.upper(), ":grey_question:")
+        emoji = STATUS_EMOJI.get(status.upper(), ":grey_question:")
         label = title if title else blueprint_id or "untitled"
 
         lines.append(f"{emoji} `{session_id}` — {label} ({status})")
@@ -59,25 +63,17 @@ def format_session_list(
     return SlackResponse(text="\n".join(lines))
 
 
-def format_blueprint_list(blueprints: Union[list, List[BlueprintSummary]]) -> SlackResponse:
-    """Format a list of blueprint summaries into a Slack message.
-
-    Accepts either raw dicts (legacy) or BlueprintSummary dataclasses.
-    """
+def format_blueprint_list(blueprints: list) -> SlackResponse:
+    """Format a list of blueprint dicts into a Slack message."""
     if not blueprints:
         return SlackResponse(text=":inbox_tray: No blueprints available.")
 
     lines = [f"*Available Blueprints* ({len(blueprints)} total)\n"]
 
     for bp in blueprints[:15]:
-        if hasattr(bp, "blueprint_id"):
-            bp_id = bp.blueprint_id
-            name = bp.name or bp_id
-            description = bp.description
-        else:
-            bp_id = bp.get("blueprint_id", "?")
-            name = bp.get("name") or bp.get("spec_dict", {}).get("name") or bp_id
-            description = bp.get("description") or ""
+        bp_id = bp.get("blueprint_id", "?")
+        name = bp.get("name") or bp.get("spec_dict", {}).get("name") or bp_id
+        description = bp.get("description") or ""
 
         desc_suffix = f" — _{description}_" if description else ""
         lines.append(f":blue_book: `{bp_id}` — *{name}*{desc_suffix}")

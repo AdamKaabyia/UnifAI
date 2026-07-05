@@ -3,12 +3,16 @@
 Thin handler: parses input, resolves blueprint/session, and delegates
 the long-running execution to SessionExecutor (deferred response pattern).
 """
+import logging
 import re
 
-from slack_commands.clients.multiagent import MultiagentClient
-from slack_commands.commands.base import CommandHandler
+import requests
+
+from slack_commands.commands.base import CommandHandler, MAS_TIMEOUT, auth_headers
 from slack_commands.execution.session_executor import SessionExecutor
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+
+logger = logging.getLogger(__name__)
 
 _UUID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -18,8 +22,9 @@ _UUID_PATTERN = re.compile(
 
 class AskCommand(CommandHandler):
 
-    def __init__(self, client: MultiagentClient, executor: SessionExecutor):
-        self._client = client
+    def __init__(self, base_url: str, signing_secret: str, executor: SessionExecutor):
+        self._url = base_url.rstrip("/")
+        self._secret = signing_secret
         self._executor = executor
 
     def handle(self, command: SlackCommand) -> SlackResponse:
@@ -30,24 +35,30 @@ class AskCommand(CommandHandler):
 
         ref, question = sanitize_slack_arg(parts[0]), parts[1]
 
-        if _UUID_PATTERN.match(ref) and self._client.session_exists(ref, command.user_name):
-            self._executor.continue_session(
-                user_name=command.user_name,
-                session_id=ref,
-                question=question,
-                response_url=command.response_url,
-            )
-            return SlackResponse(
-                text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
-                response_type="in_channel",
-            )
+        if _UUID_PATTERN.match(ref):
+            exists = self._session_exists(ref, command.user_id)
+            if exists is None:
+                return SlackResponse(
+                    text=":x: Could not verify session. Please try again.",
+                )
+            if exists:
+                self._executor.continue_session(
+                    user_id=command.user_id,
+                    session_id=ref,
+                    question=question,
+                    response_url=command.response_url,
+                )
+                return SlackResponse(
+                    text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
+                    response_type="in_channel",
+                )
 
-        blueprint_id, label = self._resolve_blueprint(command.user_name, ref)
+        blueprint_id, label = self._resolve_blueprint(command.user_id, ref)
         if blueprint_id is None:
-            return label  # label is a SlackResponse error in this case
+            return label
 
         self._executor.run_new_session(
-            user_name=command.user_name,
+            user_id=command.user_id,
             blueprint_id=blueprint_id,
             question=question,
             response_url=command.response_url,
@@ -57,9 +68,29 @@ class AskCommand(CommandHandler):
             response_type="in_channel",
         )
 
-    def _resolve_blueprint(
-        self, user_name: str, ref: str
-    ) -> "tuple[str | None, str | SlackResponse]":
+    def _session_exists(self, session_id: str, user_id: str):
+        """Returns True / False / None (transient error)."""
+        try:
+            resp = requests.get(
+                f"{self._url}/api/sessions/session.status.get",
+                params={"sessionId": session_id},
+                headers=auth_headers(self._secret, user_id),
+                timeout=5,
+            )
+            if resp.status_code == 404:
+                return False
+            resp.raise_for_status()
+            return True
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                return False
+            logger.warning("session_exists check failed: %s", e)
+            return None
+        except (requests.Timeout, requests.ConnectionError) as e:
+            logger.warning("session_exists check failed: %s", e)
+            return None
+
+    def _resolve_blueprint(self, user_id: str, ref: str):
         """Resolve a blueprint reference (UUID or name) to (id, display_label).
 
         Returns (None, SlackResponse) on error so the caller can short-circuit.
@@ -67,15 +98,30 @@ class AskCommand(CommandHandler):
         if _UUID_PATTERN.match(ref):
             return ref, ref
 
-        blueprints = self._client.list_blueprints(user_name)
-        matches = [bp for bp in blueprints if bp.name.lower() == ref.lower()]
+        resp = requests.get(
+            f"{self._url}/api/blueprints/available.blueprints.summary.get",
+            params={"userId": user_id, "identityType": "user"},
+            headers=auth_headers(self._secret, user_id),
+            timeout=MAS_TIMEOUT,
+        )
+        resp.raise_for_status()
+        blueprints = resp.json()
+
+        matches = [
+            bp for bp in blueprints
+            if (bp.get("name") or bp.get("spec_dict", {}).get("name") or "").lower() == ref.lower()
+        ]
 
         if len(matches) == 1:
-            return matches[0].blueprint_id, matches[0].name
+            bp = matches[0]
+            bp_id = bp.get("blueprint_id", "")
+            name = bp.get("name") or bp.get("spec_dict", {}).get("name") or bp_id
+            return bp_id, name
 
         if len(matches) > 1:
             ids = "\n".join(
-                f"• `{bp.blueprint_id}` — {bp.name}" for bp in matches
+                f"• `{bp.get('blueprint_id', '?')}` — {bp.get('name', '?')}"
+                for bp in matches
             )
             return None, SlackResponse(
                 text=(

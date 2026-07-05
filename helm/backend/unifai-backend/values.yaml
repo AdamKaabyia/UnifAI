@@ -1,4 +1,5 @@
 env:
+  ROLE: "flask"
   BACKEND_ENV: "production"
   SESSION_COOKIE_SAMESITE: "None"
   SESSION_COOKIE_SECURE: true

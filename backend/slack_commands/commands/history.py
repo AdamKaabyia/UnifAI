@@ -1,32 +1,23 @@
 """History command — shows the conversation messages for a session."""
-import logging
 from typing import List
 
 import requests
 
-from slack_commands.clients.multiagent import MultiagentClient
-from slack_commands.commands.base import CommandHandler
+from slack_commands.commands.base import (
+    CommandHandler, MAS_TIMEOUT, auth_headers, handle_client_error,
+)
+from slack_commands.formatters import ROLE_EMOJI
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
-
-logger = logging.getLogger(__name__)
 
 _MAX_MESSAGES = 10
 _MAX_CONTENT_LENGTH = 300
 
-_ROLE_EMOJI = {
-    "user": ":bust_in_silhouette:",
-    "human": ":bust_in_silhouette:",
-    "assistant": ":robot_face:",
-    "ai": ":robot_face:",
-    "system": ":gear:",
-    "tool": ":wrench:",
-}
-
 
 class HistoryCommand(CommandHandler):
 
-    def __init__(self, client: MultiagentClient):
-        self._client = client
+    def __init__(self, base_url: str, signing_secret: str):
+        self._url = base_url.rstrip("/")
+        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -37,19 +28,20 @@ class HistoryCommand(CommandHandler):
             )
 
         try:
-            chat = self._client.get_session_chat(session_id, command.user_name)
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                return SlackResponse(text=f":x: Session `{session_id}` not found.")
-            logger.error("History fetch failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: Failed to fetch history. Please try again later.")
-        except requests.Timeout:
-            return SlackResponse(text=":hourglass: Multi-agent service timed out.")
+            resp = requests.get(
+                f"{self._url}/api/sessions/session.chat.get",
+                params={"sessionId": session_id},
+                headers=auth_headers(self._secret, command.user_id),
+                timeout=MAS_TIMEOUT,
+            )
+            resp.raise_for_status()
+            chat = resp.json()
         except Exception as e:
-            logger.error("History fetch failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
+            return handle_client_error(
+                e, session_id=session_id, operation="History fetch",
+            )
 
-        messages = chat.get("messages", [])
+        messages = chat.get("messages", []) if isinstance(chat, dict) else []
         if not messages:
             return SlackResponse(
                 text=f":inbox_tray: No messages yet in session `{session_id}`."
@@ -68,15 +60,20 @@ class HistoryCommand(CommandHandler):
             lines.append(f"_({skipped} earlier messages not shown)_\n")
 
         for msg in shown:
-            role = msg.get("role") or msg.get("type") or "unknown"
+            if not isinstance(msg, dict):
+                continue
+            role = str(msg.get("role") or msg.get("type") or "unknown")
             content = msg.get("content") or msg.get("text") or ""
-            emoji = _ROLE_EMOJI.get(role.lower(), ":speech_balloon:")
+            emoji = ROLE_EMOJI.get(role.lower(), ":speech_balloon:")
 
             if isinstance(content, list):
                 content = " ".join(
-                    part.get("text", "") for part in content if isinstance(part, dict)
+                    part.get("text", "")
+                    for part in content
+                    if isinstance(part, dict)
                 )
 
+            content = str(content)
             if len(content) > _MAX_CONTENT_LENGTH:
                 content = content[:_MAX_CONTENT_LENGTH] + "…"
 

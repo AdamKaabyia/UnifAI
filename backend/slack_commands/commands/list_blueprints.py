@@ -1,31 +1,30 @@
 """List blueprints command — shows available blueprints from multi-agent."""
-import logging
-
 import requests
 
-from slack_commands.clients.multiagent import MultiagentClient
-from slack_commands.commands.base import CommandHandler
+from slack_commands.commands.base import (
+    CommandHandler, MAS_TIMEOUT, auth_headers, handle_client_error,
+)
 from slack_commands.formatters import format_blueprint_list
 from slack_commands.models import SlackCommand, SlackResponse
-
-logger = logging.getLogger(__name__)
 
 
 class ListBlueprintsCommand(CommandHandler):
 
-    def __init__(self, client: MultiagentClient):
-        self._client = client
+    def __init__(self, base_url: str, signing_secret: str):
+        self._url = base_url.rstrip("/")
+        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         try:
-            blueprints = self._client.list_blueprints(command.user_name)
-        except requests.Timeout:
-            return SlackResponse(text=":hourglass: Multi-agent service timed out.")
-        except requests.RequestException as e:
-            logger.error("Failed to fetch blueprints: %s", e, exc_info=True)
-            return SlackResponse(text=":x: Failed to reach multi-agent service.")
+            resp = requests.get(
+                f"{self._url}/api/blueprints/available.blueprints.summary.get",
+                params={"userId": command.user_id, "identityType": "user"},
+                headers=auth_headers(self._secret, command.user_id),
+                timeout=MAS_TIMEOUT,
+            )
+            resp.raise_for_status()
+            blueprints = resp.json()
         except Exception as e:
-            logger.error("Unexpected error listing blueprints: %s", e, exc_info=True)
-            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
+            return handle_client_error(e, operation="Blueprint listing")
 
         return format_blueprint_list(blueprints)

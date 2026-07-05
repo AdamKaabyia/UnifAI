@@ -1,19 +1,15 @@
 """Cancel command — cancels a running session."""
-import logging
-
-import requests
-
-from slack_commands.clients.multiagent import MultiagentClient
-from slack_commands.commands.base import CommandHandler
+from slack_commands.commands.base import (
+    CommandHandler, MAS_TIMEOUT, signed_post, handle_client_error,
+)
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
-
-logger = logging.getLogger(__name__)
 
 
 class CancelCommand(CommandHandler):
 
-    def __init__(self, client: MultiagentClient):
-        self._client = client
+    def __init__(self, base_url: str, signing_secret: str):
+        self._url = base_url.rstrip("/")
+        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -24,24 +20,23 @@ class CancelCommand(CommandHandler):
             )
 
         try:
-            cancelled = self._client.cancel_session(session_id, command.user_name)
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                return SlackResponse(text=f":x: Session `{session_id}` not found.")
-            logger.error("Cancel failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: Failed to cancel session. Please try again later.")
-        except requests.Timeout:
-            return SlackResponse(text=":hourglass: Multi-agent service timed out.")
+            resp = signed_post(
+                f"{self._url}/api/sessions/session.cancel",
+                self._secret, command.user_id,
+                {"sessionId": session_id},
+                timeout=MAS_TIMEOUT,
+            )
+            if resp.status_code == 409:
+                return SlackResponse(
+                    text=f":warning: Session `{session_id}` is not in a cancellable state (may already be completed or cancelled)."
+                )
+            resp.raise_for_status()
         except Exception as e:
-            logger.error("Cancel failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
-
-        if cancelled:
-            return SlackResponse(
-                text=f":no_entry_sign: Session `{session_id}` has been cancelled.",
-                response_type="in_channel",
+            return handle_client_error(
+                e, session_id=session_id, operation="Cancel",
             )
 
         return SlackResponse(
-            text=f":warning: Session `{session_id}` is not in a cancellable state (may already be completed or cancelled)."
+            text=f":no_entry_sign: Session `{session_id}` has been cancelled.",
+            response_type="in_channel",
         )

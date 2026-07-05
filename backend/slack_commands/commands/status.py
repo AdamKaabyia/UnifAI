@@ -1,30 +1,18 @@
 """Status command — shows current status and metadata for a session."""
-import logging
-
 import requests
 
-from slack_commands.clients.multiagent import MultiagentClient
-from slack_commands.commands.base import CommandHandler
+from slack_commands.commands.base import (
+    CommandHandler, MAS_TIMEOUT, auth_headers, handle_client_error,
+)
+from slack_commands.formatters import STATUS_EMOJI
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
-
-logger = logging.getLogger(__name__)
-
-_STATUS_EMOJI = {
-    "COMPLETED": ":white_check_mark:",
-    "RUNNING": ":arrows_counterclockwise:",
-    "QUEUED": ":hourglass:",
-    "PENDING": ":clock3:",
-    "FAILED": ":x:",
-    "CANCELLED": ":no_entry_sign:",
-    "LOCKED": ":lock:",
-    "IN_USE": ":arrows_counterclockwise:",
-}
 
 
 class StatusCommand(CommandHandler):
 
-    def __init__(self, client: MultiagentClient):
-        self._client = client
+    def __init__(self, base_url: str, signing_secret: str):
+        self._url = base_url.rstrip("/")
+        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -35,21 +23,30 @@ class StatusCommand(CommandHandler):
             )
 
         try:
-            status = self._client.get_session_status(session_id, command.user_name)
-            meta_resp = self._client.get_session_meta(session_id, command.user_name)
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                return SlackResponse(text=f":x: Session `{session_id}` not found.")
-            logger.error("Status check failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: Failed to get status. Please try again later.")
-        except requests.Timeout:
-            return SlackResponse(text=":hourglass: Multi-agent service timed out.")
-        except Exception as e:
-            logger.error("Status check failed: %s", e, exc_info=True)
-            return SlackResponse(text=":x: An unexpected error occurred. Please try again later.")
+            hdrs = auth_headers(self._secret, command.user_id)
+            status_resp = requests.get(
+                f"{self._url}/api/sessions/session.status.get",
+                params={"sessionId": session_id},
+                headers=hdrs, timeout=MAS_TIMEOUT,
+            )
+            status_resp.raise_for_status()
+            status = status_resp.json()
+            status = status.upper() if isinstance(status, str) else None
 
-        emoji = _STATUS_EMOJI.get((status or "").upper(), ":grey_question:")
-        meta = meta_resp.get("meta", {})
+            meta_resp = requests.get(
+                f"{self._url}/api/sessions/session.meta",
+                params={"sessionId": session_id},
+                headers=hdrs, timeout=MAS_TIMEOUT,
+            )
+            meta_resp.raise_for_status()
+            meta_data = meta_resp.json()
+        except Exception as e:
+            return handle_client_error(
+                e, session_id=session_id, operation="Status check",
+            )
+
+        emoji = STATUS_EMOJI.get(str(status or "unknown").upper(), ":grey_question:")
+        meta = meta_data.get("meta", {}) if isinstance(meta_data, dict) else {}
         title = meta.get("title") or "untitled"
         status_message = meta.get("status_message") or ""
 

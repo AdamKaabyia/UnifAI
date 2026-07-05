@@ -10,8 +10,8 @@ service at login) and resolves the workspace identity:
   URL kwarg). Its presence triggers team mode; the decorator validates
   membership before proceeding.
 
-Headless scripts/CI may fall back to the ``X-Authenticated-User`` header
-until API-token support is implemented (see design-genie-1618.md §7).
+Internal services authenticate via HMAC-signed requests using a shared
+``SERVICE_SIGNING_SECRET`` (see :mod:`global_utils.utils.service_auth`).
 
 Backward compatibility: The decorator still accepts legacy ``userId`` +
 ``identityType`` params from older UI/CLI clients. These are mapped to the
@@ -24,6 +24,7 @@ from typing import Any, Callable
 from flask import current_app, g, jsonify, request, session
 
 from global_utils.flask.decorators import validate_session, G_IDENTITY_SESSION
+from global_utils.utils.service_auth import verify_request
 from mas.core.identity import resolve_identity
 from mas.core.identity.ports import IdentityProvider
 
@@ -49,20 +50,25 @@ def _get_redis_store():
 # Session callbacks
 # ──────────────────────────────────────────────────────────────────────────────
 
-_AUTH_HEADER = "X-Authenticated-User"
-
-
 def _get_fallback_user() -> str | None:
-    """Legacy fallback: read ``X-Authenticated-User`` header.
+    """Service-to-service fallback: verify HMAC-signed request.
 
-    Used by headless CI/CD scripts that cannot perform browser SSO
-    (e.g. ``scripts/execution_workflow.py``).  Will be removed when
-    API-token auth is implemented.
+    Internal services (e.g. the backend forwarding Slack commands) sign
+    requests with ``SERVICE_SIGNING_SECRET``.  The signature covers the
+    timestamp, user-id, and body — preventing forgery and replay.
     """
-    user = request.headers.get(_AUTH_HEADER, "").strip()
-    if user:
-        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, user)
-    return user or None
+    secret = current_app.config.get("SERVICE_SIGNING_SECRET", "") or ""
+    if not secret:
+        return None
+
+    user_id = verify_request(
+        secret,
+        dict(request.headers),
+        request.get_data(cache=True),
+    )
+    if user_id:
+        logger.debug("Authenticated via service HMAC: %s", user_id)
+    return user_id
 
 
 # ──────────────────────────────────────────────────────────────────────────────

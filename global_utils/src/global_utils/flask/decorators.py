@@ -327,10 +327,11 @@ def require_slack_signature(get_signing_secret: Callable[[], str]) -> Callable:
                     "error_type": "AUTHENTICATION_REQUIRED",
                 }), 401
 
-            sig_basestring = f"v0:{timestamp}:{request.get_data(as_text=True)}"
-            expected = "v0=" + hmac.HMAC(
-                signing_secret.encode(),
-                sig_basestring.encode(),
+            body = request.get_data(cache=True)
+            sig_basestring = b"v0:" + timestamp.encode("utf-8") + b":" + body
+            expected = "v0=" + hmac.new(
+                signing_secret.encode("utf-8"),
+                sig_basestring,
                 hashlib.sha256,
             ).hexdigest()
 

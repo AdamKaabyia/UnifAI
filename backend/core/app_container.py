@@ -10,7 +10,6 @@ from global_utils.redis import RedisKVStore, TeamMembershipCache, build_redis_cl
 from global_utils.utils.singleton import SingletonMeta
 from global_utils.utils.util import get_mongo_url
 
-from slack_commands.clients.multiagent import MultiagentClient
 from slack_commands.commands.ask import AskCommand
 from slack_commands.commands.cancel import CancelCommand
 from slack_commands.commands.delete import DeleteCommand
@@ -59,21 +58,22 @@ class AppContainer(metaclass=SingletonMeta):
         )
 
         # ── Slack Commands ───────────────────────────────────────────
-        multiagent_client = MultiagentClient(base_url=cfg.multiagent_url)
-        session_executor = SessionExecutor(client=multiagent_client)
+        mas_url = cfg.multiagent_url
+        svc_secret = cfg.service_signing_secret
+        session_executor = SessionExecutor(base_url=mas_url, signing_secret=svc_secret)
 
         self.slack_commands_service = SlackCommandsService(
             handlers={
                 "help": HelpCommand(),
                 "health": HealthCommand(),
                 "whoami": WhoamiCommand(),
-                "list": ListSessionsCommand(client=multiagent_client),
-                "blueprints": ListBlueprintsCommand(client=multiagent_client),
-                "ask": AskCommand(client=multiagent_client, executor=session_executor),
-                "status": StatusCommand(client=multiagent_client),
-                "cancel": CancelCommand(client=multiagent_client),
-                "delete": DeleteCommand(client=multiagent_client),
-                "history": HistoryCommand(client=multiagent_client),
+                "list": ListSessionsCommand(base_url=mas_url, signing_secret=svc_secret),
+                "blueprints": ListBlueprintsCommand(base_url=mas_url, signing_secret=svc_secret),
+                "ask": AskCommand(base_url=mas_url, signing_secret=svc_secret, executor=session_executor),
+                "status": StatusCommand(base_url=mas_url, signing_secret=svc_secret),
+                "cancel": CancelCommand(base_url=mas_url, signing_secret=svc_secret),
+                "delete": DeleteCommand(base_url=mas_url, signing_secret=svc_secret),
+                "history": HistoryCommand(base_url=mas_url, signing_secret=svc_secret),
             }
         )
 

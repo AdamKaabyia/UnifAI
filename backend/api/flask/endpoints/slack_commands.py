@@ -15,6 +15,8 @@ _verify_slack = require_slack_signature(
     get_signing_secret=lambda: AppConfig.get_instance().get("slack_signing_secret", ""),
 )
 
+_REQUIRED_FIELDS = ("command", "user_name", "response_url")
+
 
 @slack_commands_bp.route("/commands", methods=["POST"])
 @_verify_slack
@@ -25,6 +27,10 @@ def handle_slash_command():
     Parses into a SlackCommand, delegates to SlackCommandsService,
     and returns the formatted Slack JSON response.
     """
+    for field in _REQUIRED_FIELDS:
+        if not request.form.get(field):
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+
     command = SlackCommand.from_form(request.form)
     service = current_app.container.slack_commands_service
     response = service.execute(command)
