@@ -12,6 +12,9 @@ def sanitize_slack_arg(value: str) -> str:
     return _SLACK_FORMAT_CHARS.sub("", value).strip()
 
 
+_REQUIRED_FIELDS = ("command", "user_id", "user_name", "response_url")
+
+
 class SlackCommand(BaseModel):
     """Parsed incoming slash command from Slack."""
     command: str
@@ -24,6 +27,14 @@ class SlackCommand(BaseModel):
     channel_name: str
     team_id: str
     response_url: str
+
+    @classmethod
+    def validate_payload(cls, form: dict) -> Optional[str]:
+        """Return the name of the first missing required field, or None."""
+        for field in _REQUIRED_FIELDS:
+            if not form.get(field):
+                return field
+        return None
 
     @classmethod
     def from_form(cls, form: dict) -> "SlackCommand":

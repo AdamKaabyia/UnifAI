@@ -45,10 +45,10 @@ def main():
     def handle_unifai(ack, body, respond):
         ack()
 
-        for field in ("command", "user_name", "response_url"):
-            if not body.get(field):
-                respond({"text": f"Missing required field: {field}"})
-                return
+        missing = SlackCommand.validate_payload(body)
+        if missing:
+            respond({"text": f"Missing required field: {missing}"})
+            return
 
         command = SlackCommand.from_form(body)
         response = service.execute(command)

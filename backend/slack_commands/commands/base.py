@@ -1,29 +1,13 @@
 """Abstract base for slash command handlers."""
-import json as _json
 import logging
 from abc import ABC, abstractmethod
 
 import requests
 
-from global_utils.utils.service_auth import sign_request
+from slack_commands.http import MAS_TIMEOUT, auth_headers, signed_post  # noqa: F401
 from slack_commands.models import SlackCommand, SlackResponse
 
 logger = logging.getLogger(__name__)
-
-MAS_TIMEOUT = 10
-
-
-def auth_headers(secret: str, user_id: str) -> dict:
-    return sign_request(secret, user_id)
-
-
-def signed_post(
-    url: str, secret: str, user_id: str, payload: dict, **kwargs,
-) -> requests.Response:
-    """POST JSON to MAS with an HMAC-signed body."""
-    body = _json.dumps(payload).encode()
-    headers = {**sign_request(secret, user_id, body), "Content-Type": "application/json"}
-    return requests.post(url, data=body, headers=headers, **kwargs)
 
 
 class CommandHandler(ABC):

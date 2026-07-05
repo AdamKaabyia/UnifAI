@@ -58,7 +58,9 @@ def _get_fallback_user() -> str | None:
 
     Checked in order:
     1. HMAC-signed service request (preferred — used by the backend for
-       Slack commands).
+       Slack commands).  The user_id carried in the HMAC payload is the
+       *Slack* UID (e.g. ``U07XXXXXX``), which lives in a separate
+       namespace from Keycloak/SSO identities by design.
     2. Legacy ``X-Authenticated-User`` header (used by CI/CD scripts;
        will be removed when scripts migrate to HMAC).
     """

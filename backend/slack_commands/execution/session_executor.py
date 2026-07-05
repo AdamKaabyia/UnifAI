@@ -5,6 +5,7 @@ submit → poll → extract answer → POST result to response_url.
 
 This is the single place where the poll/respond logic lives (DRY).
 """
+import atexit
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -12,7 +13,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from slack_commands.commands.base import auth_headers, signed_post
+from slack_commands.http import auth_headers, signed_post
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ class SessionExecutor:
         self._url = base_url.rstrip("/")
         self._secret = signing_secret
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
+        atexit.register(self.close)
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=False, cancel_futures=True)
 
     def run_new_session(
         self,
