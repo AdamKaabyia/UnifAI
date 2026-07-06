@@ -17,8 +17,8 @@ class ListBlueprintsCommand(CommandHandler):
         try:
             resp = requests.get(
                 f"{self._url}/api/blueprints/available.blueprints.summary.get",
-                params={"userId": command.user_id, "identityType": "user"},
-                headers=auth_headers(command.user_id),
+                params={"userId": command.user_name, "identityType": "user"},
+                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

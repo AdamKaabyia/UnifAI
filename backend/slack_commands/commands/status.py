@@ -22,7 +22,7 @@ class StatusCommand(CommandHandler):
             )
 
         try:
-            hdrs = auth_headers(command.user_id)
+            hdrs = auth_headers(command.user_name)
             status_resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},

@@ -21,7 +21,7 @@ class CancelCommand(CommandHandler):
         try:
             resp = mas_post(
                 f"{self._url}/api/sessions/session.cancel",
-                command.user_id,
+                command.user_name,
                 {"sessionId": session_id},
                 timeout=MAS_TIMEOUT,
             )

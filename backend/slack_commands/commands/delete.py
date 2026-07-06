@@ -24,7 +24,7 @@ class DeleteCommand(CommandHandler):
             resp = requests.delete(
                 f"{self._url}/api/sessions/session.delete",
                 params={"sessionId": session_id},
-                headers=auth_headers(command.user_id),
+                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

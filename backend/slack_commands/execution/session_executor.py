@@ -36,31 +36,31 @@ class SessionExecutor:
 
     def run_new_session(
         self,
-        user_id: str,
+        user_name: str,
         blueprint_id: str,
         question: str,
         response_url: str,
     ) -> None:
         """Submit a background task that creates, submits, polls, and responds."""
         self._pool.submit(
-            self._execute, user_id, blueprint_id, question, response_url, False,
+            self._execute, user_name, blueprint_id, question, response_url, False,
         )
 
     def continue_session(
         self,
-        user_id: str,
+        user_name: str,
         session_id: str,
         question: str,
         response_url: str,
     ) -> None:
         """Submit a background task that submits to existing session, polls, and responds."""
         self._pool.submit(
-            self._execute, user_id, session_id, question, response_url, True,
+            self._execute, user_name, session_id, question, response_url, True,
         )
 
     def _execute(
         self,
-        user_id: str,
+        user_name: str,
         ref_id: str,
         question: str,
         response_url: str,
@@ -70,13 +70,13 @@ class SessionExecutor:
             if is_continuation:
                 session_id = ref_id
             else:
-                session_id = self._create_session(user_id, ref_id)
+                session_id = self._create_session(user_name, ref_id)
 
-            self._submit_session(user_id, session_id, question)
-            status = self._poll_until_terminal(session_id, user_id)
+            self._submit_session(user_name, session_id, question)
+            status = self._poll_until_terminal(session_id, user_name)
 
             if status == "COMPLETED":
-                state = self._get_session_state(session_id, user_id)
+                state = self._get_session_state(session_id, user_name)
                 text = self._format_answer(state, session_id)
                 self._post_to_slack(response_url, text, success=True)
             else:
@@ -108,13 +108,13 @@ class SessionExecutor:
 
     # ── MAS API calls ─────────────────────────────────────────────
 
-    def _create_session(self, user_id: str, blueprint_id: str) -> str:
+    def _create_session(self, user_name: str, blueprint_id: str) -> str:
         resp = mas_post(
             f"{self._url}/api/sessions/user.session.create",
-            user_id,
+            user_name,
             {
                 "blueprintId": blueprint_id,
-                "userId": user_id,
+                "userId": user_name,
                 "identityType": "user",
             },
             timeout=15,
@@ -133,25 +133,25 @@ class SessionExecutor:
                 return str(sid)
         raise ValueError(f"Unexpected create_session response type: {type(payload).__name__}")
 
-    def _submit_session(self, user_id: str, session_id: str, prompt: str) -> None:
+    def _submit_session(self, user_name: str, session_id: str, prompt: str) -> None:
         resp = mas_post(
             f"{self._url}/api/sessions/user.session.submit",
-            user_id,
+            user_name,
             {
                 "sessionId": session_id,
                 "inputs": {"user_prompt": prompt},
-                "userId": user_id,
+                "userId": user_name,
                 "identityType": "user",
             },
             timeout=15,
         )
         resp.raise_for_status()
 
-    def _get_session_state(self, session_id: str, user_id: str) -> dict:
+    def _get_session_state(self, session_id: str, user_name: str) -> dict:
         resp = requests.get(
             f"{self._url}/api/sessions/session.state.get",
             params={"sessionId": session_id},
-            headers=auth_headers(user_id),
+            headers=auth_headers(user_name),
             timeout=10,
         )
         resp.raise_for_status()
@@ -159,7 +159,7 @@ class SessionExecutor:
 
     # ── Poll / format / post ──────────────────────────────────────
 
-    def _poll_until_terminal(self, session_id: str, user_id: str) -> str:
+    def _poll_until_terminal(self, session_id: str, user_name: str) -> str:
         elapsed = 0
         while elapsed < _POLL_TIMEOUT:
             time.sleep(_POLL_INTERVAL)
@@ -168,7 +168,7 @@ class SessionExecutor:
             resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(user_id),
+                headers=auth_headers(user_name),
                 timeout=10,
             )
             resp.raise_for_status()

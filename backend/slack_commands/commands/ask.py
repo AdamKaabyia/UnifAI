@@ -35,14 +35,14 @@ class AskCommand(CommandHandler):
         ref, question = sanitize_slack_arg(parts[0]), parts[1]
 
         if _UUID_PATTERN.match(ref):
-            exists = self._session_exists(ref, command.user_id)
+            exists = self._session_exists(ref, command.user_name)
             if exists is None:
                 return SlackResponse(
                     text=":x: Could not verify session. Please try again.",
                 )
             if exists:
                 self._executor.continue_session(
-                    user_id=command.user_id,
+                    user_name=command.user_name,
                     session_id=ref,
                     question=question,
                     response_url=command.response_url,
@@ -52,12 +52,12 @@ class AskCommand(CommandHandler):
                     response_type="in_channel",
                 )
 
-        blueprint_id, label = self._resolve_blueprint(command.user_id, ref)
+        blueprint_id, label = self._resolve_blueprint(command.user_name, ref)
         if blueprint_id is None:
             return label
 
         self._executor.run_new_session(
-            user_id=command.user_id,
+            user_name=command.user_name,
             blueprint_id=blueprint_id,
             question=question,
             response_url=command.response_url,

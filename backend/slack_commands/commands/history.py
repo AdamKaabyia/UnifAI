@@ -30,7 +30,7 @@ class HistoryCommand(CommandHandler):
             resp = requests.get(
                 f"{self._url}/api/sessions/session.chat.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(command.user_id),
+                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()
