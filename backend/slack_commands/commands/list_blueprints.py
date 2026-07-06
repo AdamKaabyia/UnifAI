@@ -10,16 +10,15 @@ from slack_commands.models import SlackCommand, SlackResponse
 
 class ListBlueprintsCommand(CommandHandler):
 
-    def __init__(self, base_url: str, signing_secret: str):
+    def __init__(self, base_url: str):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         try:
             resp = requests.get(
                 f"{self._url}/api/blueprints/available.blueprints.summary.get",
                 params={"userId": command.user_id, "identityType": "user"},
-                headers=auth_headers(self._secret, command.user_id),
+                headers=auth_headers(command.user_id),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

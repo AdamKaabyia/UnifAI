@@ -1,15 +1,14 @@
 """Cancel command — cancels a running session."""
 from slack_commands.commands.base import (
-    CommandHandler, MAS_TIMEOUT, signed_post, handle_client_error,
+    CommandHandler, MAS_TIMEOUT, mas_post, handle_client_error,
 )
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
 
 
 class CancelCommand(CommandHandler):
 
-    def __init__(self, base_url: str, signing_secret: str):
+    def __init__(self, base_url: str):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -20,9 +19,9 @@ class CancelCommand(CommandHandler):
             )
 
         try:
-            resp = signed_post(
+            resp = mas_post(
                 f"{self._url}/api/sessions/session.cancel",
-                self._secret, command.user_id,
+                command.user_id,
                 {"sessionId": session_id},
                 timeout=MAS_TIMEOUT,
             )

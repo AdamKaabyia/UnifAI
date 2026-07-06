@@ -51,5 +51,3 @@ class AppConfig(SharedConfig):
     identity_provider_mode: str = ""
     credential_encryption_key: str = ""
 
-    # Service-to-service HMAC auth (shared with backend)
-    service_signing_secret: str = ""

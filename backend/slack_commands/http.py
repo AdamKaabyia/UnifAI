@@ -1,21 +1,18 @@
-"""HMAC-signed HTTP helpers for outbound MAS requests."""
-import json as _json
-
+"""HTTP helpers for outbound MAS requests."""
 import requests
 
-from global_utils.utils.service_auth import sign_request
+_AUTH_HEADER = "X-Authenticated-User"
 
 MAS_TIMEOUT = 10
 
 
-def auth_headers(secret: str, user_id: str) -> dict:
-    return sign_request(secret, user_id)
+def auth_headers(user_id: str) -> dict:
+    return {_AUTH_HEADER: user_id}
 
 
-def signed_post(
-    url: str, secret: str, user_id: str, payload: dict, **kwargs,
+def mas_post(
+    url: str, user_id: str, payload: dict, **kwargs,
 ) -> requests.Response:
-    """POST JSON to MAS with an HMAC-signed body."""
-    body = _json.dumps(payload).encode()
-    headers = {**sign_request(secret, user_id, body), "Content-Type": "application/json"}
-    return requests.post(url, data=body, headers=headers, **kwargs)
+    """POST JSON to MAS with user identity header."""
+    headers = {_AUTH_HEADER: user_id, "Content-Type": "application/json"}
+    return requests.post(url, json=payload, headers=headers, **kwargs)

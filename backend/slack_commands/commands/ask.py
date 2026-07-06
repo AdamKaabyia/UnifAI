@@ -8,7 +8,7 @@ import re
 
 import requests
 
-from slack_commands.commands.base import CommandHandler, MAS_TIMEOUT, auth_headers
+from slack_commands.commands.base import CommandHandler, MAS_TIMEOUT, auth_headers, mas_post
 from slack_commands.execution.session_executor import SessionExecutor
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
 
@@ -22,9 +22,8 @@ _UUID_PATTERN = re.compile(
 
 class AskCommand(CommandHandler):
 
-    def __init__(self, base_url: str, signing_secret: str, executor: SessionExecutor):
+    def __init__(self, base_url: str, executor: SessionExecutor):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
         self._executor = executor
 
     def handle(self, command: SlackCommand) -> SlackResponse:
@@ -74,7 +73,7 @@ class AskCommand(CommandHandler):
             resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(self._secret, user_id),
+                headers=auth_headers(user_id),
                 timeout=5,
             )
             if resp.status_code == 404:
@@ -101,7 +100,7 @@ class AskCommand(CommandHandler):
         resp = requests.get(
             f"{self._url}/api/blueprints/available.blueprints.summary.get",
             params={"userId": user_id, "identityType": "user"},
-            headers=auth_headers(self._secret, user_id),
+            headers=auth_headers(user_id),
             timeout=MAS_TIMEOUT,
         )
         resp.raise_for_status()

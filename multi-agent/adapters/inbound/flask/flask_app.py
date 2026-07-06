@@ -20,7 +20,6 @@ def create_app(container, config: AppConfig = None) -> Flask:
         raise RuntimeError("secret_key is not configured. Set the SECRET_KEY environment variable.")
     app.secret_key = config.secret_key
     app.config["admin_allowed_users"] = config.admin_allowed_users
-    app.config["SERVICE_SIGNING_SECRET"] = config.service_signing_secret
     app.config.update({
         'SESSION_COOKIE_SECURE': config.session_cookie_secure,
         'SESSION_COOKIE_HTTPONLY': config.session_cookie_http_only,

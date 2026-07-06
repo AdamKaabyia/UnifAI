@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from slack_commands.http import auth_headers, signed_post
+from slack_commands.http import auth_headers, mas_post
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +26,8 @@ _MAX_WORKERS = 10
 class SessionExecutor:
     """Executes a session asynchronously and posts the result to Slack."""
 
-    def __init__(self, base_url: str, signing_secret: str, max_workers: int = _MAX_WORKERS):
+    def __init__(self, base_url: str, max_workers: int = _MAX_WORKERS):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         atexit.register(self.close)
 
@@ -110,9 +109,9 @@ class SessionExecutor:
     # ── MAS API calls ─────────────────────────────────────────────
 
     def _create_session(self, user_id: str, blueprint_id: str) -> str:
-        resp = signed_post(
+        resp = mas_post(
             f"{self._url}/api/sessions/user.session.create",
-            self._secret, user_id,
+            user_id,
             {
                 "blueprintId": blueprint_id,
                 "userId": user_id,
@@ -135,9 +134,9 @@ class SessionExecutor:
         raise ValueError(f"Unexpected create_session response type: {type(payload).__name__}")
 
     def _submit_session(self, user_id: str, session_id: str, prompt: str) -> None:
-        resp = signed_post(
+        resp = mas_post(
             f"{self._url}/api/sessions/user.session.submit",
-            self._secret, user_id,
+            user_id,
             {
                 "sessionId": session_id,
                 "inputs": {"user_prompt": prompt},
@@ -152,7 +151,7 @@ class SessionExecutor:
         resp = requests.get(
             f"{self._url}/api/sessions/session.state.get",
             params={"sessionId": session_id},
-            headers=auth_headers(self._secret, user_id),
+            headers=auth_headers(user_id),
             timeout=10,
         )
         resp.raise_for_status()
@@ -169,7 +168,7 @@ class SessionExecutor:
             resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(self._secret, user_id),
+                headers=auth_headers(user_id),
                 timeout=10,
             )
             resp.raise_for_status()

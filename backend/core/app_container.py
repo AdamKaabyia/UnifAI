@@ -59,21 +59,20 @@ class AppContainer(metaclass=SingletonMeta):
 
         # ── Slack Commands ───────────────────────────────────────────
         mas_url = cfg.multiagent_url
-        svc_secret = cfg.service_signing_secret
-        session_executor = SessionExecutor(base_url=mas_url, signing_secret=svc_secret)
+        session_executor = SessionExecutor(base_url=mas_url)
 
         self.slack_commands_service = SlackCommandsService(
             handlers={
                 "help": HelpCommand(),
                 "health": HealthCommand(),
                 "whoami": WhoamiCommand(),
-                "list": ListSessionsCommand(base_url=mas_url, signing_secret=svc_secret),
-                "blueprints": ListBlueprintsCommand(base_url=mas_url, signing_secret=svc_secret),
-                "ask": AskCommand(base_url=mas_url, signing_secret=svc_secret, executor=session_executor),
-                "status": StatusCommand(base_url=mas_url, signing_secret=svc_secret),
-                "cancel": CancelCommand(base_url=mas_url, signing_secret=svc_secret),
-                "delete": DeleteCommand(base_url=mas_url, signing_secret=svc_secret),
-                "history": HistoryCommand(base_url=mas_url, signing_secret=svc_secret),
+                "list": ListSessionsCommand(base_url=mas_url),
+                "blueprints": ListBlueprintsCommand(base_url=mas_url),
+                "ask": AskCommand(base_url=mas_url, executor=session_executor),
+                "status": StatusCommand(base_url=mas_url),
+                "cancel": CancelCommand(base_url=mas_url),
+                "delete": DeleteCommand(base_url=mas_url),
+                "history": HistoryCommand(base_url=mas_url),
             }
         )
 

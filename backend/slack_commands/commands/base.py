@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import requests
 
-from slack_commands.http import MAS_TIMEOUT, auth_headers, signed_post  # noqa: F401
+from slack_commands.http import MAS_TIMEOUT, auth_headers, mas_post  # noqa: F401
 from slack_commands.models import SlackCommand, SlackResponse
 
 logger = logging.getLogger(__name__)

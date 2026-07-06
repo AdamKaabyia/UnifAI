@@ -15,9 +15,8 @@ _MAX_CONTENT_LENGTH = 300
 
 class HistoryCommand(CommandHandler):
 
-    def __init__(self, base_url: str, signing_secret: str):
+    def __init__(self, base_url: str):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -31,7 +30,7 @@ class HistoryCommand(CommandHandler):
             resp = requests.get(
                 f"{self._url}/api/sessions/session.chat.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(self._secret, command.user_id),
+                headers=auth_headers(command.user_id),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

@@ -10,8 +10,8 @@ service at login) and resolves the workspace identity:
   URL kwarg). Its presence triggers team mode; the decorator validates
   membership before proceeding.
 
-Internal services authenticate via HMAC-signed requests using a shared
-``SERVICE_SIGNING_SECRET`` (see :mod:`global_utils.utils.service_auth`).
+Internal services (e.g. the backend relaying Slack commands) authenticate
+via the ``X-Authenticated-User`` header.
 
 Backward compatibility: The decorator still accepts legacy ``userId`` +
 ``identityType`` params from older UI/CLI clients. These are mapped to the
@@ -24,7 +24,6 @@ from typing import Any, Callable
 from flask import current_app, g, jsonify, request, session
 
 from global_utils.flask.decorators import validate_session, G_IDENTITY_SESSION
-from global_utils.utils.service_auth import verify_request
 from mas.core.identity import resolve_identity
 from mas.core.identity.ports import IdentityProvider
 
@@ -56,28 +55,14 @@ _AUTH_HEADER = "X-Authenticated-User"
 def _get_fallback_user() -> str | None:
     """Fallback authentication for non-browser callers.
 
-    Checked in order:
-    1. HMAC-signed service request (preferred — used by the backend for
-       Slack commands).  The user_id carried in the HMAC payload is the
-       *Slack* UID (e.g. ``U07XXXXXX``), which lives in a separate
-       namespace from Keycloak/SSO identities by design.
-    2. Legacy ``X-Authenticated-User`` header (used by CI/CD scripts;
-       will be removed when scripts migrate to HMAC).
+    Reads the ``X-Authenticated-User`` header set by trusted internal
+    services (e.g. the backend relaying Slack commands).  The Slack
+    user_id (e.g. ``U07XXXXXX``) lives in a separate namespace from
+    Keycloak/SSO identities by design.
     """
-    secret = current_app.config.get("SERVICE_SIGNING_SECRET", "") or ""
-    if secret:
-        user_id = verify_request(
-            secret,
-            dict(request.headers),
-            request.get_data(cache=True),
-        )
-        if user_id:
-            logger.debug("Authenticated via service HMAC: %s", user_id)
-            return user_id
-
     user = request.headers.get(_AUTH_HEADER, "").strip()
     if user:
-        logger.debug("Authenticated via %s header (legacy): %s", _AUTH_HEADER, user)
+        logger.debug("Authenticated via %s header: %s", _AUTH_HEADER, user)
         return user
 
     return None

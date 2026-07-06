@@ -10,9 +10,8 @@ from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_ar
 
 class StatusCommand(CommandHandler):
 
-    def __init__(self, base_url: str, signing_secret: str):
+    def __init__(self, base_url: str):
         self._url = base_url.rstrip("/")
-        self._secret = signing_secret
 
     def handle(self, command: SlackCommand) -> SlackResponse:
         session_id = sanitize_slack_arg(command.args)
@@ -23,7 +22,7 @@ class StatusCommand(CommandHandler):
             )
 
         try:
-            hdrs = auth_headers(self._secret, command.user_id)
+            hdrs = auth_headers(command.user_id)
             status_resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},
