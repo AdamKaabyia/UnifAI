@@ -74,7 +74,7 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
 
 slackSocket:
-  enabled: false
+  enabled: true
   resources:
     limits:
       cpu: 250m
