@@ -71,7 +71,7 @@ class SlackResponse(BaseModel):
     response_type: str = "ephemeral"
     blocks: Optional[list] = None
 
-    def for_command(self, command: "SlackCommand") -> "SlackResponse":
+    def with_visibility(self, command: "SlackCommand") -> "SlackResponse":
         """Override response_type to in_channel when the user passes --public."""
         if command.public:
             return self.model_copy(update={"response_type": "in_channel"})

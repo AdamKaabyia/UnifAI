@@ -39,7 +39,7 @@ class SlackCommandsService:
             )
 
         try:
-            return handler.handle(command).for_command(command)
+            return handler.handle(command).with_visibility(command)
         except requests.RequestException as e:
             logger.error(
                 "Command '%s' network error (user=%s): %s",
