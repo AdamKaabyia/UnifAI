@@ -8,7 +8,8 @@ import re
 
 import requests
 
-from slack_commands.commands.base import CommandHandler, MAS_TIMEOUT, auth_headers, mas_post
+from slack_commands.commands.base import CommandHandler
+from slack_commands.http import MAS_TIMEOUT, auth_headers
 from slack_commands.execution.session_executor import SessionExecutor
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
 
@@ -67,13 +68,13 @@ class AskCommand(CommandHandler):
             response_type="in_channel",
         )
 
-    def _session_exists(self, session_id: str, user_id: str):
+    def _session_exists(self, session_id: str, user_name: str):
         """Returns True / False / None (transient error)."""
         try:
             resp = requests.get(
                 f"{self._url}/api/sessions/session.status.get",
                 params={"sessionId": session_id},
-                headers=auth_headers(user_id),
+                headers=auth_headers(user_name),
                 timeout=5,
             )
             if resp.status_code == 404:
@@ -89,7 +90,7 @@ class AskCommand(CommandHandler):
             logger.warning("session_exists check failed: %s", e)
             return None
 
-    def _resolve_blueprint(self, user_id: str, ref: str):
+    def _resolve_blueprint(self, user_name: str, ref: str):
         """Resolve a blueprint reference (UUID or name) to (id, display_label).
 
         Returns (None, SlackResponse) on error so the caller can short-circuit.
@@ -99,8 +100,8 @@ class AskCommand(CommandHandler):
 
         resp = requests.get(
             f"{self._url}/api/blueprints/available.blueprints.summary.get",
-            params={"userId": user_id, "identityType": "user"},
-            headers=auth_headers(user_id),
+            params={"userId": user_name, "identityType": "user"},
+            headers=auth_headers(user_name),
             timeout=MAS_TIMEOUT,
         )
         resp.raise_for_status()

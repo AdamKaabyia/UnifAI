@@ -1,9 +1,8 @@
 """Status command — shows current status and metadata for a session."""
 import requests
 
-from slack_commands.commands.base import (
-    CommandHandler, MAS_TIMEOUT, auth_headers, handle_client_error,
-)
+from slack_commands.commands.base import CommandHandler, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, auth_headers
 from slack_commands.formatters import STATUS_EMOJI
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
 

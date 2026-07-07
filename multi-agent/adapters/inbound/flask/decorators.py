@@ -56,9 +56,9 @@ def _get_fallback_user() -> str | None:
     """Fallback authentication for non-browser callers.
 
     Reads the ``X-Authenticated-User`` header set by trusted internal
-    services (e.g. the backend relaying Slack commands).  The Slack
-    user_id (e.g. ``U07XXXXXX``) lives in a separate namespace from
-    Keycloak/SSO identities by design.
+    services (e.g. the backend relaying Slack commands).  The value is
+    the Slack *username* (e.g. ``sfiresht``), which matches the identity
+    stored in MongoDB for session ownership.
     """
     user = request.headers.get(_AUTH_HEADER, "").strip()
     if user:

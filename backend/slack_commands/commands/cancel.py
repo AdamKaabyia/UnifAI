@@ -1,7 +1,6 @@
 """Cancel command — cancels a running session."""
-from slack_commands.commands.base import (
-    CommandHandler, MAS_TIMEOUT, mas_post, handle_client_error,
-)
+from slack_commands.commands.base import CommandHandler, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, mas_post
 from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
 
 

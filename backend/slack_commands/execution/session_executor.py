@@ -200,8 +200,8 @@ class SessionExecutor:
 
         if not answer:
             answer = (
-                f"Session completed but no answer extracted.\n"
-                f"Raw result: ```{str(result)[:500]}```"
+                "Session completed but no answer could be extracted.\n"
+                "Use `/unifai history <session_id>` to inspect the conversation."
             )
 
         return (

@@ -1,9 +1,8 @@
 """List sessions command — shows the user's sessions from multi-agent."""
 import requests
 
-from slack_commands.commands.base import (
-    CommandHandler, MAS_TIMEOUT, auth_headers, handle_client_error,
-)
+from slack_commands.commands.base import CommandHandler, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, auth_headers
 from slack_commands.formatters import format_session_list
 from slack_commands.models import SlackCommand, SlackResponse
 
