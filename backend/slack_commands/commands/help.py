@@ -22,6 +22,7 @@ class HelpCommand(CommandHandler):
                 "*Utility*\n"
                 "• `/unifai help` — Show this message\n"
                 "• `/unifai health` — Check service status\n"
-                "• `/unifai whoami` — Show your Slack identity info\n"
+                "• `/unifai whoami` — Show your Slack identity info\n\n"
+                "*Tip:* Add `--public` to any command to share the response with the channel.\n"
             ),
         )

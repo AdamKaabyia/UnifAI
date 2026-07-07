@@ -15,6 +15,9 @@ def sanitize_slack_arg(value: str) -> str:
 _REQUIRED_FIELDS = ("command", "user_id", "user_name", "response_url")
 
 
+_PUBLIC_FLAG = re.compile(r"\s+--public\b", re.IGNORECASE)
+
+
 class SlackCommand(BaseModel):
     """Parsed incoming slash command from Slack."""
     command: str
@@ -27,6 +30,7 @@ class SlackCommand(BaseModel):
     channel_name: str
     team_id: str
     response_url: str
+    public: bool = False
 
     @classmethod
     def validate_payload(cls, form: dict) -> Optional[str]:
@@ -38,7 +42,10 @@ class SlackCommand(BaseModel):
 
     @classmethod
     def from_form(cls, form: dict) -> "SlackCommand":
-        text = (form.get("text") or "").strip()
+        raw_text = (form.get("text") or "").strip()
+        public = bool(_PUBLIC_FLAG.search(raw_text))
+        text = _PUBLIC_FLAG.sub("", raw_text).strip()
+
         parts = text.split(maxsplit=1)
         subcommand = parts[0].lower() if parts else "help"
         args = parts[1].strip() if len(parts) > 1 else ""
@@ -54,6 +61,7 @@ class SlackCommand(BaseModel):
             channel_name=form.get("channel_name", ""),
             team_id=form.get("team_id", ""),
             response_url=form.get("response_url", ""),
+            public=public,
         )
 
 
@@ -62,6 +70,12 @@ class SlackResponse(BaseModel):
     text: str
     response_type: str = "ephemeral"
     blocks: Optional[list] = None
+
+    def for_command(self, command: "SlackCommand") -> "SlackResponse":
+        """Override response_type to in_channel when the user passes --public."""
+        if command.public:
+            return self.model_copy(update={"response_type": "in_channel"})
+        return self
 
     def to_dict(self) -> dict:
         result = {
