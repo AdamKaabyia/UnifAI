@@ -3,10 +3,10 @@ from typing import List
 
 import requests
 
-from slack_commands.commands.base import CommandHandler, handle_client_error
-from slack_commands.http import MAS_TIMEOUT, auth_headers
+from slack_commands.commands.base import CommandHandler
+from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
 from slack_commands.formatters import ROLE_EMOJI
-from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 _MAX_MESSAGES = 10
 _MAX_CONTENT_LENGTH = 300
@@ -34,10 +34,10 @@ class HistoryCommand(CommandHandler):
             )
             resp.raise_for_status()
             chat = resp.json()
-        except Exception as e:
-            return handle_client_error(
-                e, session_id=session_id, operation="History fetch",
-            )
+        except requests.RequestException as e:
+            raise MASRequestError(
+                handle_client_error(e, session_id=session_id, operation="History fetch"),
+            ) from e
 
         messages = chat.get("messages", []) if isinstance(chat, dict) else []
         if not messages:

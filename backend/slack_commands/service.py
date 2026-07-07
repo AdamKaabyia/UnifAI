@@ -7,10 +7,8 @@ a formatted Slack response. Stateless — all dependencies injected.
 import logging
 from typing import Dict
 
-import requests
-
 from slack_commands.commands.base import CommandHandler
-from slack_commands.models import SlackCommand, SlackResponse
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +38,5 @@ class SlackCommandsService:
 
         try:
             return handler.handle(command).with_visibility(command)
-        except requests.RequestException as e:
-            logger.error(
-                "Command '%s' network error (user=%s): %s",
-                command.subcommand, command.user_id, e, exc_info=True,
-            )
-            return SlackResponse(text=":x: Service unavailable. Please try again later.")
-        except Exception as e:
-            logger.error(
-                "Command '%s' unexpected error (user=%s): %s",
-                command.subcommand, command.user_id, e, exc_info=True,
-            )
-            return SlackResponse(text=":x: Command failed. Please try again later.")
+        except MASRequestError as e:
+            return e.slack_response.with_visibility(command)

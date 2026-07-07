@@ -9,9 +9,9 @@ import re
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers
+from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
 from slack_commands.execution.session_executor import SessionExecutor
-from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 logger = logging.getLogger(__name__)
 
@@ -41,17 +41,20 @@ class AskCommand(CommandHandler):
                 return SlackResponse(
                     text=":x: Could not verify session. Please try again.",
                 )
-            if exists:
-                self._executor.continue_session(
-                    user_name=command.user_name,
-                    session_id=ref,
-                    question=question,
-                    response_url=command.response_url,
-                )
+            if not exists:
                 return SlackResponse(
-                    text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
-                    response_type="in_channel",
+                    text=f":x: Session `{ref}` not found.",
                 )
+            self._executor.continue_session(
+                user_name=command.user_name,
+                session_id=ref,
+                question=question,
+                response_url=command.response_url,
+                public=command.public,
+            )
+            return SlackResponse(
+                text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
+            )
 
         blueprint_id, label = self._resolve_blueprint(command.user_name, ref)
         if blueprint_id is None:
@@ -62,10 +65,10 @@ class AskCommand(CommandHandler):
             blueprint_id=blueprint_id,
             question=question,
             response_url=command.response_url,
+            public=command.public,
         )
         return SlackResponse(
             text=f":hourglass: Running *{label}* with your question...",
-            response_type="in_channel",
         )
 
     def _session_exists(self, session_id: str, user_name: str):
@@ -98,13 +101,18 @@ class AskCommand(CommandHandler):
         if _UUID_PATTERN.match(ref):
             return ref, ref
 
-        resp = requests.get(
-            f"{self._url}/api/blueprints/available.blueprints.summary.get",
-            params={"userId": user_name, "identityType": "user"},
-            headers=auth_headers(user_name),
-            timeout=MAS_TIMEOUT,
-        )
-        resp.raise_for_status()
+        try:
+            resp = requests.get(
+                f"{self._url}/api/blueprints/available.blueprints.summary.get",
+                params={"userId": user_name, "identityType": "user"},
+                headers=auth_headers(user_name),
+                timeout=MAS_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            raise MASRequestError(
+                handle_client_error(e, operation="Blueprint lookup"),
+            ) from e
         blueprints = resp.json()
 
         matches = [

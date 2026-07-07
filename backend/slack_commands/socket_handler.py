@@ -16,7 +16,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from config.app_config import AppConfig
 from core.app_container import AppContainer
 from shared.logger import logger
-from slack_commands.models import SlackCommand
+from slack_commands.models import SlackCommand, SlackResponse
 
 
 def _build_service():
@@ -51,7 +51,11 @@ def main():
             return
 
         command = SlackCommand.from_form(body)
-        response = service.execute(command)
+        try:
+            response = service.execute(command)
+        except Exception:
+            logger.exception("Unexpected error handling slash command")
+            response = SlackResponse(text=":x: Command failed. Please try again later.")
         respond(response.to_dict())
 
     logger.info("Starting Slack Socket Mode handler...")

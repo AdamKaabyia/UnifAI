@@ -40,10 +40,12 @@ class SessionExecutor:
         blueprint_id: str,
         question: str,
         response_url: str,
+        *,
+        public: bool = False,
     ) -> None:
         """Submit a background task that creates, submits, polls, and responds."""
         self._pool.submit(
-            self._execute, user_name, blueprint_id, question, response_url, False,
+            self._execute, user_name, blueprint_id, question, response_url, False, public,
         )
 
     def continue_session(
@@ -52,10 +54,12 @@ class SessionExecutor:
         session_id: str,
         question: str,
         response_url: str,
+        *,
+        public: bool = False,
     ) -> None:
         """Submit a background task that submits to existing session, polls, and responds."""
         self._pool.submit(
-            self._execute, user_name, session_id, question, response_url, True,
+            self._execute, user_name, session_id, question, response_url, True, public,
         )
 
     def _execute(
@@ -65,6 +69,7 @@ class SessionExecutor:
         question: str,
         response_url: str,
         is_continuation: bool,
+        public: bool,
     ) -> None:
         try:
             if is_continuation:
@@ -78,12 +83,13 @@ class SessionExecutor:
             if status == "COMPLETED":
                 state = self._get_session_state(session_id, user_name)
                 text = self._format_answer(state, session_id)
-                self._post_to_slack(response_url, text, success=True)
+                self._post_to_slack(response_url, text, public=public)
             else:
                 self._post_to_slack(
                     response_url,
                     f":x: Session ended with status: *{status}*\n"
                     f"_Session ID: `{session_id}`_",
+                    public=public,
                 )
 
         except requests.HTTPError as e:
@@ -93,17 +99,20 @@ class SessionExecutor:
             self._post_to_slack(
                 response_url,
                 ":x: Session request failed. Please try again later.",
+                public=public,
             )
         except TimeoutError:
             self._post_to_slack(
                 response_url,
                 ":x: Session timed out. It may still be running.",
+                public=public,
             )
         except Exception as e:
             logger.error("Session execution failed: %s", e, exc_info=True)
             self._post_to_slack(
                 response_url,
                 ":x: An unexpected error occurred. Please try again later.",
+                public=public,
             )
 
     # ── MAS API calls ─────────────────────────────────────────────
@@ -173,6 +182,8 @@ class SessionExecutor:
             )
             resp.raise_for_status()
             status = resp.json()
+            if isinstance(status, dict):
+                status = status.get("status")
             if isinstance(status, str) and status.upper() in _TERMINAL_STATUSES:
                 return status.upper()
 
@@ -220,7 +231,7 @@ class SessionExecutor:
         return ""
 
     @staticmethod
-    def _post_to_slack(response_url: str, text: str, success: bool = False) -> None:
+    def _post_to_slack(response_url: str, text: str, *, public: bool = False) -> None:
         try:
             parsed = urlparse(response_url or "")
             host = (parsed.hostname or "").lower()
@@ -231,7 +242,7 @@ class SessionExecutor:
             resp = requests.post(
                 response_url,
                 json={
-                    "response_type": "in_channel" if success else "ephemeral",
+                    "response_type": "in_channel" if public else "ephemeral",
                     "text": text,
                 },
                 timeout=10,

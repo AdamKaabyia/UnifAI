@@ -3,11 +3,15 @@
 Thin layer: verifies the request signature, parses the Slack form payload,
 delegates to the service, and returns the response.
 """
+import logging
+
 from flask import Blueprint, current_app, jsonify, request
 
 from config.app_config import AppConfig
 from global_utils.flask.decorators import require_slack_signature
-from slack_commands.models import SlackCommand
+from slack_commands.models import SlackCommand, SlackResponse
+
+logger = logging.getLogger(__name__)
 
 slack_commands_bp = Blueprint("slack_commands", __name__)
 
@@ -30,5 +34,9 @@ def handle_slash_command():
 
     command = SlackCommand.from_form(request.form)
     service = current_app.container.slack_commands_service
-    response = service.execute(command)
+    try:
+        response = service.execute(command)
+    except Exception:
+        logger.exception("Unexpected error handling slash command")
+        response = SlackResponse(text=":x: Command failed. Please try again later.")
     return jsonify(response.to_dict()), 200

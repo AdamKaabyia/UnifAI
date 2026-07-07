@@ -1,9 +1,9 @@
 """Delete command — permanently removes a session."""
 import requests
 
-from slack_commands.commands.base import CommandHandler, handle_client_error
-from slack_commands.http import MAS_TIMEOUT, auth_headers
-from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+from slack_commands.commands.base import CommandHandler
+from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 
 class DeleteCommand(CommandHandler):
@@ -28,10 +28,10 @@ class DeleteCommand(CommandHandler):
             )
             resp.raise_for_status()
             deleted = resp.json().get("success", False)
-        except Exception as e:
-            return handle_client_error(
-                e, session_id=session_id, operation="Delete",
-            )
+        except requests.RequestException as e:
+            raise MASRequestError(
+                handle_client_error(e, session_id=session_id, operation="Delete"),
+            ) from e
 
         if deleted:
             return SlackResponse(

@@ -1,10 +1,10 @@
 """Status command — shows current status and metadata for a session."""
 import requests
 
-from slack_commands.commands.base import CommandHandler, handle_client_error
-from slack_commands.http import MAS_TIMEOUT, auth_headers
+from slack_commands.commands.base import CommandHandler
+from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
 from slack_commands.formatters import STATUS_EMOJI
-from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 
 class StatusCommand(CommandHandler):
@@ -38,10 +38,10 @@ class StatusCommand(CommandHandler):
             )
             meta_resp.raise_for_status()
             meta_data = meta_resp.json()
-        except Exception as e:
-            return handle_client_error(
-                e, session_id=session_id, operation="Status check",
-            )
+        except requests.RequestException as e:
+            raise MASRequestError(
+                handle_client_error(e, session_id=session_id, operation="Status check"),
+            ) from e
 
         emoji = STATUS_EMOJI.get(str(status or "unknown").upper(), ":grey_question:")
         meta = meta_data.get("meta", {}) if isinstance(meta_data, dict) else {}

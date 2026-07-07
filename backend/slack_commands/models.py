@@ -4,12 +4,14 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-_SLACK_FORMAT_CHARS = re.compile(r"[`_*~]")
+_WRAP_TICKS = re.compile(r"^`(.+)`$")
 
 
 def sanitize_slack_arg(value: str) -> str:
-    """Strip Slack formatting characters (backticks, underscores, bold, strike) from a value."""
-    return _SLACK_FORMAT_CHARS.sub("", value).strip()
+    """Strip wrapping backticks that Slack adds around pasted IDs/names."""
+    v = (value or "").strip()
+    m = _WRAP_TICKS.match(v)
+    return m.group(1).strip() if m else v
 
 
 _REQUIRED_FIELDS = ("command", "user_id", "user_name", "response_url")
@@ -63,6 +65,14 @@ class SlackCommand(BaseModel):
             response_url=form.get("response_url", ""),
             public=public,
         )
+
+
+class MASRequestError(Exception):
+    """Raised by command handlers when a MAS HTTP request fails."""
+
+    def __init__(self, slack_response: "SlackResponse"):
+        self.slack_response = slack_response
+        super().__init__(slack_response.text)
 
 
 class SlackResponse(BaseModel):

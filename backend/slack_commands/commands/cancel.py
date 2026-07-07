@@ -1,7 +1,9 @@
 """Cancel command — cancels a running session."""
-from slack_commands.commands.base import CommandHandler, handle_client_error
-from slack_commands.http import MAS_TIMEOUT, mas_post
-from slack_commands.models import SlackCommand, SlackResponse, sanitize_slack_arg
+import requests
+
+from slack_commands.commands.base import CommandHandler
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_post
+from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 
 class CancelCommand(CommandHandler):
@@ -29,10 +31,10 @@ class CancelCommand(CommandHandler):
                     text=f":warning: Session `{session_id}` is not in a cancellable state (may already be completed or cancelled)."
                 )
             resp.raise_for_status()
-        except Exception as e:
-            return handle_client_error(
-                e, session_id=session_id, operation="Cancel",
-            )
+        except requests.RequestException as e:
+            raise MASRequestError(
+                handle_client_error(e, session_id=session_id, operation="Cancel"),
+            ) from e
 
         return SlackResponse(
             text=f":no_entry_sign: Session `{session_id}` has been cancelled.",
