@@ -18,7 +18,7 @@ from slack_commands.commands.help import HelpCommand
 from slack_commands.commands.history import HistoryCommand
 from slack_commands.commands.list_blueprints import ListBlueprintsCommand
 from slack_commands.commands.list_sessions import ListSessionsCommand
-from slack_commands.commands.status import StatusCommand
+from slack_commands.commands.session_status import StatusCommand
 from slack_commands.commands.whoami import WhoamiCommand
 from slack_commands.execution.session_executor import SessionExecutor
 from slack_commands.service import SlackCommandsService
