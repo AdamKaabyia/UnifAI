@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from slack_commands.http import auth_headers, mas_post
+from slack_commands.http import mas_get, mas_post
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,12 @@ class SessionExecutor:
                 ":x: Session request failed. Please try again later.",
                 public=public,
             )
+        except requests.Timeout:
+            self._post_to_slack(
+                response_url,
+                ":hourglass: MAS request timed out. The session may still be running.",
+                public=public,
+            )
         except TimeoutError:
             self._post_to_slack(
                 response_url,
@@ -157,10 +163,10 @@ class SessionExecutor:
         resp.raise_for_status()
 
     def _get_session_state(self, session_id: str, user_name: str) -> dict:
-        resp = requests.get(
+        resp = mas_get(
             f"{self._url}/api/sessions/session.state.get",
+            user_name,
             params={"sessionId": session_id},
-            headers=auth_headers(user_name),
             timeout=10,
         )
         resp.raise_for_status()
@@ -174,10 +180,10 @@ class SessionExecutor:
             time.sleep(_POLL_INTERVAL)
             elapsed += _POLL_INTERVAL
 
-            resp = requests.get(
+            resp = mas_get(
                 f"{self._url}/api/sessions/session.status.get",
+                user_name,
                 params={"sessionId": session_id},
-                headers=auth_headers(user_name),
                 timeout=10,
             )
             resp.raise_for_status()

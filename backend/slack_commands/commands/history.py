@@ -4,7 +4,7 @@ from typing import List
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_get
 from slack_commands.formatters import ROLE_EMOJI
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
@@ -26,10 +26,10 @@ class HistoryCommand(CommandHandler):
             )
 
         try:
-            resp = requests.get(
+            resp = mas_get(
                 f"{self._url}/api/sessions/session.chat.get",
+                command.user_name,
                 params={"sessionId": session_id},
-                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

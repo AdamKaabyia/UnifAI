@@ -9,7 +9,7 @@ import re
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_get
 from slack_commands.execution.session_executor import SessionExecutor
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
@@ -74,10 +74,10 @@ class AskCommand(CommandHandler):
     def _session_exists(self, session_id: str, user_name: str):
         """Returns True / False / None (transient error)."""
         try:
-            resp = requests.get(
+            resp = mas_get(
                 f"{self._url}/api/sessions/session.status.get",
+                user_name,
                 params={"sessionId": session_id},
-                headers=auth_headers(user_name),
                 timeout=5,
             )
             if resp.status_code == 404:
@@ -102,10 +102,10 @@ class AskCommand(CommandHandler):
             return ref, ref
 
         try:
-            resp = requests.get(
+            resp = mas_get(
                 f"{self._url}/api/blueprints/available.blueprints.summary.get",
+                user_name,
                 params={"userId": user_name, "identityType": "user"},
-                headers=auth_headers(user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

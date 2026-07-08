@@ -2,7 +2,7 @@
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_get
 from slack_commands.formatters import format_session_list
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse
 
@@ -18,10 +18,10 @@ class ListSessionsCommand(CommandHandler):
         page = self._parse_page(command.args)
 
         try:
-            resp = requests.get(
+            resp = mas_get(
                 f"{self._url}/api/sessions/session.user.list",
+                command.user_name,
                 params={"userId": command.user_name, "identityType": "user"},
-                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

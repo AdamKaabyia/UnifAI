@@ -16,12 +16,30 @@ def auth_headers(user_id: str) -> dict:
     return {_AUTH_HEADER: user_id}
 
 
+def mas_get(
+    url: str, user_id: str, params: dict = None, **kwargs,
+) -> requests.Response:
+    """GET from MAS with user identity header."""
+    return requests.get(
+        url, params=params, headers={_AUTH_HEADER: user_id}, **kwargs,
+    )
+
+
 def mas_post(
     url: str, user_id: str, payload: dict, **kwargs,
 ) -> requests.Response:
     """POST JSON to MAS with user identity header."""
     headers = {_AUTH_HEADER: user_id, "Content-Type": "application/json"}
     return requests.post(url, json=payload, headers=headers, **kwargs)
+
+
+def mas_delete(
+    url: str, user_id: str, params: dict = None, **kwargs,
+) -> requests.Response:
+    """DELETE from MAS with user identity header."""
+    return requests.delete(
+        url, params=params, headers={_AUTH_HEADER: user_id}, **kwargs,
+    )
 
 
 def handle_client_error(

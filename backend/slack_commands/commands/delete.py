@@ -2,7 +2,7 @@
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_delete
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
 
@@ -20,10 +20,10 @@ class DeleteCommand(CommandHandler):
             )
 
         try:
-            resp = requests.delete(
+            resp = mas_delete(
                 f"{self._url}/api/sessions/session.delete",
+                command.user_name,
                 params={"sessionId": session_id},
-                headers=auth_headers(command.user_name),
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()

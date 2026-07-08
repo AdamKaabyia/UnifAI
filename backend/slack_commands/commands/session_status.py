@@ -2,7 +2,7 @@
 import requests
 
 from slack_commands.commands.base import CommandHandler
-from slack_commands.http import MAS_TIMEOUT, auth_headers, handle_client_error
+from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_get
 from slack_commands.formatters import STATUS_EMOJI
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse, sanitize_slack_arg
 
@@ -21,20 +21,21 @@ class StatusCommand(CommandHandler):
             )
 
         try:
-            hdrs = auth_headers(command.user_name)
-            status_resp = requests.get(
+            status_resp = mas_get(
                 f"{self._url}/api/sessions/session.status.get",
+                command.user_name,
                 params={"sessionId": session_id},
-                headers=hdrs, timeout=MAS_TIMEOUT,
+                timeout=MAS_TIMEOUT,
             )
             status_resp.raise_for_status()
             status = status_resp.json()
             status = status.upper() if isinstance(status, str) else None
 
-            meta_resp = requests.get(
+            meta_resp = mas_get(
                 f"{self._url}/api/sessions/session.meta",
+                command.user_name,
                 params={"sessionId": session_id},
-                headers=hdrs, timeout=MAS_TIMEOUT,
+                timeout=MAS_TIMEOUT,
             )
             meta_resp.raise_for_status()
             meta_data = meta_resp.json()
