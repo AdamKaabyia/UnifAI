@@ -1,13 +1,13 @@
-"""List blueprints command — shows available blueprints from multi-agent."""
+"""List workflows command — shows available workflows from multi-agent."""
 import requests
 
 from slack_commands.commands.base import CommandHandler
 from slack_commands.http import MAS_TIMEOUT, handle_client_error, mas_get
-from slack_commands.formatters import format_blueprint_list
+from slack_commands.formatters import format_workflow_list
 from slack_commands.models import MASRequestError, SlackCommand, SlackResponse
 
 
-class ListBlueprintsCommand(CommandHandler):
+class ListWorkflowsCommand(CommandHandler):
 
     def __init__(self, base_url: str):
         self._url = base_url.rstrip("/")
@@ -21,10 +21,10 @@ class ListBlueprintsCommand(CommandHandler):
                 timeout=MAS_TIMEOUT,
             )
             resp.raise_for_status()
-            blueprints = resp.json()
+            workflows = resp.json()
         except requests.RequestException as e:
             raise MASRequestError(
-                handle_client_error(e, operation="Blueprint listing"),
+                handle_client_error(e, operation="Workflow listing"),
             ) from e
 
-        return format_blueprint_list(blueprints)
+        return format_workflow_list(workflows)

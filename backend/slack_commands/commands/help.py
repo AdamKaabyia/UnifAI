@@ -10,7 +10,7 @@ class HelpCommand(CommandHandler):
             text=(
                 "*Available Commands*\n\n"
                 "*Sessions*\n"
-                "• `/unifai ask <blueprint> <question>` — Start a new session\n"
+                "• `/unifai ask <workflow> <question>` — Start a new session\n"
                 "• `/unifai ask <session_id> <question>` — Continue an existing session\n"
                 "• `/unifai list [page]` — List your sessions\n"
                 "• `/unifai status <session_id>` — Check session status\n"
@@ -18,7 +18,7 @@ class HelpCommand(CommandHandler):
                 "• `/unifai cancel <session_id>` — Cancel a running session\n"
                 "• `/unifai delete <session_id>` — Permanently delete a session\n\n"
                 "*Discovery*\n"
-                "• `/unifai blueprints` — List available blueprints\n\n"
+                "• `/unifai workflows` — List available workflows\n\n"
                 "*Utility*\n"
                 "• `/unifai help` — Show this message\n"
                 "• `/unifai health` — Check service status\n"

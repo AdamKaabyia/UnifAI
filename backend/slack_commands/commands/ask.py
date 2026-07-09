@@ -1,6 +1,6 @@
-"""Ask command — creates or continues a session against a blueprint.
+"""Ask command — creates or continues a session against a workflow.
 
-Thin handler: parses input, resolves blueprint/session, and delegates
+Thin handler: parses input, resolves workflow/session, and delegates
 the long-running execution to SessionExecutor (deferred response pattern).
 """
 import logging
@@ -56,13 +56,13 @@ class AskCommand(CommandHandler):
                 text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
             )
 
-        blueprint_id, label = self._resolve_blueprint(command.user_name, ref)
-        if blueprint_id is None:
+        workflow_id, label = self._resolve_workflow(command.user_name, ref)
+        if workflow_id is None:
             return label
 
         self._executor.run_new_session(
             user_name=command.user_name,
-            blueprint_id=blueprint_id,
+            workflow_id=workflow_id,
             question=question,
             response_url=command.response_url,
             public=command.public,
@@ -93,8 +93,8 @@ class AskCommand(CommandHandler):
             logger.warning("session_exists check failed: %s", e)
             return None
 
-    def _resolve_blueprint(self, user_name: str, ref: str):
-        """Resolve a blueprint reference (UUID or name) to (id, display_label).
+    def _resolve_workflow(self, user_name: str, ref: str):
+        """Resolve a workflow reference (UUID or name) to (id, display_label).
 
         Returns (None, SlackResponse) on error so the caller can short-circuit.
         """
@@ -111,12 +111,12 @@ class AskCommand(CommandHandler):
             resp.raise_for_status()
         except requests.RequestException as e:
             raise MASRequestError(
-                handle_client_error(e, operation="Blueprint lookup"),
+                handle_client_error(e, operation="Workflow lookup"),
             ) from e
-        blueprints = resp.json()
+        workflows = resp.json()
 
         matches = [
-            bp for bp in blueprints
+            bp for bp in workflows
             if (bp.get("name") or bp.get("spec_dict", {}).get("name") or "").lower() == ref.lower()
         ]
 
@@ -133,15 +133,15 @@ class AskCommand(CommandHandler):
             )
             return None, SlackResponse(
                 text=(
-                    f":warning: Multiple blueprints named *{ref}*:\n{ids}\n"
+                    f":warning: Multiple workflows named *{ref}*:\n{ids}\n"
                     f"Please use the full ID."
                 ),
             )
 
         return None, SlackResponse(
             text=(
-                f":x: No blueprint found with name *{ref}*.\n"
-                f"Run `/unifai blueprints` to see available options."
+                f":x: No workflow found with name *{ref}*.\n"
+                f"Run `/unifai workflows` to see available options."
             ),
         )
 
@@ -150,8 +150,8 @@ class AskCommand(CommandHandler):
         return SlackResponse(
             text=(
                 "*Usage:*\n"
-                "• `/unifai ask <blueprint> <question>` — Start a new session\n"
+                "• `/unifai ask <workflow> <question>` — Start a new session\n"
                 "• `/unifai ask <session_id> <question>` — Continue an existing session\n"
-                "\nRun `/unifai blueprints` to see available blueprints."
+                "\nRun `/unifai workflows` to see available workflows."
             ),
         )

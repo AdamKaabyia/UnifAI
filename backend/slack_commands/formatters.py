@@ -63,22 +63,22 @@ def format_session_list(
     return SlackResponse(text="\n".join(lines))
 
 
-def format_blueprint_list(blueprints: list) -> SlackResponse:
-    """Format a list of blueprint dicts into a Slack message."""
-    if not blueprints:
-        return SlackResponse(text=":inbox_tray: No blueprints available.")
+def format_workflow_list(workflows: list) -> SlackResponse:
+    """Format a list of workflow dicts into a Slack message."""
+    if not workflows:
+        return SlackResponse(text=":inbox_tray: No workflows available.")
 
-    lines = [f"*Available Blueprints* ({len(blueprints)} total)\n"]
+    lines = [f"*Available Workflows* ({len(workflows)} total)\n"]
 
-    for bp in blueprints[:15]:
-        bp_id = bp.get("blueprint_id", "?")
-        name = bp.get("name") or bp.get("spec_dict", {}).get("name") or bp_id
-        description = bp.get("description") or ""
+    for wf in workflows[:15]:
+        wf_id = wf.get("blueprint_id", "?")
+        name = wf.get("name") or wf.get("spec_dict", {}).get("name") or wf_id
+        description = wf.get("description") or ""
 
         desc_suffix = f" — _{description}_" if description else ""
-        lines.append(f":blue_book: `{bp_id}` — *{name}*{desc_suffix}")
+        lines.append(f":blue_book: `{wf_id}` — *{name}*{desc_suffix}")
 
-    if len(blueprints) > 15:
-        lines.append(f"\n_…and {len(blueprints) - 15} more_")
+    if len(workflows) > 15:
+        lines.append(f"\n_…and {len(workflows) - 15} more_")
 
     return SlackResponse(text="\n".join(lines))

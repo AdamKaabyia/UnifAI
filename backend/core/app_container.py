@@ -16,7 +16,7 @@ from slack_commands.commands.delete import DeleteCommand
 from slack_commands.commands.health import HealthCommand
 from slack_commands.commands.help import HelpCommand
 from slack_commands.commands.history import HistoryCommand
-from slack_commands.commands.list_blueprints import ListBlueprintsCommand
+from slack_commands.commands.list_workflows import ListWorkflowsCommand
 from slack_commands.commands.list_sessions import ListSessionsCommand
 from slack_commands.commands.session_status import StatusCommand
 from slack_commands.commands.whoami import WhoamiCommand
@@ -67,7 +67,7 @@ class AppContainer(metaclass=SingletonMeta):
                 "health": HealthCommand(),
                 "whoami": WhoamiCommand(),
                 "list": ListSessionsCommand(base_url=mas_url),
-                "blueprints": ListBlueprintsCommand(base_url=mas_url),
+                "workflows": ListWorkflowsCommand(base_url=mas_url),
                 "ask": AskCommand(base_url=mas_url, executor=session_executor),
                 "status": StatusCommand(base_url=mas_url),
                 "cancel": CancelCommand(base_url=mas_url),
