@@ -37,7 +37,7 @@ class SessionExecutor:
     def run_new_session(
         self,
         user_name: str,
-        blueprint_id: str,
+        workflow_id: str,
         question: str,
         response_url: str,
         *,
@@ -45,7 +45,7 @@ class SessionExecutor:
     ) -> None:
         """Submit a background task that creates, submits, polls, and responds."""
         self._pool.submit(
-            self._execute, user_name, blueprint_id, question, response_url, False, public,
+            self._execute, user_name, workflow_id, question, response_url, False, public,
         )
 
     def continue_session(
@@ -123,12 +123,12 @@ class SessionExecutor:
 
     # ── MAS API calls ─────────────────────────────────────────────
 
-    def _create_session(self, user_name: str, blueprint_id: str) -> str:
+    def _create_session(self, user_name: str, workflow_id: str) -> str:
         resp = mas_post(
             f"{self._url}/api/sessions/user.session.create",
             user_name,
             {
-                "blueprintId": blueprint_id,
+                "blueprintId": workflow_id,
                 "userId": user_name,
                 "identityType": "user",
             },
