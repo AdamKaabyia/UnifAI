@@ -36,12 +36,7 @@ class AskCommand(CommandHandler):
         ref, question = sanitize_slack_arg(parts[0]), parts[1]
 
         if _UUID_PATTERN.match(ref):
-            exists = self._session_exists(ref, command.user_name)
-            if exists is None:
-                return SlackResponse(
-                    text=":x: Could not verify session. Please try again.",
-                )
-            if exists:
+            if self._session_exists(ref, command.user_name):
                 self._executor.continue_session(
                     user_name=command.user_name,
                     session_id=ref,
@@ -52,7 +47,7 @@ class AskCommand(CommandHandler):
                 return SlackResponse(
                     text=f":hourglass: Continuing session `{ref[:8]}…` with your question...",
                 )
-            # UUID is not a session — treat it as a workflow ID below
+            # UUID is not a confirmed session — treat it as a workflow ID below
 
         workflow_id, label = self._resolve_workflow(command.user_name, ref)
         if workflow_id is None:
