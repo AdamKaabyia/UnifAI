@@ -20,7 +20,7 @@ import { AgentCardVisualization } from "./AgentCardVisualization";
 import { FileUpload } from "@/components/ui/file-upload";
 import { ElementType } from "../../../types/workspace";
 import { maskSecretValue } from "../../../utils/maskSecretFields";
-import { XCircle } from "lucide-react";
+import { XCircle, Settings } from "lucide-react";
 import {getArrayDisplayText, getArrayFieldMode, getValidRefOptions,} from "./arrayFieldHelpers";
 
 /** Resolved string enum definition from $defs */
@@ -58,6 +58,7 @@ interface FieldRendererProps {
   onValidationChange: (fieldName: string, isValid: boolean, itemResults?: ItemValidationResult[]) => void;
   onPopulateResult: (fieldName: string, results: string[] | any, multiSelect: boolean) => void;
   onActionOutput?: (fieldName: string, output: any) => void;
+  onEditRefElement?: (rid: string) => void;
 }
 
 // Controlled number input with local state buffer to handle intermediate typing (e.g., "0.")
@@ -191,6 +192,7 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
   onValidationChange,
   onPopulateResult,
   onActionOutput,
+  onEditRefElement,
 }) => {
   // Check if this field has validation errors based on validation action result
   // Use useMemo to recalculate when fieldValidationStates changes after validation action
@@ -386,6 +388,19 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
                           {selectedOption
                             ? `${selectedOption.name} (${selectedOption.type})`
                             : selectedRid}
+                          {onEditRefElement && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditRefElement(selectedRid);
+                              }}
+                              className="ml-1 hover:text-primary"
+                              title="Configure this element"
+                            >
+                              <Settings className="h-3 w-3" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -744,6 +759,18 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({
                 )}
               </SelectContent>
             </Select>
+            {value && onEditRefElement && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                onClick={() => onEditRefElement(value)}
+                title="Configure this element"
+              >
+                <Settings className="h-4 w-4 text-muted-foreground hover:text-primary" />
+              </Button>
+            )}
             {!isRequired && value && (
               <Button
                 type="button"
